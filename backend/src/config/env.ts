@@ -81,6 +81,8 @@ export const env = cleanEnv(process.env, {
   MEGA_VIDEOS: str({ default: '/video' }),
 
   // Build/Deploy helpers
+  TRUST_PROXY: str({ default: '' }),
+  MOBILE_ENV: str({ default: 'development' }),
   RAILPACK_INSTALL_CMD: str({ default: 'npm install --force' }),
   RAILPACK_BUILD_CMD: str({ default: 'npm run build' }),
   RAILPACK_START_CMD: str({ default: 'npm start' }),

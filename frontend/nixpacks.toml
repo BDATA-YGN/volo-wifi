@@ -1,7 +1,18 @@
-# Dokploy / Nixpacks — Next.js 15+ requires Node 20.9+; this project pins Node 22.
-# Default Nixpacks Node 18 can fail at install/build. Pin a nixpkgs snapshot with Node 22.13+.
+# Dokploy / Nixpacks — Next.js 16 requires Node 22+.
+# Dokploy: Root Directory = frontend, Build = Nixpacks (or Railpack).
+
 [phases.setup]
 nixpkgsArchive = "51ad838b03a05b1de6f9f2a0fffecee64a9788ee"
 
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
+
 [variables]
 NIXPACKS_NODE_VERSION = "22"
+HOSTNAME = "0.0.0.0"

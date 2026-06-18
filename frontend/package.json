@@ -10,7 +10,7 @@
     "dev:web": "next dev --port 4488 --webpack",
     "build": "NODE_ENV=production next build && npm run postbuild",
     "postbuild": "cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static",
-    "start": "NODE_ENV=production PORT=${PORT:-4488} node .next/standalone/server.js",
+    "start": "NODE_ENV=production HOSTNAME=0.0.0.0 PORT=${PORT:-4488} node .next/standalone/server.js",
     "lint": "next lint",
     "scaffold:sms": "node ./tools/scaffold-sms-features.js"
   },

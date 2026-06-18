@@ -11,12 +11,14 @@
     "start": "cross-env NODE_ENV=production node dist/server.js",
     "dev": "cross-env NODE_ENV=development node --max-old-space-size=4096 ./node_modules/nodemon/bin/nodemon.js",
     "build": "npm run prisma:generate && swc src -d dist --source-maps --copy-files",
+    "postinstall": "prisma generate",
     "lint": "eslint --ignore-path .gitignore --ext .ts src/",
     "lint:fix": "npm run lint -- --fix",
     "deploy:prod": "npm run build && pm2 start ecosystem.config.js --only prod",
     "deploy:dev": "pm2 start ecosystem.config.js --only dev",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
     "prisma:push": "prisma db push && prisma generate",
     "prisma:studio": "prisma studio",
     "seed": "ts-node -r tsconfig-paths/register src/prisma/seed.ts",
@@ -38,6 +40,7 @@
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "axios": "1.15.2",
     "bcrypt": "^6.0.0",
@@ -79,7 +82,6 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
-    "@prisma/client": "^7.2.0",
     "@swc/cli": "^0.1.57",
     "@swc/core": "^1.2.220",
     "@types/compression": "^1.7.2",
