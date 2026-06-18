@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <title>Volo WiFi — Login failed</title>
+    <script src="portal-config.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+        function portalAuthUrl() {
+            var q = new URLSearchParams();
+            q.set('mac', '$(mac)');
+            q.set('ip', '$(ip)');
+            q.set('link-login', '$(link-login)');
+            q.set('link-login-only', '$(link-login-only)');
+            q.set('link-logout', '$(link-logout)');
+            q.set('link-orig', '$(link-orig)');
+            if ('$(error)' !== '') q.set('error', '$(error)');
+            return window.voloPortalAuthUrl(q.toString());
+        }
+        function redirectToPortal() {
+            location.replace(portalAuthUrl());
+        }
+    </script>
+</head>
+<body onload="redirectToPortal()">
+    <div class="ie-fixMinHeight">
+        <div class="main">
+            <div class="wrap">
+                <h1>Login failed</h1>
+                <p class="info">$(error)</p>
+                <p class="info">Returning to Volo WiFi portal...</p>
+                <p class="info"><a id="retry-link" href="#">Try again</a></p>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('retry-link').href = portalAuthUrl();
+    </script>
+</body>
+</html>

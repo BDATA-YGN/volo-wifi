@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="pragma" content="no-cache" />
+    <meta http-equiv="expires" content="-1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Volo WiFi — Redirecting</title>
+    <script src="portal-config.js"></script>
+    <script>
+        /** Binary MikroTik CHAP values → hex (safe for URL query strings). */
+        function mikrotikToHex(str) {
+            if (!str) return '';
+            var hex = '';
+            for (var i = 0; i < str.length; i++) {
+                var b = str.charCodeAt(i) & 0xff;
+                hex += (b < 16 ? '0' : '') + b.toString(16);
+            }
+            return hex;
+        }
+
+        function buildPortalAuthUrl() {
+            var q = new URLSearchParams();
+
+            q.set('mac', '$(mac)');
+            q.set('ip', '$(ip)');
+            if ('$(username)' !== '') q.set('username', '$(username)');
+            q.set('link-login', '$(link-login)');
+            q.set('link-login-only', '$(link-login-only)');
+            q.set('link-logout', '$(link-logout)');
+            q.set('link-orig', '$(link-orig)');
+            if ('$(error)' !== '') q.set('error', '$(error)');
+
+            var chapId = '$(chap-id)';
+            var chapChallenge = '$(chap-challenge)';
+            if (chapId) q.set('chap-id-hex', mikrotikToHex(chapId));
+            if (chapChallenge) q.set('chap-challenge-hex', mikrotikToHex(chapChallenge));
+
+            return window.voloPortalAuthUrl(q.toString());
+        }
+
+        (function () {
+            var target = buildPortalAuthUrl();
+            location.replace(target);
+        })();
+    </script>
+</head>
+<body>
+    <p>Redirecting to Volo WiFi...</p>
+    <p><a id="fallback" href="#">Click here if not redirected</a></p>
+    <script>
+        document.getElementById('fallback').href = buildPortalAuthUrl();
+    </script>
+</body>
+</html>
