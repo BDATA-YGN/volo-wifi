@@ -1,0 +1,97 @@
+// WiFi stations and NAS devices.
+model WifiStation {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  code     String //TODO format? @map("code")
+  name     String @map("name")
+  location String? @map("location")
+  address  String? @map("address")
+
+  status StationStatus @map("status") @default(ACTIVE)
+
+  /// License billing tier — price resolved via StationLicensePrice / OrgLicenseStationSizePrice.
+  stationSizeId String      @map("station_size_id")
+  stationSize   StationSize @relation(fields: [stationSizeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  // Captive portal / NAS settings
+  portalBaseUrl  String? // e.g. https://portal.example.com @map("portal_base_url")
+  nasIdentifier  String? // NAS-Identifier (if you use) @map("nas_identifier")
+  radiusClientIp String? // The NAS IP as seen by RADIUS @map("radius_client_ip")
+  radiusSecret   String? // (optional) if you manage shared secret centrally @map("radius_secret")
+  vlanId         String? @map("vlan_id")
+
+  // Link to Admin account for portal login
+  adminId String? @map("admin_id") @unique
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  devices        StationDevice[]
+  priceBooks     PlanPriceBook[]
+  credentials    Credential[]
+  voucherBatches VoucherBatch[]
+  sales          SaleOrder[]
+  sessions       RadiusSession[]
+  dailyStats     DailySalesStat[]
+  monthlyStats   MonthlySalesStat[]
+  yearlyStats    YearlySalesStat[]
+  dailyRadiusUsageStats DailyRadiusUsageStat[]
+
+  finSettlements RptFinSettlement[]
+  rptFinSourceCoverages RptFinSourceCoverage[]
+
+  // Which RADIUS / NAS vendor model this site uses (supported attributes, plan attrs, etc.)
+  radiusVendorProfileId String? @map("radius_vendor_profile_id")
+  radiusVendorProfile  RadiusVendorProfile? @relation(fields: [radiusVendorProfileId], references: [id], onDelete: SetNull)
+
+  /// Plan-level RADIUS attribute overrides scoped to this station (and plan).
+  planRadiusOverrides PlanRadiusAttribute[]
+
+  resellerStations    ResellerStation[]
+  memberRoles         OrgMemberRole[]
+  memberStationScopes OrgMemberStation[]
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgId, code], map: "uq_wf_station__org_id__code")
+  @@index([orgId, status], map: "idx_wf_station__org_id__status")
+  @@index([stationSizeId], map: "idx_wf_station__station_size_id")
+  @@index([radiusVendorProfileId], map: "idx_wf_station__radius_vendor_profile_id")
+  @@map("wf_station")
+}
+
+model StationDevice {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  type     DeviceType @map("type") @default(ROUTER)
+  vendor   String? // Ruijie, etc. @map("vendor")
+  model    String? // RG-EG1510XS
+  serialNo String? @map("serial_no")
+  macAddr  String? @map("mac_addr")
+  ipAddr   String? @map("ip_addr")
+  note     String? @map("note")
+
+  // RADIUS client fields (if device is a NAS)
+  isRadiusClient Boolean @map("is_radius_client") @default(false)
+  radiusSecret   String? @map("radius_secret")
+  nasShortname   String? // Short name for NAS (for FreeRADIUS) @map("nas_shortname")
+  nasType        String? @map("nas_type") @default("other") // NAS type: other, cisco, computone, etc.
+  nasPorts       Int? // Number of ports @map("nas_ports")
+  nasServer      String? // Optional RADIUS server IP @map("nas_server")
+  nasCommunity   String? // SNMP community string @map("nas_community")
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([orgId, stationId], map: "idx_wf_station_device__org_id__station_id")
+  @@index([orgId, isRadiusClient], map: "idx_wf_station_device__org_id__is_radius_client")
+  @@map("wf_station_device")
+}

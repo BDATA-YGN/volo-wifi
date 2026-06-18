@@ -1,0 +1,28 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Settings
+GET {{baseUrl}}/settings
+
+### Get Single Setting
+GET {{baseUrl}}/settings/1
+
+### Create Setting
+POST {{baseUrl}}/settings
+Content-Type: application/json
+
+{
+  "key": "new_setting",
+  "value": "new_value"
+}
+
+### Update Setting
+PUT {{baseUrl}}/settings/1
+Content-Type: application/json
+
+{
+  "key": "updated_setting",
+  "value": "updated_value"
+}
+
+### Delete Setting
+DELETE {{baseUrl}}/settings/1

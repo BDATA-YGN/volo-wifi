@@ -1,0 +1,32 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Databases
+GET {{baseUrl}}/databases
+
+### Get Single Database
+GET {{baseUrl}}/databases/1
+
+### Create Database
+POST {{baseUrl}}/databases
+Content-Type: application/json
+
+{
+  "name": "New Database",
+  "type": "SQL",
+  "host": "localhost",
+  "port": 5432
+}
+
+### Update Database
+PUT {{baseUrl}}/databases/1
+Content-Type: application/json
+
+{
+  "name": "Updated Database",
+  "type": "NoSQL",
+  "host": "localhost",
+  "port": 27017
+}
+
+### Delete Database
+DELETE {{baseUrl}}/databases/1

@@ -1,0 +1,11 @@
+{
+  "app_name": "APP Name",
+  "favicon": "/assets/images/favicon.ico",
+  "app_description": "App Description",
+  "content": "Brainwave Data",
+  "logo": "/assets/images/logo.svg",
+  "logo_light": "/assets/images/logo-light.png",
+  "logo_dark": "/assets/images/logo-dark.png",
+  "logo_sm_dark": "/assets/images/logo-sm-dark.png",
+  "logo_sm_light": "/assets/images/logo-sm-light.png"
+}

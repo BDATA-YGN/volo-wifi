@@ -1,0 +1,45 @@
+@baseUrl = http://localhost:6688/console
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "developer",
+  "password": "asdfasdf"
+}
+
+> {%
+const body = JSON.parse(response.body);
+client.global.set("token", body.data.token);
+ %}
+
+### Logout
+POST {{baseUrl}}/auth/logout
+
+### Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "newuser",
+  "password": "newpassword",
+  "email": "newuser@example.com"
+}
+
+### Forgot Password
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+
+### Reset Password
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "reset-token",
+  "newPassword": "newpassword"
+}

@@ -1,0 +1,33 @@
+model MenuGroup {
+  id        Int        @id @default(autoincrement())
+  key       String     @unique
+  title     String     @map("title")
+  icon      String?    @map("icon")
+  position  Int        @map("position")
+  items     MenuItem[]
+  level     String?    @default("app") @map("level")
+  mode      Int        @default(0) @map("mode")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  deletedAt DateTime?  @map("deleted_at")
+
+  @@index([position])
+  @@map("tbl_menu_group")
+}
+
+model MenuItem {
+  id        Int       @id @default(autoincrement())
+  key       String    @unique @map("key")
+  title     String    @map("title")
+  icon      String?   @map("icon")
+  url       String?   @unique @map("url")
+  position  Int       @map("position")
+  groupId   Int       @map("group_id")
+  level     String?   @default("app") @map("level")
+  group     MenuGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("tbl_menu_item")
+}

@@ -1,0 +1,39 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Menus
+GET {{baseUrl}}/menus
+
+### Get Single Menu
+GET {{baseUrl}}/menus/1
+
+### Create Menu
+POST {{baseUrl}}/menus
+Content-Type: application/json
+
+{
+  "name": "New Menu",
+  "url": "/new-menu",
+  "icon": "new-icon"
+}
+
+### Update Menu
+PUT {{baseUrl}}/menus/1
+Content-Type: application/json
+
+{
+  "name": "Updated Menu",
+  "url": "/updated-menu",
+  "icon": "updated-icon"
+}
+
+### Delete Menu
+DELETE {{baseUrl}}/menus/1
+
+### Update Menu Positions
+PUT {{baseUrl}}/menus/positions
+Content-Type: application/json
+
+[
+  { "id": 1, "position": 2 },
+  { "id": 2, "position": 1 }
+]

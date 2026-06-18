@@ -1,0 +1,30 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Clients
+GET {{baseUrl}}/clients
+
+### Get Single Client
+GET {{baseUrl}}/clients/1
+
+### Create Client
+POST {{baseUrl}}/clients
+Content-Type: application/json
+
+{
+  "name": "New Client",
+  "email": "client@example.com",
+  "phone": "123-456-7890"
+}
+
+### Update Client
+PUT {{baseUrl}}/clients/1
+Content-Type: application/json
+
+{
+  "name": "Updated Client",
+  "email": "updatedclient@example.com",
+  "phone": "098-765-4321"
+}
+
+### Delete Client
+DELETE {{baseUrl}}/clients/1

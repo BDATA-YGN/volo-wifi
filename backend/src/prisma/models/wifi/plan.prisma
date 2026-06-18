@@ -1,0 +1,104 @@
+// Plans and price books.
+model Plan {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  code        String @map("code")
+  name        String @map("name")
+  description String? @map("description")
+  quotaType   PlanQuotaType @map("quota_type") @default(TIME_ONLY)
+
+  // time quota (optional depending on quotaType)
+  timeAmount Int? @map("time_amount")
+  timeUnit   UnitTime?
+
+  // data quota (MB)
+  dataMb Int? @map("data_mb")
+
+  // validity (days) from first activation
+  validityDays Int? @map("validity_days") @default(1) //TODO do we need on time based ?
+
+  // concurrency / device limit
+  maxDevices Int? @map("max_devices") @default(1)
+
+  /// Applies when quota includes time (TIME_ONLY / TIME_AND_DATA). Ignored for data-only plans.
+  timeUsageMode PlanTimeUsageMode @map("time_usage_mode") @default(CUMULATIVE_SESSIONS)
+
+  isActive Boolean @map("is_active") @default(true)
+
+  prices          PlanPrice[]
+  credentials     Credential[]
+  voucherBatches  VoucherBatch[]
+  salesItems      SaleItem[]
+  commissionRules CommissionRule[]
+  planAttributes  PlanRadiusAttribute[]
+  dailyStats      DailySalesStat[]
+  monthlyStats    MonthlySalesStat[]
+  yearlyStats     YearlySalesStat[]
+  dailyRadiusUsageStats DailyRadiusUsageStat[]
+  resellerEntitlements ResellerPlanEntitlement[]
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgId, code], map: "uq_wf_plan__org_id__code")
+  @@index([orgId, quotaType], map: "idx_wf_plan__org_id__quota_type")
+  @@index([orgId, isActive], map: "idx_wf_plan__org_id__is_active")
+  @@map("wf_plan")
+}
+
+model PlanPriceBook {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  name      String @map("name")
+  isDefault Boolean @map("is_default") @default(false)
+
+  // Optional: limit to reseller or station
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  prices PlanPrice[]
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([orgId, isDefault], map: "idx_wf_plan_price_book__org_id__is_default")
+  @@index([orgId, resellerId], map: "idx_wf_plan_price_book__org_id__reseller_id")
+  @@index([orgId, stationId], map: "idx_wf_plan_price_book__org_id__station_id")
+  @@map("wf_plan_price_book")
+}
+
+model PlanPrice {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  priceBookId String @map("price_book_id")
+  priceBook   PlanPriceBook @relation(fields: [priceBookId], references: [id], onDelete: Cascade)
+
+  planId String @map("plan_id")
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // Price + cost
+  retailPrice Decimal @map("retail_price")  @db.Decimal(18, 2)
+  costPrice   Decimal? @map("cost_price") @db.Decimal(18, 2)
+
+  isActive Boolean @map("is_active") @default(true)
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([priceBookId, planId], map: "uq_wf_plan_price__price_book_id__plan_id")
+  @@index([orgId, planId], map: "idx_wf_plan_price__org_id__plan_id")
+  @@index([orgId, isActive], map: "idx_wf_plan_price__org_id__is_active")
+  @@map("wf_plan_price")
+}

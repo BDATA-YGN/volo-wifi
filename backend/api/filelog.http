@@ -1,0 +1,37 @@
+@baseUrl = http://localhost:6558/console
+
+### Get All File Logs
+GET {{baseUrl}}/filelogs/undefined?category=Desktop&mimeType=image&take=13&skip=0&page=2&limit=10&order_by=asc
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJhM2RhNjUxNi04NWQ0LTQ4MzQtOTFkNC0xNjc4OWI4MzNjMDIiLCJpYXQiOjE3NTU0MjQzODcsImV4cCI6MTc1NTQzODc4N30.WQD9lMWS_N7EuFWtnUG-RCyrspBh81_-40RFVY2sdM8
+
+### Get Single File Log
+GET {{baseUrl}}/filelogs/2
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E
+
+### Create File Log
+POST {{baseUrl}}/filelogs
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E
+
+{
+  "fileName": "New File Log",
+  "url": "/path/to/file",
+  "type": "image/jpeg",
+  "size": 123456,
+  "mimeType": "image/jpeg",
+  "category": "uploads",
+  "authorId": 1
+}
+
+### Update File Log
+POST {{baseUrl}}/filelogs/1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E
+
+{
+  "fileName": "Updated File Log"
+}
+
+### Delete File Log
+DELETE {{baseUrl}}/filelogs/delete/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E

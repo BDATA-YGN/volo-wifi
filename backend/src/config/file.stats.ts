@@ -1,0 +1,1 @@
+// later will pass static url from here if need config

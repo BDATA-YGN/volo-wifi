@@ -1,0 +1,11 @@
+### Variables
+@baseUrl = http://localhost:3001/console
+@token = your_auth_token_here
+
+### Distinct towns from tbl_places (for township pickers)
+GET {{baseUrl}}/places/towns
+Authorization: Bearer {{token}}
+
+### Distinct towns filtered by region
+GET {{baseUrl}}/places/towns?region=Rakhine
+Authorization: Bearer {{token}}

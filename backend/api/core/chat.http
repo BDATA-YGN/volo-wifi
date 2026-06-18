@@ -1,0 +1,28 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Chat Messages
+GET {{baseUrl}}/chat/messages
+
+### Get Single Chat Message
+GET {{baseUrl}}/chat/messages/1
+
+### Create Chat Message
+POST {{baseUrl}}/chat/messages
+Content-Type: application/json
+
+{
+  "sender": "user1",
+  "receiver": "user2",
+  "message": "Hello, how are you?"
+}
+
+### Update Chat Message
+PUT {{baseUrl}}/chat/messages/1
+Content-Type: application/json
+
+{
+  "message": "Hello, I am good, how about you?"
+}
+
+### Delete Chat Message
+DELETE {{baseUrl}}/chat/messages/1

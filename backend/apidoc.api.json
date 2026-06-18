@@ -1,0 +1,14 @@
+{
+  "name": "B-DATA DEMO API",
+  "version": "1.0.0",
+  "description": "API Documentation",
+  "title": "API Documentation",
+  "url": "http://localhost:6556/api",
+  "sampleUrl": "http://localhost:6556/api",
+  "template": {
+    "withCompare": true,
+    "withGenerator": true
+  },
+  "output": "./src/docs/api",
+  "input": ["./src/features/clients"]
+}

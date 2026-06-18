@@ -1,0 +1,133 @@
+// Pre-aggregated sales and usage stats.
+model DailySalesStat {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  /// Store as date bucket (00:00 UTC), handle timezone in app/UI
+  date      DateTime @map("date")
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  planId String? @map("plan_id")
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  ordersCount Int @map("orders_count")     @default(0)
+  itemsCount  Int @map("items_count")     @default(0)
+  revenue     Decimal @map("revenue") @default(0) @db.Decimal(18, 2)
+  commission  Decimal @map("commission") @default(0) @db.Decimal(18, 2)
+  netRevenue  Decimal @map("net_revenue") @default(0) @db.Decimal(18, 2)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  /// Prevent duplicates per bucket/dimension set (cron can upsert safely)
+  @@unique([orgId, date, stationId, resellerId, planId], map: "uq_rpt_daily_sales_stat__orgid_date_statid_reseid_planid")
+  @@index([orgId, date], map: "idx_rpt_daily_sales_stat__org_id__date")
+  @@index([orgId, stationId, date], map: "idx_rpt_daily_sales_stat__org_id__station_id__date")
+  @@index([orgId, resellerId, date], map: "idx_rpt_daily_sales_stat__org_id__reseller_id__date")
+  @@index([orgId, planId, date], map: "idx_rpt_daily_sales_stat__org_id__plan_id__date")
+  @@map("rpt_daily_sales_stat")
+}
+
+model MonthlySalesStat {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  year  Int @map("year")
+  month Int // 1..12 @map("month")
+
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  planId String? @map("plan_id")
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  ordersCount Int @map("orders_count")     @default(0)
+  itemsCount  Int @map("items_count")     @default(0)
+  revenue     Decimal @map("revenue") @default(0) @db.Decimal(18, 2)
+  commission  Decimal @map("commission") @default(0) @db.Decimal(18, 2)
+  netRevenue  Decimal @map("net_revenue") @default(0) @db.Decimal(18, 2)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgId, year, month, stationId, resellerId, planId], map: "uq_rpt_monthly_sales_stat__orgid_year_mont_statid_reseid_planid")
+  @@index([orgId, year, month], map: "idx_rpt_monthly_sales_stat__org_id__year__month")
+  @@map("rpt_monthly_sales_stat")
+}
+
+model YearlySalesStat {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  year Int @map("year")
+
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  planId String? @map("plan_id")
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  ordersCount Int @map("orders_count")     @default(0)
+  itemsCount  Int @map("items_count")     @default(0)
+  revenue     Decimal @map("revenue") @default(0) @db.Decimal(18, 2)
+  commission  Decimal @map("commission") @default(0) @db.Decimal(18, 2)
+  netRevenue  Decimal @map("net_revenue") @default(0) @db.Decimal(18, 2)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgId, year, stationId, resellerId, planId], map: "uq_rpt_yearly_sales_stat__orgid_year_statid_reseid_planid")
+  @@index([orgId, year], map: "idx_rpt_yearly_sales_stat__org_id__year")
+  @@map("rpt_yearly_sales_stat")
+}
+
+model DailyRadiusUsageStat {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  /// Store as date bucket (00:00 UTC), handle timezone in app/UI
+  date      DateTime @map("date")
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  planId String? @map("plan_id")
+  plan   Plan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  sessionsCount      Int @map("sessions_count")    @default(0)
+  uniqueCredentials  Int @map("unique_credentials")    @default(0)
+  totalInputBytes    BigInt @map("total_input_bytes") @default(0)
+  totalOutputBytes   BigInt @map("total_output_bytes") @default(0)
+  totalBytes         BigInt @map("total_bytes") @default(0)
+  totalSessionTimeSec Int @map("total_session_time_sec")   @default(0)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgId, date, stationId, resellerId, planId], map: "uq_rpt_daily_radius_usage_stat__orgid_date_statid_reseid_planid")
+  @@index([orgId, date], map: "idx_rpt_daily_radius_usage_stat__org_id__date")
+  @@index([orgId, stationId, date], map: "idx_rpt_daily_radius_usage_stat__org_id__station_id__date")
+  @@index([orgId, resellerId, date], map: "idx_rpt_daily_radius_usage_stat__org_id__reseller_id__date")
+  @@index([orgId, planId, date], map: "idx_rpt_daily_radius_usage_stat__org_id__plan_id__date")
+  @@map("rpt_daily_radius_usage_stat")
+}

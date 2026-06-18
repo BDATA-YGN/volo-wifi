@@ -1,0 +1,30 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Audit Logs
+GET {{baseUrl}}/audit/logs
+
+### Get Single Audit Log
+GET {{baseUrl}}/audit/logs/1
+
+### Create Audit Log
+POST {{baseUrl}}/audit/logs
+Content-Type: application/json
+
+{
+  "action": "create",
+  "user": "admin",
+  "timestamp": "2023-10-01T12:00:00Z"
+}
+
+### Update Audit Log
+PUT {{baseUrl}}/audit/logs/1
+Content-Type: application/json
+
+{
+  "action": "update",
+  "user": "admin",
+  "timestamp": "2023-10-01T12:30:00Z"
+}
+
+### Delete Audit Log
+DELETE {{baseUrl}}/audit/logs/1

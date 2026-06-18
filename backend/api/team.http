@@ -1,0 +1,38 @@
+@baseUrl = http://localhost:6558/console
+
+### Get All Team Members
+GET {{baseUrl}}/team
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E
+
+### Get Single Team Member
+GET {{baseUrl}}/team/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E
+
+### Create Team Member
+POST {{baseUrl}}/team
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E
+
+{
+  "name": "John Doe",
+  "role": "Developer",
+  "image": "john-doe.jpg",
+  "bio": "John Doe is a developer",
+  "social": {
+    "facebook": "https://facebook.com/johndoe",
+    "twitter": "https://twitter.com/johndoe"
+  }
+}
+
+### Update Team Member
+POST {{baseUrl}}/team/1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E
+
+{
+  "role": "Senior Developer"
+}
+
+### Delete Team Member
+DELETE {{baseUrl}}/team/delete/1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4MmU2NzAzYy02N2FjLTQwZjctYjhjOC01NTY3ZDZlNGJmOGIiLCJpYXQiOjE3NTM0MTY3NTYsImV4cCI6MTc1MzQzMTE1Nn0._Krlie03B3ZUKhLBa0-0WOBXCqjI4AkIekShcNGH85E

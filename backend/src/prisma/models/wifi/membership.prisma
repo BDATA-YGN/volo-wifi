@@ -1,0 +1,121 @@
+// Org membership, multi-role assignments, and station scoping.
+// Provisioning is internal-only: an authorized admin creates/links Admin + OrgMember + OrgMemberRole.
+// No external email/phone invite workflow.
+//
+// Role codes (String, app-validated): ORG_VIEWER | ORG_FINANCE | STATION_OPS | ORG_ADMIN | PARTNER
+// Legacy rows may still store ORG_OWNER, STATION_MANAGER, etc. — normalized in app layer.
+//
+// scopeKey stabilizes uniqueness when scope FKs are nullable:
+//   "" = org-wide, "station:{uuid}", "reseller:{uuid}"
+
+/// Admin ↔ org membership (one row per admin per org; roles live on OrgMemberRole).
+model OrgMember {
+  id      String @map("id") @id @default(uuid())
+  orgId   String @map("org_id")
+  org     Org    @relation(fields: [orgId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  adminId String @map("admin_id")
+  admin   Admin  @relation(fields: [adminId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  /// ACTIVE | SUSPENDED | DISABLED
+  status    String  @map("status") @default("ACTIVE")
+  isPrimary Boolean @map("is_primary") @default(false)
+  title     String? @map("title")
+
+  /// Admin who created this org membership (internal provisioning audit).
+  createdByAdminId String? @map("created_by_admin_id")
+  createdByAdmin   Admin?  @relation("WifiOrgMemberCreatedBy", fields: [createdByAdminId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  joinedAt  DateTime? @map("joined_at")
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  roles         OrgMemberRole[]
+  stationScopes OrgMemberStation[]
+
+  @@unique([orgId, adminId], map: "uq_wf_org_member__org_id__admin_id")
+  @@index([orgId, status], map: "idx_wf_org_member__org_id__status")
+  @@index([adminId, status], map: "idx_wf_org_member__admin_id__status")
+  @@index([orgId, isPrimary], map: "idx_wf_org_member__org_id__is_primary")
+  @@index([createdByAdminId], map: "idx_wf_org_member__created_by_admin_id")
+  @@map("wf_org_member")
+}
+
+/// One role assignment with optional business-entity or station scope.
+model OrgMemberRole {
+  id          String    @map("id") @id @default(uuid())
+  orgId       String    @map("org_id")
+  org         Org       @relation(fields: [orgId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  orgMemberId String    @map("org_member_id")
+  orgMember   OrgMember @relation(fields: [orgMemberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  roleCode String @map("role_code")
+  scopeKey String @map("scope_key") @default("")
+
+  stationId  String?      @map("station_id")
+  station    WifiStation? @relation(fields: [stationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  resellerId String?      @map("reseller_id")
+  reseller   Reseller?    @relation(fields: [resellerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  isActive      Boolean   @map("is_active") @default(true)
+  effectiveFrom DateTime? @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+
+  assignedByAdminId String? @map("assigned_by_admin_id")
+  assignedByAdmin   Admin?  @relation("WifiOrgMemberRoleAssignedBy", fields: [assignedByAdminId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgMemberId, roleCode, scopeKey], map: "uq_wf_org_member_role__member__role__scope")
+  @@index([orgId, roleCode, isActive], map: "idx_wf_org_member_role__org_id__role_code__is_active")
+  @@index([orgId, orgMemberId], map: "idx_wf_org_member_role__org_id__org_member_id")
+  @@index([orgMemberId, isActive], map: "idx_wf_org_member_role__org_member_id__is_active")
+  @@index([roleCode, isActive], map: "idx_wf_org_member_role__role_code__is_active")
+  @@index([stationId], map: "idx_wf_org_member_role__station_id")
+  @@index([resellerId], map: "idx_wf_org_member_role__reseller_id")
+  @@map("wf_org_member_role")
+}
+
+/// Optional station allow-list for a member (e.g. org staff limited to specific sites).
+model OrgMemberStation {
+  id          String      @map("id") @id @default(uuid())
+  orgId       String      @map("org_id")
+  org         Org         @relation(fields: [orgId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  orgMemberId String      @map("org_member_id")
+  orgMember   OrgMember   @relation(fields: [orgMemberId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  stationId   String      @map("station_id")
+  station     WifiStation @relation(fields: [stationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@unique([orgMemberId, stationId], map: "uq_wf_org_member_station__org_member_id__station_id")
+  @@index([orgId, stationId], map: "idx_wf_org_member_station__org_id__station_id")
+  @@index([orgId, orgMemberId], map: "idx_wf_org_member_station__org_id__org_member_id")
+  @@index([stationId], map: "idx_wf_org_member_station__station_id")
+  @@map("wf_org_member_station")
+}
+
+/// Relational replacement for Reseller.stationIds JSON (keep JSON during migration).
+model ResellerStation {
+  id         String      @map("id") @id @default(uuid())
+  orgId      String      @map("org_id")
+  org        Org         @relation(fields: [orgId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  resellerId String      @map("reseller_id")
+  reseller   Reseller    @relation(fields: [resellerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  stationId  String      @map("station_id")
+  station    WifiStation @relation(fields: [stationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  assignedByAdminId String? @map("assigned_by_admin_id")
+  assignedByAdmin   Admin?  @relation("WifiResellerStationAssignedBy", fields: [assignedByAdminId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([resellerId, stationId], map: "uq_wf_reseller_station__reseller_id__station_id")
+  @@index([orgId, resellerId], map: "idx_wf_reseller_station__org_id__reseller_id")
+  @@index([orgId, stationId], map: "idx_wf_reseller_station__org_id__station_id")
+  @@map("wf_reseller_station")
+}

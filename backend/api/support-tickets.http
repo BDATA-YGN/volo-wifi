@@ -1,0 +1,73 @@
+### Variables
+@baseUrl = http://localhost:3001/console
+@token = your_auth_token_here
+@ticketId = ticket-uuid-here
+
+### Stats
+GET {{baseUrl}}/sms/support/tickets/stats
+Authorization: Bearer {{token}}
+
+### List tickets
+GET {{baseUrl}}/sms/support/tickets?page=1&limit=20&queue=true
+Authorization: Bearer {{token}}
+
+### Ticket detail (with messages)
+GET {{baseUrl}}/sms/support/tickets/{{ticketId}}
+Authorization: Bearer {{token}}
+
+### Create ticket (staff)
+POST {{baseUrl}}/sms/support/tickets
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerId": "customer-uuid",
+  "category": "BILLING",
+  "priority": "NORMAL",
+  "source": "PHONE",
+  "subject": "Invoice not received",
+  "description": "Customer called about missing March invoice.",
+  "assignedToAdminId": null
+}
+
+### Assign ticket
+POST {{baseUrl}}/sms/support/tickets/{{ticketId}}/assign
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assignedToAdminId": "admin-uuid"
+}
+
+### Reply to customer
+POST {{baseUrl}}/sms/support/tickets/{{ticketId}}/reply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "body": "We have resent the invoice to your registered email.",
+  "isInternal": false
+}
+
+### Internal note
+POST {{baseUrl}}/sms/support/tickets/{{ticketId}}/reply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "body": "Checked billing — invoice was emailed 2026-03-01.",
+  "isInternal": true
+}
+
+### Update status
+POST {{baseUrl}}/sms/support/tickets/{{ticketId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "RESOLVED"
+}
+
+### Soft delete
+DELETE {{baseUrl}}/sms/support/tickets/delete/{{ticketId}}
+Authorization: Bearer {{token}}

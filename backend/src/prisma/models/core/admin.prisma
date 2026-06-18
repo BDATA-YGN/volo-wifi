@@ -1,0 +1,118 @@
+model Admin {
+  id             String    @id @default(uuid()) @map("id")
+  fullName       String    @map("full_name")
+  username       String    @unique @map("username")
+  email          String?   @map("email")
+  password       String    @map("password")
+  roleId         Int       @map("role_id")
+  emailAccountId String?   @unique @map("email_account_id")
+  profileImage   String?   @map("profile_image")
+  phoneNumber    String?   @map("phone_number")
+  isActive       Boolean   @default(false) @map("is_active")
+  isSuper        Boolean   @default(false) @map("is_super")
+  isVerified     Boolean   @default(false) @map("is_verified")
+  isBlocked      Boolean   @default(false) @map("is_blocked")
+  isOnline       Boolean   @default(false) @map("is_online")
+  lastLogin      DateTime? @map("last_login")
+  lastIp         String?   @map("last_ip")
+  joinDate       DateTime  @default(now()) @map("join_date")
+  reporterCode   String    @default("0001") @map("reporter_code")
+  employmentType String    @default("full_time") @map("employment_type")
+  createdBy      String    @default("system") @map("created_by")
+  updatedBy      String?   @map("updated_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime? @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  role                       MngRoles                  @relation(fields: [roleId], references: [roleId])
+  adminTokens                AdminToken[]
+  conversationsCreated       Conversation[]            @relation("ConversationsCreated")
+  conversationParticipations ConversationParticipant[] @relation("ConversationParticipants")
+  messagesSent               Message[]                 @relation("MessagesSent")
+
+  // -- WiFi module back-relations --
+  wifiOrg                      Org?
+  wifiReseller                 Reseller?
+  wifiStation                  WifiStation?
+  wifiAuditLogs                WifiAuditLog[]
+  wifiOrgLicenseHistories      OrgLicenseHistory[]
+  wifiOrgInvoicePaymentsReceived OrgInvoicePayment[]
+  wifiOrgMembers                 OrgMember[]
+  wifiOrgMembersCreated          OrgMember[]         @relation("WifiOrgMemberCreatedBy")
+  wifiOrgMemberRolesAssigned     OrgMemberRole[]     @relation("WifiOrgMemberRoleAssignedBy")
+  wifiResellerStationsAssigned   ResellerStation[]   @relation("WifiResellerStationAssignedBy")
+  // -- end WiFi module back-relations --
+
+  @@index([emailAccountId])
+  @@map("tbl_admin")
+}
+
+model AdminToken {
+  id           String    @id @default(uuid()) @map("id")
+  adminId      String    @map("admin_id")
+  token        String    @map("token")
+  refreshToken String    @map("refresh_token")
+  isValid      Boolean   @default(true) @map("is_valid")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime? @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("tbl_admin_token")
+}
+
+/// Classifies a permission row: synced from menu structure vs manual extras.
+enum MngRoleSettingKind {
+  menuGroup
+  menu
+  button
+  feature
+}
+
+model MapRoleSettings {
+  id         String    @id @default(uuid()) @map("id")
+  roleId     Int       @map("role_id")
+  settingKey String    @map("setting_key")
+  enable     Boolean   @default(false) @map("enable")
+  visibility Boolean   @default(false) @map("visibility")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  role            MngRoles         @relation(fields: [roleId], references: [roleId])
+  mngRoleSettings MngRoleSettings? @relation(fields: [settingKey], references: [id])
+
+  @@map("map_role_settings")
+}
+
+model MngRoleSettings {
+  id              String             @id @default(uuid()) @map("id")
+  settingKey      String             @map("setting_key")
+  description     String?            @map("description")
+  parentId        String?            @map("parent_id")
+  level           String?            @default("app") @map("level")
+  kind            MngRoleSettingKind @default(feature) @map("kind")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime?          @map("updated_at")
+  deletedAt       DateTime?          @map("deleted_at")
+  MapRoleSettings MapRoleSettings[]
+
+  @@map("tbl_mng_role_settings")
+}
+
+model MngRoles {
+  id          Int       @id @default(autoincrement()) @map("id")
+  roleId      Int       @unique @map("role_id")
+  roleName    String    @unique @map("role_name")
+  description String?   @map("description")
+  level       String?   @default("app") @map("level")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  roleSettings MapRoleSettings[]
+  Admin        Admin[]
+
+  @@map("tbl_mng_roles")
+}

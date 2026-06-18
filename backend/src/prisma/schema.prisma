@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // relationMode = "prisma"
+}
+
+// Authentication and Authorization Enums
+enum OauthProvider {
+  FACEBOOK
+  GOOGLE
+  APPLE
+}
+
+// Audit Log Enums
+enum AuditLogType {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  OTHER
+  SYSTEM
+  REGISTER
+  PAYMENT
+  TOPUP
+  SUBSCRIPTION
+  CHAT
+  ACCOUNT
+  UPLOAD
+  DOWNLOAD
+  LIKE
+  COMMENT
+}
+
+enum AuditLogSeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
+/// Conversation routing topology.
+///   DIRECT    — private 1:1 DM between two admins.
+///   GROUP     — named multi-participant chat (future use).
+///   BROADCAST — one sender, "everyone" is implicitly a participant; replies
+///               from non-creators behave like a forum thread.
+enum ConversationKind {
+  DIRECT
+  GROUP
+  BROADCAST
+}

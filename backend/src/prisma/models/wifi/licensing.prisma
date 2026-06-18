@@ -1,0 +1,233 @@
+// Organization licensing, station size tiers, and SaaS billing.
+//
+// Lifecycle (see docs/admin-menu.md):
+//   0) Platform defines StationSize + StationLicensePrice
+//   1) Tenant Registration → Org + OrgLicense + owner OrgMember (single transaction)
+//   2) Org admin adds role-based accounts, sites (with stationSizeId), plans, partners
+//   3) Month-end job counts sites per tier → OrgInvoice / OrgInvoiceItem per stationSizeId
+
+/// Platform catalog of station capacity tiers (e.g. SMALL, MEDIUM, LARGE).
+model StationSize {
+  id          String  @map("id") @id @default(uuid())
+  /// SCREAMING_SNAKE_CASE code: SMALL | MEDIUM | LARGE | XL
+  code        String  @unique @map("code")
+  name        String  @map("name")
+  description String? @map("description")
+  sortOrder   Int     @map("sort_order") @default(0)
+  isActive    Boolean @map("is_active") @default(true)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  stations            WifiStation[]
+  globalLicensePrices StationLicensePrice[]
+  orgLicensePrices    OrgLicenseStationSizePrice[]
+  licenseHistory      OrgLicenseHistory[]
+  invoiceItems        OrgInvoiceItem[]
+
+  @@index([isActive, sortOrder], map: "idx_wf_station_size__is_active__sort_order")
+  @@map("wf_station_size")
+}
+
+/// Platform default license unit price per station size tier.
+model StationLicensePrice {
+  id            String      @map("id") @id @default(uuid())
+  stationSizeId String      @map("station_size_id")
+  stationSize   StationSize @relation(fields: [stationSizeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  billingCycle  BillingCycle @map("billing_cycle") @default(MONTHLY)
+  unitPrice     Decimal      @map("unit_price") @db.Decimal(18, 2)
+  currency      String       @map("currency") @default("MMK")
+  effectiveFrom DateTime     @map("effective_from")
+  effectiveTo   DateTime?    @map("effective_to")
+  isActive      Boolean      @map("is_active") @default(true)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@index([stationSizeId, billingCycle, isActive], map: "idx_wf_station_license_price__size_cycle_active")
+  @@index([effectiveFrom], map: "idx_wf_station_license_price__effective_from")
+  @@map("wf_station_license_price")
+}
+
+/// Org-specific license unit price override per station size tier.
+model OrgLicenseStationSizePrice {
+  id            String      @map("id") @id @default(uuid())
+  orgId         String      @map("org_id")
+  org           Org         @relation(fields: [orgId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  stationSizeId String      @map("station_size_id")
+  stationSize   StationSize @relation(fields: [stationSizeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  billingCycle  BillingCycle  @map("billing_cycle") @default(MONTHLY)
+  unitPrice     Decimal       @map("unit_price") @db.Decimal(18, 2)
+  currency      String        @map("currency") @default("MMK")
+  pricingSource PricingSource @map("pricing_source") @default(ORG_CUSTOM)
+  effectiveFrom DateTime      @map("effective_from")
+  effectiveTo   DateTime?     @map("effective_to")
+  isActive      Boolean       @map("is_active") @default(true)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@unique([orgId, stationSizeId, billingCycle, effectiveFrom], map: "uq_wf_org_lic_size_price__org_size_cycle_from")
+  @@index([orgId, isActive], map: "idx_wf_org_lic_size_price__org_id__is_active")
+  @@map("wf_org_license_station_size_price")
+}
+
+model OrgLicense {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id") @unique
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  status       OrgLicenseStatus @map("status") @default(ACTIVE)
+  billingCycle BillingCycle     @map("billing_cycle") @default(MONTHLY)
+
+  stationLimit              Int @map("station_limit")
+  currentActiveStationCount Int @map("current_active_station_count") @default(0)
+
+  currency String @map("currency") @default("MMK")
+
+  effectiveFrom DateTime  @map("effective_from")
+  expiresAt     DateTime? @map("expires_at")
+
+  notes String? @map("notes")
+
+  history  OrgLicenseHistory[]
+  invoices OrgInvoice[]
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@index([status], map: "idx_wf_org_license__status")
+  @@map("wf_org_license")
+}
+
+model OrgLicenseHistory {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  licenseId String     @map("license_id")
+  license   OrgLicense @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  changeType LicenseChangeType @map("change_type")
+
+  previousStationLimit Int? @map("previous_station_limit")
+  newStationLimit      Int? @map("new_station_limit")
+
+  stationSizeId String?      @map("station_size_id")
+  stationSize   StationSize? @relation(fields: [stationSizeId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  previousUnitPrice Decimal? @map("previous_unit_price") @db.Decimal(18, 2)
+  newUnitPrice      Decimal? @map("new_unit_price") @db.Decimal(18, 2)
+
+  previousStatus OrgLicenseStatus? @map("previous_status")
+  newStatus      OrgLicenseStatus? @map("new_status")
+
+  effectiveFrom DateTime @map("effective_from")
+  reason        String?  @map("reason")
+
+  changedByAdminId String @map("changed_by_admin_id")
+  changedByAdmin   Admin  @relation(fields: [changedByAdminId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@index([orgId, createdAt], map: "idx_wf_org_license_history__org_id__created_at")
+  @@index([licenseId, createdAt], map: "idx_wf_org_license_history__license_id__created_at")
+  @@index([stationSizeId], map: "idx_wf_org_license_history__station_size_id")
+  @@map("wf_org_license_history")
+}
+
+model OrgInvoice {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  invoiceNo String        @map("invoice_no") @unique
+  status    InvoiceStatus @map("status") @default(DRAFT)
+
+  billingCycle      BillingCycle @map("billing_cycle") @default(MONTHLY)
+  billingPeriodFrom DateTime     @map("billing_period_from")
+  billingPeriodTo   DateTime     @map("billing_period_to")
+
+  licenseId String?     @map("license_id")
+  license   OrgLicense? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+
+  pricingSource PricingSource @map("pricing_source") @default(ORG_CUSTOM)
+  currency      String        @map("currency") @default("MMK")
+
+  subtotalAmount Decimal  @map("subtotal_amount") @db.Decimal(18, 2)
+  taxRate        Decimal? @map("tax_rate") @db.Decimal(5, 4)
+  taxAmount      Decimal  @map("tax_amount") @db.Decimal(18, 2)
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(18, 2)
+
+  dueDate  DateTime  @map("due_date")
+  issuedAt DateTime? @map("issued_at")
+  paidAt   DateTime? @map("paid_at")
+
+  notes String? @map("notes")
+
+  items    OrgInvoiceItem[]
+  payments OrgInvoicePayment[]
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@index([orgId, billingPeriodFrom], map: "idx_wf_org_invoice__org_id__billing_period_from")
+  @@index([status], map: "idx_wf_org_invoice__status")
+  @@map("wf_org_invoice")
+}
+
+model OrgInvoiceItem {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  invoiceId String     @map("invoice_id")
+  invoice   OrgInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  stationSizeId String      @map("station_size_id")
+  stationSize   StationSize @relation(fields: [stationSizeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  description  String  @map("description")
+  quantity     Int     @map("quantity")
+  unitPrice    Decimal @map("unit_price") @db.Decimal(18, 2)
+  lineSubtotal Decimal @map("line_subtotal") @db.Decimal(18, 2)
+  taxRate      Decimal? @map("tax_rate") @db.Decimal(5, 4)
+  taxAmount    Decimal @map("tax_amount") @db.Decimal(18, 2)
+  lineTotal    Decimal @map("line_total") @db.Decimal(18, 2)
+
+  metadata Json? @map("metadata")
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@index([orgId, invoiceId], map: "idx_wf_org_invoice_item__org_id__invoice_id")
+  @@index([stationSizeId], map: "idx_wf_org_invoice_item__station_size_id")
+  @@map("wf_org_invoice_item")
+}
+
+model OrgInvoicePayment {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  invoiceId String     @map("invoice_id")
+  invoice   OrgInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  amount   Decimal @map("amount") @db.Decimal(18, 2)
+  currency String  @map("currency") @default("MMK")
+
+  paymentDate   DateTime      @map("payment_date")
+  paymentMethod PaymentMethod @map("payment_method") @default(CASH)
+  refNo         String?       @map("ref_no")
+  note          String?       @map("note")
+
+  receivedByAdminId String @map("received_by_admin_id")
+  receivedByAdmin   Admin  @relation(fields: [receivedByAdminId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@index([orgId, invoiceId], map: "idx_wf_org_invoice_payment__org_id__invoice_id")
+  @@index([receivedByAdminId, createdAt], map: "idx_wf_org_invoice_payment__received_by_admin_id__created_at")
+  @@map("wf_org_invoice_payment")
+}

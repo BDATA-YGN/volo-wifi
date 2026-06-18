@@ -1,0 +1,161 @@
+// Sales orders, payments, commissions.
+model SaleOrder {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  orderNo String @map("order_no")
+  status  SaleStatus @map("status") @default(DRAFT)
+
+  // who sold
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  // summary
+  subtotal Decimal @map("subtotal") @default(0) @db.Decimal(18, 2)
+  discount Decimal @map("discount") @default(0) @db.Decimal(18, 2)
+  total    Decimal @map("total") @default(0) @db.Decimal(18, 2)
+
+  currency String @map("currency")  @default("MMK")
+  note     String? @map("note")
+
+  items    SaleItem[]
+  payments Payment[]
+
+  soldAt    DateTime? @map("sold_at")
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+
+  @@unique([orgId, orderNo], map: "uq_wf_sale_order__org_id__order_no")
+  @@index([orgId, status, soldAt], map: "idx_wf_sale_order__org_id__status__sold_at")
+  @@index([orgId, resellerId, soldAt], map: "idx_wf_sale_order__org_id__reseller_id__sold_at")
+  @@map("wf_sale_order")
+}
+
+model SaleItem {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  orderId String @map("order_id")
+  order   SaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  planId String @map("plan_id")
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // the sold credential (token/account)
+  credentialId String? @map("credential_id")
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  qty       Int @map("qty")     @default(1)
+  unitPrice Decimal @map("unit_price") @db.Decimal(18, 2)
+  lineTotal Decimal @map("line_total") @db.Decimal(18, 2)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@index([orgId, orderId], map: "idx_wf_sale_item__org_id__order_id")
+  @@index([orgId, planId], map: "idx_wf_sale_item__org_id__plan_id")
+  @@index([orgId, credentialId], map: "idx_wf_sale_item__org_id__credential_id")
+  @@map("wf_sale_item")
+}
+
+model Payment {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  orderId String? @map("order_id")
+  order   SaleOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  method PaymentMethod @map("method") @default(CASH)
+  amount Decimal @map("amount")       @db.Decimal(18, 2)
+  refNo  String? @map("ref_no")
+  paidAt DateTime @map("paid_at")      @default(now())
+  note   String? @map("note")
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@index([orgId, paidAt], map: "idx_wf_payment__org_id__paid_at")
+  @@index([orgId, orderId], map: "idx_wf_payment__org_id__order_id")
+  @@map("wf_payment")
+}
+
+model CommissionRule {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  // scope
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  planId String? @map("plan_id")
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  type  CommissionType @map("type") @default(PERCENT)
+  value Decimal @map("value")        @db.Decimal(18, 6) // percent (e.g. 0.10) or fixed amount
+
+  isActive  Boolean @map("is_active")   @default(true)
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([orgId, isActive], map: "idx_wf_commission_rule__org_id__is_active")
+  @@index([orgId, resellerId], map: "idx_wf_commission_rule__org_id__reseller_id")
+  @@index([orgId, planId], map: "idx_wf_commission_rule__org_id__plan_id")
+  @@map("wf_commission_rule")
+}
+
+model CommissionPayout {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  resellerId String? @map("reseller_id")
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  periodFrom DateTime @map("period_from")
+  periodTo   DateTime @map("period_to")
+
+  amount Decimal @map("amount")      @db.Decimal(18, 2)
+  status PayoutStatus @map("status") @default(PENDING)
+
+  paidAt DateTime? @map("paid_at")
+  note   String? @map("note")
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@index([orgId, status], map: "idx_wf_commission_payout__org_id__status")
+  @@index([orgId, resellerId, periodFrom], map: "idx_wf_commission_payout__org_id__reseller_id__period_from")
+  @@map("wf_commission_payout")
+}
+
+/// Cold storage for closed sale orders (items + payments embedded in payload).
+model SaleOrderArchive {
+  id       String @map("id") @id @default(uuid())
+  sourceId String @map("source_id") @unique
+
+  orgId   String @map("org_id")
+  org     Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  orderNo    String     @map("order_no")
+  status     SaleStatus @map("status")
+  resellerId String?    @map("reseller_id")
+  stationId  String?    @map("station_id")
+  total      Decimal    @map("total") @db.Decimal(18, 2)
+  currency   String     @map("currency")
+
+  soldAt          DateTime? @map("sold_at")
+  sourceCreatedAt DateTime  @map("source_created_at")
+  payload         Json      @map("payload")
+  archivedAt      DateTime  @map("archived_at") @default(now())
+
+  @@index([orgId, soldAt], map: "idx_wf_sale_order_arc__org_id__sold_at")
+  @@index([orgId, orderNo], map: "idx_wf_sale_order_arc__org_id__order_no")
+  @@index([archivedAt], map: "idx_wf_sale_order_arc__archived_at")
+  @@map("wf_sale_order_archive")
+}

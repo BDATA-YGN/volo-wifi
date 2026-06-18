@@ -1,0 +1,17 @@
+{
+  "name": "B-DATA DEMO",
+  "version": "1.0.0",
+  "description": "Console API Documentation for APP",
+  "title": "API Documentation",
+  "url": "http://localhost:6558/console",
+  "sampleUrl": "http://localhost:6558/console",
+  "template": {
+    "withCompare": true,
+    "withGenerator": true
+  },
+  "output": "./src/docs/console",
+  "input": [
+    "./src/features/core",
+    "./src/features/system"
+  ]
+}

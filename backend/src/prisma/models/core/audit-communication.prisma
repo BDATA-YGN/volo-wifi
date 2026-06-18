@@ -1,0 +1,93 @@
+model AuditLog {
+  id        String           @id @default(uuid())
+  timestamp DateTime         @default(now())
+  type      AuditLogType     @map("type")
+  severity  AuditLogSeverity @map("severity")
+  userId    String           @map("user_id")
+  userEmail String           @map("user_email")
+  action    String           @map("action")
+  resource  String           @map("resource")
+  details   String           @map("details")
+  ipAddress String           @map("ip_address")
+  userAgent String           @map("user_agent")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime?        @map("updated_at")
+  deletedAt DateTime?        @map("deleted_at")
+
+  @@index([timestamp])
+  @@index([type])
+  @@index([severity])
+  @@index([userId])
+  @@index([resource])
+  @@map("tbl_audit_log")
+}
+
+/// Top-level conversation row. The actual roster is in
+/// `ConversationParticipant`. `lastMessageAt` is denormalised so the inbox
+/// list can be sorted without joining every conversation's messages.
+model Conversation {
+  id            String           @id @default(uuid())
+  kind          ConversationKind @default(DIRECT) @map("kind")
+  /// Optional human label — used for GROUP / BROADCAST. Direct DMs render
+  /// the other participant's name on the client instead.
+  title         String?          @map("title")
+  createdById   String           @map("created_by_id")
+  createdBy     Admin            @relation("ConversationsCreated", fields: [createdById], references: [id])
+  lastMessageAt DateTime?        @map("last_message_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime?        @updatedAt @map("updated_at")
+  deletedAt     DateTime?        @map("deleted_at")
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([kind])
+  @@index([lastMessageAt])
+  @@index([createdById])
+  @@map("tbl_conversations")
+}
+
+/// Membership join table. Per-participant read state lives here so unread
+/// counts are O(1) (`messages where createdAt > lastReadAt`).
+///
+/// For BROADCAST conversations we materialise one participant row per active
+/// admin at fan-out time — keeps unread counts uniform across kinds.
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  adminId        String       @map("admin_id")
+  admin          Admin        @relation("ConversationParticipants", fields: [adminId], references: [id])
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+  lastReadAt     DateTime?    @map("last_read_at")
+  isMuted        Boolean      @default(false) @map("is_muted")
+  /// True for the conversation creator on BROADCAST threads — used to render
+  /// "Broadcaster" / "Author" labels and gate edit/delete permissions.
+  isOwner        Boolean      @default(false) @map("is_owner")
+
+  @@unique([conversationId, adminId])
+  @@index([adminId])
+  @@map("tbl_conversation_participants")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String       @map("sender_id")
+  sender         Admin        @relation("MessagesSent", fields: [senderId], references: [id])
+  content        String       @map("content")
+  /// Optional MinIO key for image / file attachments — surface via the
+  /// storage proxy on render.
+  attachmentUrl  String?      @map("attachment_url")
+  /// When the sender edits a message we keep the row and stamp this field —
+  /// useful for the "(edited)" indicator on the bubble.
+  editedAt       DateTime?    @map("edited_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime?    @updatedAt @map("updated_at")
+  deletedAt      DateTime?    @map("deleted_at")
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("tbl_messages")
+}

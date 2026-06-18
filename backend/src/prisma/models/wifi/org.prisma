@@ -1,0 +1,102 @@
+// Multi-tenant organization root.
+model Org {
+  id          String @map("id")  @id @default(uuid())
+  code        String @map("code")
+  name        String @map("name")
+  description String? @map("description")
+
+  // Prefix codes for org-scoped entities (used when generating codes)
+  stationCodePrefix  String @map("station_code_prefix") @default("")
+  planCodePrefix     String @map("plan_code_prefix") @default("")
+  resellerCodePrefix String @map("reseller_code_prefix") @default("")
+
+  timezone       String @map("timezone") @default("Asia/Yangon")
+  currency       String @map("currency") @default("MMK")
+  announcement   String? @map("announcement")   @db.Text
+  enableAnnouncement  Boolean @map("enable_announcement") @default(false)
+
+  isActive Boolean @map("is_active") @default(true)
+
+  // Link to Admin account for portal login
+  adminId String? @map("admin_id") @unique
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  wifiAuditLogs   WifiAuditLog[]
+  resellers       Reseller[]
+  stations        WifiStation[]
+  devices         StationDevice[]
+  plans           Plan[]
+  priceBooks      PlanPriceBook[]
+  planPrices      PlanPrice[]
+  voucherBatches  VoucherBatch[]
+  credentials     Credential[]
+  sales           SaleOrder[]
+  saleItems       SaleItem[]
+  payments        Payment[]
+  commissionRules CommissionRule[]
+  payouts         CommissionPayout[]
+  radiusSessions  RadiusSession[]
+  radiusVendorProfiles RadiusVendorProfile[]
+  routerSupportedAttributes RouterSupportedAttribute[]
+  radiusVendorProfileSupportedAttributes RadiusVendorProfileSupportedAttribute[]
+  planAttributes  PlanRadiusAttribute[]
+  dailyStats      DailySalesStat[]
+  monthlyStats    MonthlySalesStat[]
+  yearlyStats     YearlySalesStat[]
+  dailyRadiusUsageStats DailyRadiusUsageStat[]
+  radiusSessionArchives RadiusSessionArchive[]
+  credentialArchives CredentialArchive[]
+  saleOrderArchives SaleOrderArchive[]
+  captivePortalSessions CaptivePortalSession[]
+
+  // Licensing & Billing
+  orgLicense      OrgLicense?
+  orgInvoices     OrgInvoice[]
+  orgLicenseHistory OrgLicenseHistory[]
+  orgInvoiceItems OrgInvoiceItem[]
+  orgInvoicePayments OrgInvoicePayment[]
+
+  /// Finance / reporting settlements (reconciliation, posting, sealed snapshots)
+  finSettlements RptFinSettlement[]
+  /// Operational coverage for retention/purging (what time range is sealed for reporting)
+  rptFinSourceCoverages RptFinSourceCoverage[]
+
+  members                    OrgMember[]
+  memberRoles                OrgMemberRole[]
+  memberStations             OrgMemberStation[]
+  resellerPlanEntitlements   ResellerPlanEntitlement[]
+  resellerStations           ResellerStation[]
+  orgLicenseStationSizePrices OrgLicenseStationSizePrice[]
+  finSettlementLines         RptFinSettlementLine[]
+  finAttestations            RptFinAttestation[]
+  finPostings                RptFinPosting[]
+
+  @@map("wf_org")
+}
+
+model WifiAuditLog {
+  id      String @map("id")  @id @default(uuid())
+  orgId   String @map("org_id")
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  adminId String? @map("admin_id")
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  action   String @map("action")
+  entity   String? @map("entity")
+  entityId String? @map("entity_id")
+  meta     Json? @map("meta")
+
+  ip        String? @map("ip")
+  userAgent String? @map("user_agent")
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@index([orgId, createdAt], map: "idx_wf_audit_log__org_id__created_at")
+  @@index([orgId, entity, entityId], map: "idx_wf_audit_log__org_id__entity__entity_id")
+  @@index([adminId], map: "idx_wf_audit_log__admin_id")
+  @@map("wf_audit_log")
+}

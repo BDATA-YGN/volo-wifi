@@ -1,0 +1,7 @@
+# Dokploy / Nixpacks — Prisma 7 requires Node 20.19+, 22.12+, or 24.0+.
+# Default Nixpacks Node 18 fails at `npm install`. Pin a nixpkgs snapshot with Node 22.13+.
+[phases.setup]
+nixpkgsArchive = "51ad838b03a05b1de6f9f2a0fffecee64a9788ee"
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"

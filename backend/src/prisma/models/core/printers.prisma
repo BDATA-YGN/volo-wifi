@@ -1,0 +1,37 @@
+model Printers {
+  id             String    @id @default(uuid()) @map("id")
+  printerName    String    @map("printer_name")
+  port           String    @map("port")
+  baudRate       Int       @map("baud_Rate")
+  width          String    @map("width")
+  height         String    @map("height")
+  preview        Boolean   @map("preview")
+  margin         String    @map("margin")
+  copies         Int       @map("copies")
+  timeOutPerLine Int       @map("time_out_per_line")
+  pageSize       String    @map("page_size")
+  silent         Boolean   @map("silent")
+  desc           String?   @map("desc")
+  type           String    @default("POS") @map("type")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime? @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  @@map("tbl_printers")
+}
+
+model ReceiptTemplate {
+  id        String    @id @default(uuid()) @map("id")
+  name      String
+  code      String?   @map("code")
+  paperSize String    @map("paper_size")
+  styles    Json      @map("styles")
+  elements  Json
+  preview   Json?
+  printerId String?   @map("printer_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("tbl_receipt_template")
+}

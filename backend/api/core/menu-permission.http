@@ -1,0 +1,30 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Menu Permissions
+GET {{baseUrl}}/menu-permissions
+
+### Get Single Menu Permission
+GET {{baseUrl}}/menu-permissions/1
+
+### Create Menu Permission
+POST {{baseUrl}}/menu-permissions
+Content-Type: application/json
+
+{
+  "menuId": 1,
+  "roleId": 1,
+  "permissions": ["read", "write"]
+}
+
+### Update Menu Permission
+PUT {{baseUrl}}/menu-permissions/1
+Content-Type: application/json
+
+{
+  "menuId": 1,
+  "roleId": 1,
+  "permissions": ["read", "write", "delete"]
+}
+
+### Delete Menu Permission
+DELETE {{baseUrl}}/menu-permissions/1

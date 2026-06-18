@@ -1,0 +1,146 @@
+// WiFi domain enums (portable Prisma enums; validate codes in app when adding providers).
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum StationStatus {
+  ACTIVE
+  MAINTENANCE
+  DISABLED
+}
+
+enum DeviceType {
+  ROUTER
+  AP
+  CONTROLLER
+  SWITCH
+}
+
+enum CredentialType {
+  VOUCHER_TOKEN // token only
+  USER_PASSWORD // username & password
+}
+
+enum CredentialStatus {
+  NEW
+  SOLD
+  ACTIVE
+  EXPIRED
+  REVOKED
+  CONSUMED
+  ACTIVATED
+  /// Captive login succeeded and the package includes time — both cumulative and single-session plans (RADIUS may be active).
+  IN_USE
+  /// Time plan: RADIUS session ended with quota left; login disabled until reseller unlocks (see singleSessionResellerUnlockAt). Name is generic; only SINGLE_SESSION plans set this today.
+  PAUSED
+}
+
+enum PlanQuotaType {
+  TIME_ONLY
+  DATA_ONLY
+  TIME_AND_DATA
+}
+
+enum PlanTimeUsageMode {
+  CUMULATIVE_SESSIONS
+  SINGLE_SESSION
+}
+
+enum UnitTime {
+  MINUTE
+  HOUR
+  DAY
+}
+
+enum SaleStatus {
+  DRAFT
+  PAID
+  VOID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CARD
+  OTHER
+}
+
+enum RptFinSettlementStatus {
+  /// System computed totals are available, but not yet approved for reporting
+  DRAFT
+  /// Reseller submitted declared cash totals (may differ from system)
+  DECLARED
+  /// Station role attested (step 1)
+  STATION_ATTESTED
+  /// Organization role approved (step 2 / final)
+  ORG_APPROVED
+  REJECTED
+  /// Immutable financial snapshot created for reporting
+  POSTED
+}
+
+enum RptFinAttestationKind {
+  STATION
+  ORGANIZATION
+}
+
+enum RptFinPostingKind {
+  /// Sealed totals for UI/reporting (derived, immutable)
+  SETTLEMENT_SNAPSHOT
+}
+
+enum RadiusAcctStatus {
+  START
+  INTERIM
+  STOP
+}
+
+enum CommissionType {
+  FIXED
+  PERCENT
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum OrgLicenseStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  CANCELLED
+}
+
+enum BillingCycle {
+  MONTHLY
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PricingSource {
+  GLOBAL_DEFAULT
+  ORG_CUSTOM
+  MANUAL_OVERRIDE
+}
+
+enum LicenseChangeType {
+  STATION_LIMIT_CHANGE
+  STATION_SIZE_PRICE_CHANGE
+  PRICE_CHANGE
+  STATUS_CHANGE
+  OTHER
+}

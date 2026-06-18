@@ -1,0 +1,17 @@
+export const SIO_EVENTS = {
+    REGISTER_CONSOLE_ADMIN: 'REGISTER_CONSOLE_ADMIN',
+    REGISTER_DRIVER: 'REGISTER_DRIVER',
+    REGISTER_HARDWARES: 'REGISTER_HARDWARES',
+    TRANSFER: 'TRANSFER',
+    SYNC_PROGRESS: 'SYNC_PROGRESS'
+}
+
+export const BROADCAST_EVENTS = {
+    FETCH_ADMINS: 'FETCH_ADMINS'
+}
+
+export const REDIS_STREAMS = {
+    SOCKET_EVENTS: 'stream:socket:events',
+    NOTIFICATIONS: 'stream:notifications',
+    CHAT_MESSAGES: 'stream:chat:messages',
+};

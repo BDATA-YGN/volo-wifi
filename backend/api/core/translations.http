@@ -1,0 +1,28 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Translations
+GET {{baseUrl}}/translations
+
+### Get Single Translation
+GET {{baseUrl}}/translations/1
+
+### Create Translation
+POST {{baseUrl}}/translations
+Content-Type: application/json
+
+{
+  "key": "new_translation",
+  "value": "New Translation"
+}
+
+### Update Translation
+PUT {{baseUrl}}/translations/1
+Content-Type: application/json
+
+{
+  "key": "updated_translation",
+  "value": "Updated Translation"
+}
+
+### Delete Translation
+DELETE {{baseUrl}}/translations/1

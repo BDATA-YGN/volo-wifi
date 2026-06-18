@@ -1,0 +1,2491 @@
+{
+  "version": 1,
+  "exportedAt": "2026-06-11T02:46:59.284Z",
+  "mngRoles": [
+    {
+      "id": 1,
+      "roleId": 1,
+      "roleName": "ADMIN",
+      "description": "Platform administrator — full WiFi, billing setup, tenant registration, and system",
+      "level": "app"
+    },
+    {
+      "id": 2,
+      "roleId": 2,
+      "roleName": "ORG_VIEWER",
+      "description": "Read-only tenant user — dashboard and analytics",
+      "level": "app"
+    },
+    {
+      "id": 3,
+      "roleId": 3,
+      "roleName": "DEVELOPER",
+      "description": "Super developer — system, development tools, and all WiFi menus",
+      "level": "super"
+    },
+    {
+      "id": 4,
+      "roleId": 4,
+      "roleName": "ORG_FINANCE",
+      "description": "Tenant finance — subscription, invoices, reconciliation, and revenue analytics",
+      "level": "app"
+    },
+    {
+      "id": 5,
+      "roleId": 5,
+      "roleName": "STATION_OPS",
+      "description": "Site operator — sites, network infrastructure, and site analytics",
+      "level": "app"
+    },
+    {
+      "id": 6,
+      "roleId": 6,
+      "roleName": "ORG_ADMIN",
+      "description": "Tenant administrator — members, catalog, sites, partners, and org configuration (no billing or subscription edits)",
+      "level": "app"
+    },
+    {
+      "id": 7,
+      "roleId": 7,
+      "roleName": "PARTNER",
+      "description": "Reseller partner — workspace, access tokens, transactions, and partner insights",
+      "level": "app"
+    }
+  ],
+  "mngRoleSettings": [
+    {
+      "id": "20912c1a-05a4-4640-b051-ead8d7347840",
+      "settingKey": "system",
+      "description": "menu-group.system",
+      "parentId": null,
+      "level": "app",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "6dc0243c-8289-4559-b89a-51ad19529bef",
+      "settingKey": "development",
+      "description": "menu-group.devmode",
+      "parentId": null,
+      "level": "super",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
+      "settingKey": "/system/admin-users",
+      "description": "menus.admin-users",
+      "parentId": "system",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "95ae5b7a-93de-4211-b618-727cbe55e387",
+      "settingKey": "/system/admin-roles",
+      "description": "menus.admin-roles-permissions",
+      "parentId": "system",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "1a65fcb0-1eed-44a4-82d4-8d4ec7ae9a6c",
+      "settingKey": "/system/settings",
+      "description": "menus.system-settings",
+      "parentId": "system",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "45edd57f-f1eb-4017-8623-a83a095fe901",
+      "settingKey": "/system/audit-logs",
+      "description": "menus.audit-logs",
+      "parentId": "system",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "a553b4c4-2640-410e-ac3b-d490a136a42f",
+      "settingKey": "/system/conversations",
+      "description": "menus.conversations",
+      "parentId": "system",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "fbbc87ef-b6d2-4de0-83a0-ec70c86d8cee",
+      "settingKey": "/permissions",
+      "description": "menus.permissions",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "85b32f2d-23fe-44b1-8fd6-80f067b1995f",
+      "settingKey": "/settings",
+      "description": "menus.settings",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "50f07f21-0c6e-411d-913e-12e6ee27768e",
+      "settingKey": "/menu-management",
+      "description": "menus.review",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "98340ed7-5afb-4e83-8496-75787669b3e9",
+      "settingKey": "/themes",
+      "description": "menus.themes",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "20cb40f6-c5d4-42a7-bbd2-44b5c59c8035",
+      "settingKey": "/system/files",
+      "description": "menus.files",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "8b639b43-758d-4cb9-8d62-9555481d7088",
+      "settingKey": "/contents",
+      "description": "menus.client",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "408bf462-f3e9-4d80-afdf-b411821c2fe3",
+      "settingKey": "/receipts",
+      "description": "menus.receipt-editor",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "db715f62-492a-43ba-9271-635cb1ac26de",
+      "settingKey": "/system/contact-support",
+      "description": "menus.contact-support",
+      "parentId": "development",
+      "level": "super",
+      "kind": "menu"
+    },
+    {
+      "id": "af887b2e-990c-416f-ba91-64c0775659c0",
+      "settingKey": "profile",
+      "description": null,
+      "parentId": null,
+      "level": "app",
+      "kind": "feature"
+    },
+    {
+      "id": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "settingKey": "overview",
+      "description": "menu-group.wifi.overview",
+      "parentId": null,
+      "level": "app",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "953e52f5-6abe-495c-937b-84166231ce73",
+      "settingKey": "tenant",
+      "description": "menu-group.wifi.tenant",
+      "parentId": null,
+      "level": "app",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "f33269de-b52a-42b3-9c3d-51ffd4a28052",
+      "settingKey": "wifi-billing",
+      "description": "menu-group.wifi.billing",
+      "parentId": null,
+      "level": "app",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "37ab5831-2b6b-4df3-807a-f9d01de613f4",
+      "settingKey": "network",
+      "description": "menu-group.wifi.network",
+      "parentId": null,
+      "level": "app",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "ce8c31d2-945b-4302-a3ce-50efe4349c40",
+      "settingKey": "commerce",
+      "description": "menu-group.wifi.commerce",
+      "parentId": null,
+      "level": "app",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "4ae755d4-d3b4-4b34-a795-b5387c1b8f1e",
+      "settingKey": "analytics",
+      "description": "menu-group.wifi.analytics",
+      "parentId": null,
+      "level": "app",
+      "kind": "menuGroup"
+    },
+    {
+      "id": "c34483b1-914d-4440-b754-eb37383a81db",
+      "settingKey": "/wifi",
+      "description": "menus.wifi.overview.dashboard",
+      "parentId": "overview",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "c33ecfab-ef37-48b2-a3fc-8cdac48424db",
+      "settingKey": "/wifi/tenants",
+      "description": "menus.wifi.tenant.directory",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "33d16301-e187-4627-80a6-1182a4ac1a9f",
+      "settingKey": "/wifi/tenant/profile",
+      "description": "menus.wifi.tenant.profile",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "b8e142e6-1a32-4e0e-ba57-b95b124ca054",
+      "settingKey": "/wifi/tenant/access-control",
+      "description": "menus.wifi.tenant.access-control",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "47754789-7780-4fa4-bf65-23215a73e268",
+      "settingKey": "/wifi/tenant/activity-log",
+      "description": "menus.wifi.tenant.activity-log",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "cebb20e7-7d05-464c-960b-114b5590c251",
+      "settingKey": "/wifi/catalog/service-plans",
+      "description": "menus.wifi.catalog.service-plans",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "7ae3ba9c-9c53-4e7b-8551-93a7c6b248e9",
+      "settingKey": "/wifi/catalog/retail-pricing",
+      "description": "menus.wifi.catalog.retail-pricing",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "490a2398-7f78-4fd5-8dfa-6af017ab77fe",
+      "settingKey": "/wifi/sites",
+      "description": "menus.wifi.sites.directory",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "7398f63b-d4b0-4e09-bdf3-8a9ac68c4a8c",
+      "settingKey": "/wifi/access/voucher-runs",
+      "description": "menus.wifi.access.voucher-runs",
+      "parentId": "tenant",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "1d5e3e06-748f-4302-bd3f-6565a207f46b",
+      "settingKey": "/wifi/billing/tenant-registration",
+      "description": "menus.wifi.billing.tenant-registration",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "797fe942-b046-4cba-9ef5-3cb367a7a332",
+      "settingKey": "/wifi/billing/capacity-tiers",
+      "description": "menus.wifi.billing.capacity-tiers",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "57b6f655-c7e1-441d-918d-ef11490b5384",
+      "settingKey": "/wifi/billing/tier-rates/platform",
+      "description": "menus.wifi.billing.tier-rates.platform",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "c62d30a8-04b8-4bdb-9b20-64ee23b15057",
+      "settingKey": "/wifi/billing/tier-rates/tenant",
+      "description": "menus.wifi.billing.tier-rates.tenant",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "f1d186a2-c2b7-4969-87bb-d464e457eedf",
+      "settingKey": "/wifi/billing/subscription",
+      "description": "menus.wifi.billing.subscription",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "337f81d7-0258-455b-8977-db954e5069b9",
+      "settingKey": "/wifi/billing/subscription/sites",
+      "description": "menus.wifi.billing.subscription.sites",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "f667a63e-8ce7-46d4-bea7-fa8fe30bd428",
+      "settingKey": "/wifi/billing/subscription/changelog",
+      "description": "menus.wifi.billing.subscription.changelog",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "db876cfb-e64d-4936-b72d-fad69857d8fa",
+      "settingKey": "/wifi/billing/invoices",
+      "description": "menus.wifi.billing.invoices",
+      "parentId": "wifi-billing",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "ce3b3521-532f-4b53-9d11-c66b559d8e38",
+      "settingKey": "/wifi/network/nas-devices",
+      "description": "menus.wifi.network.nas-devices",
+      "parentId": "network",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "c998a558-17a5-4321-983d-e9e3db9f5597",
+      "settingKey": "/wifi/network/radius/vendor-profiles",
+      "description": "menus.wifi.network.radius.vendor-profiles",
+      "parentId": "network",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "d9e74164-57f2-44c1-8da8-9e5c8e3ff9a2",
+      "settingKey": "/wifi/network/radius/attribute-catalog",
+      "description": "menus.wifi.network.radius.attribute-catalog",
+      "parentId": "network",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "1ea680d6-b719-454e-9394-2e6952fe2743",
+      "settingKey": "/wifi/network/radius/plan-policies",
+      "description": "menus.wifi.network.radius.plan-policies",
+      "parentId": "network",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "dac450a9-2e48-4c39-a9ff-815fba388d11",
+      "settingKey": "/wifi/network/radius/live-sessions",
+      "description": "menus.wifi.network.radius.live-sessions",
+      "parentId": "network",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "d2236f0b-d6df-4088-9d92-cf8f843e944c",
+      "settingKey": "/wifi/network/radius/auth-events",
+      "description": "menus.wifi.network.radius.auth-events",
+      "parentId": "network",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "b840ba5d-1106-49d2-9aaa-916ee7589cfd",
+      "settingKey": "/wifi/commerce/partners",
+      "description": "menus.wifi.commerce.partners.directory",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "c914e073-5476-4c48-b3dd-2a10be6ccb7c",
+      "settingKey": "/wifi/commerce/partners/workspace",
+      "description": "menus.wifi.commerce.partners.workspace",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "6d5d8c13-b248-401f-bf9f-8750cec217b1",
+      "settingKey": "/wifi/commerce/access-tokens",
+      "description": "menus.wifi.commerce.access-tokens",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "15655da2-360a-4e2e-85c4-994897b6d311",
+      "settingKey": "/wifi/commerce/transactions/orders",
+      "description": "menus.wifi.commerce.transactions.orders",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "10cc617a-7be4-4c57-90ff-39818697e74f",
+      "settingKey": "/wifi/commerce/transactions/payments",
+      "description": "menus.wifi.commerce.transactions.payments",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "7a93b378-2095-419c-98bb-87225367218d",
+      "settingKey": "/wifi/commerce/commissions/rules",
+      "description": "menus.wifi.commerce.commissions.rules",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "3ba3b38d-35ea-46cc-a52e-7959d6bb5ae1",
+      "settingKey": "/wifi/commerce/commissions/payouts",
+      "description": "menus.wifi.commerce.commissions.payouts",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "0b4c83d2-1dad-4fe9-9557-0e8d55967ee7",
+      "settingKey": "/wifi/commerce/partners/insights",
+      "description": "menus.wifi.commerce.partners.insights",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "658aac8c-2fc8-40b3-b49c-279310da3e1b",
+      "settingKey": "/wifi/analytics/tenants",
+      "description": "menus.wifi.analytics.tenants",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "39c4a24a-f5e9-43ef-aa53-52eb58b86b45",
+      "settingKey": "/wifi/analytics/sites",
+      "description": "menus.wifi.analytics.sites",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "84ca06c2-d940-4010-bba0-f2729d1483f4",
+      "settingKey": "/wifi/analytics/partners",
+      "description": "menus.wifi.analytics.partners",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "7fa5ec48-aacb-41e1-b277-fafc10a1da1e",
+      "settingKey": "/wifi/analytics/service-plans",
+      "description": "menus.wifi.analytics.service-plans",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "5c07ad61-cca6-400d-ba36-b9621c0364fd",
+      "settingKey": "/wifi/analytics/revenue",
+      "description": "menus.wifi.analytics.revenue",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "75d1101c-2bff-4d78-8496-175bed616105",
+      "settingKey": "/wifi/analytics/access-tokens",
+      "description": "menus.wifi.analytics.access-tokens",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "c3d9667e-03c4-4aaf-8efe-bf84c438363a",
+      "settingKey": "/wifi/analytics/session-traffic",
+      "description": "menus.wifi.analytics.session-traffic",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "bac6939d-2e90-454b-b931-5e0fffa9394b",
+      "settingKey": "/wifi/analytics/voucher-runs",
+      "description": "menus.wifi.analytics.voucher-runs",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "3d8751fe-f884-4d34-918f-09b23618c85b",
+      "settingKey": "/wifi/analytics/site-inventory",
+      "description": "menus.wifi.analytics.site-inventory",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "2c919872-457a-44d3-a0b7-6d191f5e9f11",
+      "settingKey": "/wifi/analytics/nas-inventory",
+      "description": "menus.wifi.analytics.nas-inventory",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "f57413dc-6fc0-42db-83c4-66ddda35613e",
+      "settingKey": "/wifi/analytics/reconciliation/settlements",
+      "description": "menus.wifi.analytics.reconciliation.settlements",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "9997d9e7-436a-4cee-b5f5-87cb4edb03e9",
+      "settingKey": "/wifi/analytics/reconciliation/approvals",
+      "description": "menus.wifi.analytics.reconciliation.approvals",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "0c71c588-f75d-4a4e-bf94-9f7750f08474",
+      "settingKey": "/wifi/analytics/reconciliation/coverage",
+      "description": "menus.wifi.analytics.reconciliation.coverage",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "3567f1bd-89af-4db6-a14a-0d6a21262369",
+      "settingKey": "/wifi/analytics/live-ops",
+      "description": "menus.wifi.analytics.live-ops",
+      "parentId": "analytics",
+      "level": "app",
+      "kind": "menu"
+    }
+  ],
+  "mapRoleSettings": [
+    {
+      "id": "689abdba-13b9-489f-90b8-5ad5c73d16fa",
+      "roleId": 1,
+      "settingKey": "20912c1a-05a4-4640-b051-ead8d7347840",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "system"
+    },
+    {
+      "id": "2343609d-512a-4d18-81f0-0462714481cc",
+      "roleId": 1,
+      "settingKey": "6dc0243c-8289-4559-b89a-51ad19529bef",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "development"
+    },
+    {
+      "id": "e1d9eb4d-5e71-45fc-aa35-823326cf3a22",
+      "roleId": 1,
+      "settingKey": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-users"
+    },
+    {
+      "id": "1d537396-ff50-4c78-9ecc-a772bd682bf4",
+      "roleId": 1,
+      "settingKey": "95ae5b7a-93de-4211-b618-727cbe55e387",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-roles"
+    },
+    {
+      "id": "43824427-4f60-489b-bb00-c548b7e1a32b",
+      "roleId": 1,
+      "settingKey": "1a65fcb0-1eed-44a4-82d4-8d4ec7ae9a6c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/settings"
+    },
+    {
+      "id": "d48fefb3-5aab-4004-aa8a-c956632dc4de",
+      "roleId": 1,
+      "settingKey": "45edd57f-f1eb-4017-8623-a83a095fe901",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/audit-logs"
+    },
+    {
+      "id": "defda840-7ae3-434b-a308-e21b1da933db",
+      "roleId": 1,
+      "settingKey": "a553b4c4-2640-410e-ac3b-d490a136a42f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/conversations"
+    },
+    {
+      "id": "fe5ff7e2-a7a8-49bf-90ce-c49c2759a7f6",
+      "roleId": 1,
+      "settingKey": "fbbc87ef-b6d2-4de0-83a0-ec70c86d8cee",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/permissions"
+    },
+    {
+      "id": "56ad086a-01da-490e-8a09-d9c666ad37f3",
+      "roleId": 1,
+      "settingKey": "85b32f2d-23fe-44b1-8fd6-80f067b1995f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/settings"
+    },
+    {
+      "id": "46caaaf1-28ee-4a8e-a86d-3d65123a3610",
+      "roleId": 1,
+      "settingKey": "50f07f21-0c6e-411d-913e-12e6ee27768e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/menu-management"
+    },
+    {
+      "id": "5f765e11-c2af-43e7-8fc1-7fda288055d1",
+      "roleId": 1,
+      "settingKey": "98340ed7-5afb-4e83-8496-75787669b3e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/themes"
+    },
+    {
+      "id": "55af83a4-52d7-4f97-b11f-2856006f2026",
+      "roleId": 1,
+      "settingKey": "20cb40f6-c5d4-42a7-bbd2-44b5c59c8035",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/files"
+    },
+    {
+      "id": "b8136c2e-d09f-4ebb-bcf0-1c2c6da98080",
+      "roleId": 1,
+      "settingKey": "8b639b43-758d-4cb9-8d62-9555481d7088",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/contents"
+    },
+    {
+      "id": "36cfc906-b218-4d16-b633-6ca65845aabd",
+      "roleId": 1,
+      "settingKey": "408bf462-f3e9-4d80-afdf-b411821c2fe3",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/receipts"
+    },
+    {
+      "id": "1cd77f17-252f-413c-b8c0-e128c9f60ae6",
+      "roleId": 1,
+      "settingKey": "db715f62-492a-43ba-9271-635cb1ac26de",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/contact-support"
+    },
+    {
+      "id": "a409e289-c8ed-4f16-a309-47f5a4b15ced",
+      "roleId": 1,
+      "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "overview"
+    },
+    {
+      "id": "b6a895c8-ce56-4b49-bbd9-8304e143a89b",
+      "roleId": 1,
+      "settingKey": "953e52f5-6abe-495c-937b-84166231ce73",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "tenant"
+    },
+    {
+      "id": "c13cec82-8cf7-40ee-9c5c-0ae7c283220c",
+      "roleId": 1,
+      "settingKey": "f33269de-b52a-42b3-9c3d-51ffd4a28052",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "wifi-billing"
+    },
+    {
+      "id": "54fb33d1-74a3-4687-a7d3-5603ad6f833a",
+      "roleId": 1,
+      "settingKey": "37ab5831-2b6b-4df3-807a-f9d01de613f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "network"
+    },
+    {
+      "id": "6dc7bd52-5459-46da-a0e0-e62d22686109",
+      "roleId": 1,
+      "settingKey": "ce8c31d2-945b-4302-a3ce-50efe4349c40",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "commerce"
+    },
+    {
+      "id": "2f4d1ce0-cfdf-477d-8f55-f10c790541c9",
+      "roleId": 1,
+      "settingKey": "4ae755d4-d3b4-4b34-a795-b5387c1b8f1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "analytics"
+    },
+    {
+      "id": "1005a681-74a6-441c-883d-b15a2537b117",
+      "roleId": 1,
+      "settingKey": "c34483b1-914d-4440-b754-eb37383a81db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi"
+    },
+    {
+      "id": "a0486117-46f8-40cc-8cff-1e4fe62e01bd",
+      "roleId": 1,
+      "settingKey": "c33ecfab-ef37-48b2-a3fc-8cdac48424db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenants"
+    },
+    {
+      "id": "2a2bb08c-6bd4-47b3-afe7-af43838a8de7",
+      "roleId": 1,
+      "settingKey": "33d16301-e187-4627-80a6-1182a4ac1a9f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/profile"
+    },
+    {
+      "id": "9e2b4d23-8878-4a62-945a-c2b6eb3bb389",
+      "roleId": 1,
+      "settingKey": "b8e142e6-1a32-4e0e-ba57-b95b124ca054",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/access-control"
+    },
+    {
+      "id": "8de9e55a-9da0-4e11-87f8-32e4d4c518a4",
+      "roleId": 1,
+      "settingKey": "47754789-7780-4fa4-bf65-23215a73e268",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/activity-log"
+    },
+    {
+      "id": "f1709419-5212-414c-a81d-a48e974b0ea4",
+      "roleId": 1,
+      "settingKey": "cebb20e7-7d05-464c-960b-114b5590c251",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/catalog/service-plans"
+    },
+    {
+      "id": "b68fa3f2-fe7f-4134-9d81-3a9c3e9c69df",
+      "roleId": 1,
+      "settingKey": "7ae3ba9c-9c53-4e7b-8551-93a7c6b248e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/catalog/retail-pricing"
+    },
+    {
+      "id": "f3986b1d-07f8-4b29-86e4-8cd58e382271",
+      "roleId": 1,
+      "settingKey": "490a2398-7f78-4fd5-8dfa-6af017ab77fe",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/sites"
+    },
+    {
+      "id": "ff450780-6e29-4a21-8551-0e6a54fa89d9",
+      "roleId": 1,
+      "settingKey": "7398f63b-d4b0-4e09-bdf3-8a9ac68c4a8c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/access/voucher-runs"
+    },
+    {
+      "id": "eafd8c5c-5fcf-4ee9-9f44-e38ca4591c5b",
+      "roleId": 1,
+      "settingKey": "1d5e3e06-748f-4302-bd3f-6565a207f46b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/tenant-registration"
+    },
+    {
+      "id": "b2cc6e13-d781-4bce-9a40-99279abcef79",
+      "roleId": 1,
+      "settingKey": "797fe942-b046-4cba-9ef5-3cb367a7a332",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/capacity-tiers"
+    },
+    {
+      "id": "50fb2060-3d6b-4198-9cf5-5b29e810dd9a",
+      "roleId": 1,
+      "settingKey": "57b6f655-c7e1-441d-918d-ef11490b5384",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/tier-rates/platform"
+    },
+    {
+      "id": "7a24976f-f554-4381-b09b-5a1bf994344e",
+      "roleId": 1,
+      "settingKey": "c62d30a8-04b8-4bdb-9b20-64ee23b15057",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/tier-rates/tenant"
+    },
+    {
+      "id": "4ca4405e-990f-494b-aded-2de6e5c7ab57",
+      "roleId": 1,
+      "settingKey": "f1d186a2-c2b7-4969-87bb-d464e457eedf",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription"
+    },
+    {
+      "id": "3f64000b-5e7c-4630-b753-2d603c345a78",
+      "roleId": 1,
+      "settingKey": "337f81d7-0258-455b-8977-db954e5069b9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription/sites"
+    },
+    {
+      "id": "1a52783c-7cc7-4265-9864-db6fc25c4883",
+      "roleId": 1,
+      "settingKey": "f667a63e-8ce7-46d4-bea7-fa8fe30bd428",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription/changelog"
+    },
+    {
+      "id": "a853b022-e0f7-4305-80cc-ffd32f8cb145",
+      "roleId": 1,
+      "settingKey": "db876cfb-e64d-4936-b72d-fad69857d8fa",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/invoices"
+    },
+    {
+      "id": "02f498d6-3a92-4fbb-bdaa-0218bc8029a2",
+      "roleId": 1,
+      "settingKey": "ce3b3521-532f-4b53-9d11-c66b559d8e38",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/nas-devices"
+    },
+    {
+      "id": "51491170-8efb-48ce-b452-c14a5a779cbd",
+      "roleId": 1,
+      "settingKey": "c998a558-17a5-4321-983d-e9e3db9f5597",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/vendor-profiles"
+    },
+    {
+      "id": "a9f08c97-3e12-4f56-b70b-5158df3cb5c6",
+      "roleId": 1,
+      "settingKey": "d9e74164-57f2-44c1-8da8-9e5c8e3ff9a2",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/attribute-catalog"
+    },
+    {
+      "id": "cfa40100-1e93-4b74-9e69-60e7e297ab96",
+      "roleId": 1,
+      "settingKey": "1ea680d6-b719-454e-9394-2e6952fe2743",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/plan-policies"
+    },
+    {
+      "id": "3f99d614-be1d-4ec2-964c-ce60b3a182eb",
+      "roleId": 1,
+      "settingKey": "dac450a9-2e48-4c39-a9ff-815fba388d11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/live-sessions"
+    },
+    {
+      "id": "40913eec-e4bd-4a6c-84a6-fc7cced30e2c",
+      "roleId": 1,
+      "settingKey": "d2236f0b-d6df-4088-9d92-cf8f843e944c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/auth-events"
+    },
+    {
+      "id": "a416b756-8eec-43db-bb61-cf141308c18b",
+      "roleId": 1,
+      "settingKey": "b840ba5d-1106-49d2-9aaa-916ee7589cfd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners"
+    },
+    {
+      "id": "0426208f-05ea-44ba-8258-d3857ccb6cd5",
+      "roleId": 1,
+      "settingKey": "c914e073-5476-4c48-b3dd-2a10be6ccb7c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners/workspace"
+    },
+    {
+      "id": "b4310fec-3ce6-4f21-983d-38d201b29adf",
+      "roleId": 1,
+      "settingKey": "6d5d8c13-b248-401f-bf9f-8750cec217b1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/access-tokens"
+    },
+    {
+      "id": "deb0f6a6-4871-447a-8b0b-3e1c9f136729",
+      "roleId": 1,
+      "settingKey": "15655da2-360a-4e2e-85c4-994897b6d311",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/transactions/orders"
+    },
+    {
+      "id": "7ad9440f-12a9-4427-8e79-65c8e08ed808",
+      "roleId": 1,
+      "settingKey": "10cc617a-7be4-4c57-90ff-39818697e74f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/transactions/payments"
+    },
+    {
+      "id": "43712667-365d-41c8-96dd-1f4136ac5ad3",
+      "roleId": 1,
+      "settingKey": "7a93b378-2095-419c-98bb-87225367218d",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/commissions/rules"
+    },
+    {
+      "id": "7cc82d8a-a793-4cb4-aec8-ae7b89276e70",
+      "roleId": 1,
+      "settingKey": "3ba3b38d-35ea-46cc-a52e-7959d6bb5ae1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/commissions/payouts"
+    },
+    {
+      "id": "0c5a5f00-8802-424f-adc8-d20cefcccf6e",
+      "roleId": 1,
+      "settingKey": "0b4c83d2-1dad-4fe9-9557-0e8d55967ee7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners/insights"
+    },
+    {
+      "id": "61b995cb-87e0-4a4a-adcf-5d605933fea6",
+      "roleId": 1,
+      "settingKey": "658aac8c-2fc8-40b3-b49c-279310da3e1b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/tenants"
+    },
+    {
+      "id": "7e4c35e7-7d8a-4e12-a42d-939b933d006d",
+      "roleId": 1,
+      "settingKey": "39c4a24a-f5e9-43ef-aa53-52eb58b86b45",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/sites"
+    },
+    {
+      "id": "0e3d57f7-4b5f-41ac-9006-51ca89db2c03",
+      "roleId": 1,
+      "settingKey": "84ca06c2-d940-4010-bba0-f2729d1483f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/partners"
+    },
+    {
+      "id": "d8b6d640-7cf0-47da-b55e-3b0a1cea8b40",
+      "roleId": 1,
+      "settingKey": "7fa5ec48-aacb-41e1-b277-fafc10a1da1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/service-plans"
+    },
+    {
+      "id": "71bd4b84-b131-4f20-884e-105997c329e9",
+      "roleId": 1,
+      "settingKey": "5c07ad61-cca6-400d-ba36-b9621c0364fd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/revenue"
+    },
+    {
+      "id": "c1340e7b-fdc7-4da9-bfb0-36dbc0723abb",
+      "roleId": 1,
+      "settingKey": "75d1101c-2bff-4d78-8496-175bed616105",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/access-tokens"
+    },
+    {
+      "id": "927a4e58-7a04-40d7-9eeb-ab5bf8a7534b",
+      "roleId": 1,
+      "settingKey": "c3d9667e-03c4-4aaf-8efe-bf84c438363a",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/session-traffic"
+    },
+    {
+      "id": "353c5669-64dd-4bd1-b67f-90060e808c68",
+      "roleId": 1,
+      "settingKey": "bac6939d-2e90-454b-b931-5e0fffa9394b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/voucher-runs"
+    },
+    {
+      "id": "c86f8e10-f936-4045-ba32-e9b532b5f3e0",
+      "roleId": 1,
+      "settingKey": "3d8751fe-f884-4d34-918f-09b23618c85b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/site-inventory"
+    },
+    {
+      "id": "40a1ac55-a5b8-4674-9aa1-888068b8e92c",
+      "roleId": 1,
+      "settingKey": "2c919872-457a-44d3-a0b7-6d191f5e9f11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/nas-inventory"
+    },
+    {
+      "id": "f6b6f385-8700-4177-b89a-66bc3f655def",
+      "roleId": 1,
+      "settingKey": "f57413dc-6fc0-42db-83c4-66ddda35613e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/settlements"
+    },
+    {
+      "id": "6b4426ef-7b9f-4e32-9a6c-0fa4ebc87e18",
+      "roleId": 1,
+      "settingKey": "9997d9e7-436a-4cee-b5f5-87cb4edb03e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/approvals"
+    },
+    {
+      "id": "1f55be99-4286-4aa5-93a8-25fd8289c2ef",
+      "roleId": 1,
+      "settingKey": "0c71c588-f75d-4a4e-bf94-9f7750f08474",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/coverage"
+    },
+    {
+      "id": "c30364b3-409f-4124-88a1-6ca721440a85",
+      "roleId": 1,
+      "settingKey": "3567f1bd-89af-4db6-a14a-0d6a21262369",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/live-ops"
+    },
+    {
+      "id": "7ebd3f54-3941-44b8-b252-4877155a3973",
+      "roleId": 2,
+      "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "overview"
+    },
+    {
+      "id": "e01ba540-b502-44ff-898e-482434f70078",
+      "roleId": 2,
+      "settingKey": "4ae755d4-d3b4-4b34-a795-b5387c1b8f1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "analytics"
+    },
+    {
+      "id": "b16c4753-bb1c-407f-a3fa-3aa95cbb7813",
+      "roleId": 2,
+      "settingKey": "c34483b1-914d-4440-b754-eb37383a81db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi"
+    },
+    {
+      "id": "ae8b403f-d0cd-4017-be21-ec9343c96a15",
+      "roleId": 2,
+      "settingKey": "39c4a24a-f5e9-43ef-aa53-52eb58b86b45",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/sites"
+    },
+    {
+      "id": "6fc7f565-71c3-4bad-ad46-1b7a29e550f9",
+      "roleId": 2,
+      "settingKey": "84ca06c2-d940-4010-bba0-f2729d1483f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/partners"
+    },
+    {
+      "id": "a4c101ea-5b45-414e-a8cc-48ed204a36dd",
+      "roleId": 2,
+      "settingKey": "7fa5ec48-aacb-41e1-b277-fafc10a1da1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/service-plans"
+    },
+    {
+      "id": "762e42d7-d9c5-4958-87bb-1465dea36d0e",
+      "roleId": 2,
+      "settingKey": "5c07ad61-cca6-400d-ba36-b9621c0364fd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/revenue"
+    },
+    {
+      "id": "eea44206-7179-4e78-be00-94686c7268ee",
+      "roleId": 3,
+      "settingKey": "20912c1a-05a4-4640-b051-ead8d7347840",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "system"
+    },
+    {
+      "id": "c985305c-4866-4413-8c19-8d3101bca213",
+      "roleId": 3,
+      "settingKey": "6dc0243c-8289-4559-b89a-51ad19529bef",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "development"
+    },
+    {
+      "id": "427ed9ae-a685-4fc5-90c8-c7b3e7da1fab",
+      "roleId": 3,
+      "settingKey": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-users"
+    },
+    {
+      "id": "5d6c9707-e2d3-42b7-b58b-9f9241aef372",
+      "roleId": 3,
+      "settingKey": "95ae5b7a-93de-4211-b618-727cbe55e387",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-roles"
+    },
+    {
+      "id": "8eef96ac-6f12-40c3-991a-1a127dcc49b8",
+      "roleId": 3,
+      "settingKey": "1a65fcb0-1eed-44a4-82d4-8d4ec7ae9a6c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/settings"
+    },
+    {
+      "id": "542e3d5e-a2ab-4256-9288-296c73909465",
+      "roleId": 3,
+      "settingKey": "45edd57f-f1eb-4017-8623-a83a095fe901",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/audit-logs"
+    },
+    {
+      "id": "528bb918-3d19-4e84-ac45-41f7fa9e87fd",
+      "roleId": 3,
+      "settingKey": "a553b4c4-2640-410e-ac3b-d490a136a42f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/conversations"
+    },
+    {
+      "id": "21c577db-4f8f-4466-8821-f64ae9e0b14e",
+      "roleId": 3,
+      "settingKey": "fbbc87ef-b6d2-4de0-83a0-ec70c86d8cee",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/permissions"
+    },
+    {
+      "id": "48e08470-0a98-411d-9d00-99d948e92067",
+      "roleId": 3,
+      "settingKey": "85b32f2d-23fe-44b1-8fd6-80f067b1995f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/settings"
+    },
+    {
+      "id": "32885362-21cc-48ed-b93e-b54dc42661d0",
+      "roleId": 3,
+      "settingKey": "50f07f21-0c6e-411d-913e-12e6ee27768e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/menu-management"
+    },
+    {
+      "id": "ad590227-be24-4c3d-9597-f5282d8222a8",
+      "roleId": 3,
+      "settingKey": "98340ed7-5afb-4e83-8496-75787669b3e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/themes"
+    },
+    {
+      "id": "c6e6aa55-8f74-499d-8b49-f7534cc0042c",
+      "roleId": 3,
+      "settingKey": "20cb40f6-c5d4-42a7-bbd2-44b5c59c8035",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/files"
+    },
+    {
+      "id": "667e0991-264a-46ba-b272-737a3fcf4a92",
+      "roleId": 3,
+      "settingKey": "8b639b43-758d-4cb9-8d62-9555481d7088",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/contents"
+    },
+    {
+      "id": "af650ebd-a79b-4804-8b6a-b7315c62bed1",
+      "roleId": 3,
+      "settingKey": "408bf462-f3e9-4d80-afdf-b411821c2fe3",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/receipts"
+    },
+    {
+      "id": "09eac5c2-c73e-4b23-b3e9-2ea9a1907ebb",
+      "roleId": 3,
+      "settingKey": "db715f62-492a-43ba-9271-635cb1ac26de",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/contact-support"
+    },
+    {
+      "id": "beb16fa8-ba54-4f26-89f5-0842ea44d91e",
+      "roleId": 3,
+      "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "overview"
+    },
+    {
+      "id": "583329da-a2e6-45e4-82e9-e40e572ec751",
+      "roleId": 3,
+      "settingKey": "953e52f5-6abe-495c-937b-84166231ce73",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "tenant"
+    },
+    {
+      "id": "c9b75be4-256f-4ca3-ad3b-6f5c5b15a561",
+      "roleId": 3,
+      "settingKey": "f33269de-b52a-42b3-9c3d-51ffd4a28052",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "wifi-billing"
+    },
+    {
+      "id": "0398e3f6-e375-40a7-b75c-eb66bbebe263",
+      "roleId": 3,
+      "settingKey": "37ab5831-2b6b-4df3-807a-f9d01de613f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "network"
+    },
+    {
+      "id": "0ac04d59-9c0c-44fb-a346-67963939240f",
+      "roleId": 3,
+      "settingKey": "ce8c31d2-945b-4302-a3ce-50efe4349c40",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "commerce"
+    },
+    {
+      "id": "59d82855-cc69-4277-b575-83f8d102e462",
+      "roleId": 3,
+      "settingKey": "4ae755d4-d3b4-4b34-a795-b5387c1b8f1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "analytics"
+    },
+    {
+      "id": "2516627c-48d5-48bd-b883-1261c5dad10a",
+      "roleId": 3,
+      "settingKey": "c34483b1-914d-4440-b754-eb37383a81db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi"
+    },
+    {
+      "id": "2115a848-f916-453a-ab01-31c069ff1f92",
+      "roleId": 3,
+      "settingKey": "c33ecfab-ef37-48b2-a3fc-8cdac48424db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenants"
+    },
+    {
+      "id": "1cfa0486-5905-4c47-aa43-578922a97ea1",
+      "roleId": 3,
+      "settingKey": "33d16301-e187-4627-80a6-1182a4ac1a9f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/profile"
+    },
+    {
+      "id": "df68668e-7e83-4bbf-8e64-66f0e8fb203c",
+      "roleId": 3,
+      "settingKey": "b8e142e6-1a32-4e0e-ba57-b95b124ca054",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/access-control"
+    },
+    {
+      "id": "614b87ea-15ee-4c7a-aaac-f0467a4a20b3",
+      "roleId": 3,
+      "settingKey": "47754789-7780-4fa4-bf65-23215a73e268",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/activity-log"
+    },
+    {
+      "id": "971bfad5-ff69-45e8-95e3-b42e80da353f",
+      "roleId": 3,
+      "settingKey": "cebb20e7-7d05-464c-960b-114b5590c251",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/catalog/service-plans"
+    },
+    {
+      "id": "17ea0e44-23f7-4232-b200-816ce7568e8a",
+      "roleId": 3,
+      "settingKey": "7ae3ba9c-9c53-4e7b-8551-93a7c6b248e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/catalog/retail-pricing"
+    },
+    {
+      "id": "09a0f39d-5921-42cd-8ffb-c5bd7fc24105",
+      "roleId": 3,
+      "settingKey": "490a2398-7f78-4fd5-8dfa-6af017ab77fe",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/sites"
+    },
+    {
+      "id": "aee47e6b-0a27-41d8-a070-fdde5a5babea",
+      "roleId": 3,
+      "settingKey": "7398f63b-d4b0-4e09-bdf3-8a9ac68c4a8c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/access/voucher-runs"
+    },
+    {
+      "id": "16abd763-85a0-4146-b5cb-b7429d9b4a3e",
+      "roleId": 3,
+      "settingKey": "1d5e3e06-748f-4302-bd3f-6565a207f46b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/tenant-registration"
+    },
+    {
+      "id": "89e23169-02ce-47ca-b348-d7ece3c174c4",
+      "roleId": 3,
+      "settingKey": "797fe942-b046-4cba-9ef5-3cb367a7a332",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/capacity-tiers"
+    },
+    {
+      "id": "9d36cfb1-10aa-457a-b9a2-a39ecd1e401e",
+      "roleId": 3,
+      "settingKey": "57b6f655-c7e1-441d-918d-ef11490b5384",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/tier-rates/platform"
+    },
+    {
+      "id": "e9b93323-6d7a-43a5-89a4-b4f88ce14b41",
+      "roleId": 3,
+      "settingKey": "c62d30a8-04b8-4bdb-9b20-64ee23b15057",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/tier-rates/tenant"
+    },
+    {
+      "id": "53cd461b-2516-445f-849b-48fcb29295d9",
+      "roleId": 3,
+      "settingKey": "f1d186a2-c2b7-4969-87bb-d464e457eedf",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription"
+    },
+    {
+      "id": "db9458d3-8e40-42ea-b4d3-dc9e6938255c",
+      "roleId": 3,
+      "settingKey": "337f81d7-0258-455b-8977-db954e5069b9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription/sites"
+    },
+    {
+      "id": "38b0dfa2-a4f4-4ea2-b2db-b0b38ed198ee",
+      "roleId": 3,
+      "settingKey": "f667a63e-8ce7-46d4-bea7-fa8fe30bd428",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription/changelog"
+    },
+    {
+      "id": "a6ff22eb-8b1b-4861-9c55-d17852ef9cf2",
+      "roleId": 3,
+      "settingKey": "db876cfb-e64d-4936-b72d-fad69857d8fa",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/invoices"
+    },
+    {
+      "id": "94e50ff2-e263-4b19-9328-ea2f0f15e4f1",
+      "roleId": 3,
+      "settingKey": "ce3b3521-532f-4b53-9d11-c66b559d8e38",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/nas-devices"
+    },
+    {
+      "id": "c474d4f6-c8e1-40c2-8884-447a6b41d3b9",
+      "roleId": 3,
+      "settingKey": "c998a558-17a5-4321-983d-e9e3db9f5597",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/vendor-profiles"
+    },
+    {
+      "id": "c684a889-62c6-4097-a9ec-6230a7d6fbfd",
+      "roleId": 3,
+      "settingKey": "d9e74164-57f2-44c1-8da8-9e5c8e3ff9a2",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/attribute-catalog"
+    },
+    {
+      "id": "3364906f-7335-454f-8c67-6960e929d84a",
+      "roleId": 3,
+      "settingKey": "1ea680d6-b719-454e-9394-2e6952fe2743",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/plan-policies"
+    },
+    {
+      "id": "f07c2d47-019f-460f-a946-07785f25ffdc",
+      "roleId": 3,
+      "settingKey": "dac450a9-2e48-4c39-a9ff-815fba388d11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/live-sessions"
+    },
+    {
+      "id": "9a676327-d40f-492c-be75-96dc56b8497c",
+      "roleId": 3,
+      "settingKey": "d2236f0b-d6df-4088-9d92-cf8f843e944c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/auth-events"
+    },
+    {
+      "id": "32650a91-9e95-4034-8b02-2241c92ca848",
+      "roleId": 3,
+      "settingKey": "b840ba5d-1106-49d2-9aaa-916ee7589cfd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners"
+    },
+    {
+      "id": "b1614534-76fb-49f7-92d1-5abeec9721c4",
+      "roleId": 3,
+      "settingKey": "c914e073-5476-4c48-b3dd-2a10be6ccb7c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners/workspace"
+    },
+    {
+      "id": "099177e2-91a0-4721-8d12-9d40f193227f",
+      "roleId": 3,
+      "settingKey": "6d5d8c13-b248-401f-bf9f-8750cec217b1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/access-tokens"
+    },
+    {
+      "id": "86b19def-4f60-46e1-b328-ff3ef47ea300",
+      "roleId": 3,
+      "settingKey": "15655da2-360a-4e2e-85c4-994897b6d311",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/transactions/orders"
+    },
+    {
+      "id": "ea464c48-9476-4b74-a24e-697161c6615b",
+      "roleId": 3,
+      "settingKey": "10cc617a-7be4-4c57-90ff-39818697e74f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/transactions/payments"
+    },
+    {
+      "id": "a7913b5b-fa2d-4901-8032-10d4630583a3",
+      "roleId": 3,
+      "settingKey": "7a93b378-2095-419c-98bb-87225367218d",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/commissions/rules"
+    },
+    {
+      "id": "b1e33bb5-d368-46de-93de-ecadf7bf0836",
+      "roleId": 3,
+      "settingKey": "3ba3b38d-35ea-46cc-a52e-7959d6bb5ae1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/commissions/payouts"
+    },
+    {
+      "id": "2480b6b1-8299-4a50-8159-10120558b151",
+      "roleId": 3,
+      "settingKey": "0b4c83d2-1dad-4fe9-9557-0e8d55967ee7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners/insights"
+    },
+    {
+      "id": "20bea659-5aec-477c-8fdf-52e631054752",
+      "roleId": 3,
+      "settingKey": "658aac8c-2fc8-40b3-b49c-279310da3e1b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/tenants"
+    },
+    {
+      "id": "57f63e4d-587e-43a9-b884-fb938cb712f0",
+      "roleId": 3,
+      "settingKey": "39c4a24a-f5e9-43ef-aa53-52eb58b86b45",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/sites"
+    },
+    {
+      "id": "cf7bd090-3025-47fb-ba37-0d21f43e7d1d",
+      "roleId": 3,
+      "settingKey": "84ca06c2-d940-4010-bba0-f2729d1483f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/partners"
+    },
+    {
+      "id": "fb83658e-bdfd-4484-a510-aa1ced96672e",
+      "roleId": 3,
+      "settingKey": "7fa5ec48-aacb-41e1-b277-fafc10a1da1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/service-plans"
+    },
+    {
+      "id": "278bf4d4-b39e-4980-ac95-93ae6115431d",
+      "roleId": 3,
+      "settingKey": "5c07ad61-cca6-400d-ba36-b9621c0364fd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/revenue"
+    },
+    {
+      "id": "6b1620ae-7ce8-408f-a56d-22c65dd8b01b",
+      "roleId": 3,
+      "settingKey": "75d1101c-2bff-4d78-8496-175bed616105",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/access-tokens"
+    },
+    {
+      "id": "1cbfdf95-268b-4382-a999-5343ff59c39d",
+      "roleId": 3,
+      "settingKey": "c3d9667e-03c4-4aaf-8efe-bf84c438363a",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/session-traffic"
+    },
+    {
+      "id": "86ced124-490c-4956-b6d5-e413d1688118",
+      "roleId": 3,
+      "settingKey": "bac6939d-2e90-454b-b931-5e0fffa9394b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/voucher-runs"
+    },
+    {
+      "id": "672e54ca-b4ca-48f7-a985-c3bd6aa60095",
+      "roleId": 3,
+      "settingKey": "3d8751fe-f884-4d34-918f-09b23618c85b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/site-inventory"
+    },
+    {
+      "id": "21f8df9c-c7f8-4233-9789-524e1db925b0",
+      "roleId": 3,
+      "settingKey": "2c919872-457a-44d3-a0b7-6d191f5e9f11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/nas-inventory"
+    },
+    {
+      "id": "6e39fe8f-7c6e-4360-9ce4-a7941520cf54",
+      "roleId": 3,
+      "settingKey": "f57413dc-6fc0-42db-83c4-66ddda35613e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/settlements"
+    },
+    {
+      "id": "414f7572-4b06-4835-ba6f-97e171661132",
+      "roleId": 3,
+      "settingKey": "9997d9e7-436a-4cee-b5f5-87cb4edb03e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/approvals"
+    },
+    {
+      "id": "ddcf561f-f371-41e5-b952-fe4068ef3866",
+      "roleId": 3,
+      "settingKey": "0c71c588-f75d-4a4e-bf94-9f7750f08474",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/coverage"
+    },
+    {
+      "id": "f6b20660-9c9b-4938-94c8-4df51b27c85d",
+      "roleId": 3,
+      "settingKey": "3567f1bd-89af-4db6-a14a-0d6a21262369",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/live-ops"
+    },
+    {
+      "id": "381a9bbd-090c-4f4c-96fe-d202d986cc68",
+      "roleId": 4,
+      "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "overview"
+    },
+    {
+      "id": "00270fbd-a365-47ee-812b-2f02f0e61e04",
+      "roleId": 4,
+      "settingKey": "f33269de-b52a-42b3-9c3d-51ffd4a28052",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "wifi-billing"
+    },
+    {
+      "id": "e3012d01-25b5-4215-bb65-9a70bcaa8d56",
+      "roleId": 4,
+      "settingKey": "4ae755d4-d3b4-4b34-a795-b5387c1b8f1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "analytics"
+    },
+    {
+      "id": "a893d274-718f-4170-84f2-a653261003c7",
+      "roleId": 4,
+      "settingKey": "c34483b1-914d-4440-b754-eb37383a81db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi"
+    },
+    {
+      "id": "3723c0df-757e-40ac-af0b-f6f5ca4cdd40",
+      "roleId": 4,
+      "settingKey": "f1d186a2-c2b7-4969-87bb-d464e457eedf",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription"
+    },
+    {
+      "id": "5c9687c8-41bd-4695-945c-ce38cdee1b89",
+      "roleId": 4,
+      "settingKey": "337f81d7-0258-455b-8977-db954e5069b9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription/sites"
+    },
+    {
+      "id": "9c106867-8a62-43b6-b04d-e49d0923fe62",
+      "roleId": 4,
+      "settingKey": "f667a63e-8ce7-46d4-bea7-fa8fe30bd428",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/subscription/changelog"
+    },
+    {
+      "id": "088dc2d3-ce55-4be5-8572-4ac447cbd1e2",
+      "roleId": 4,
+      "settingKey": "db876cfb-e64d-4936-b72d-fad69857d8fa",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/invoices"
+    },
+    {
+      "id": "7c712198-7cab-461d-b534-31a725052088",
+      "roleId": 4,
+      "settingKey": "c62d30a8-04b8-4bdb-9b20-64ee23b15057",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/billing/tier-rates/tenant"
+    },
+    {
+      "id": "a95f97bb-9ecf-45da-b3bb-5cfe38db4a0c",
+      "roleId": 4,
+      "settingKey": "5c07ad61-cca6-400d-ba36-b9621c0364fd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/revenue"
+    },
+    {
+      "id": "49ce7d7b-f753-455a-a4f0-2f941b69bdd5",
+      "roleId": 4,
+      "settingKey": "f57413dc-6fc0-42db-83c4-66ddda35613e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/settlements"
+    },
+    {
+      "id": "8589bd28-c449-4d1c-a938-3301833fa473",
+      "roleId": 4,
+      "settingKey": "9997d9e7-436a-4cee-b5f5-87cb4edb03e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/approvals"
+    },
+    {
+      "id": "10fda5de-a123-42fd-b3fd-d5b9374e5fcd",
+      "roleId": 4,
+      "settingKey": "0c71c588-f75d-4a4e-bf94-9f7750f08474",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/coverage"
+    },
+    {
+      "id": "e73fdd4c-17df-49ee-93ad-b0b1314b7d86",
+      "roleId": 5,
+      "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "overview"
+    },
+    {
+      "id": "ef8741f9-0973-4671-935d-eb6e19386659",
+      "roleId": 5,
+      "settingKey": "953e52f5-6abe-495c-937b-84166231ce73",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "tenant"
+    },
+    {
+      "id": "d7c67550-cab0-457b-9fb3-31eea9b807fb",
+      "roleId": 5,
+      "settingKey": "37ab5831-2b6b-4df3-807a-f9d01de613f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "network"
+    },
+    {
+      "id": "74cb1227-fced-4351-9a9d-5d643eefc1fa",
+      "roleId": 5,
+      "settingKey": "4ae755d4-d3b4-4b34-a795-b5387c1b8f1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "analytics"
+    },
+    {
+      "id": "d52bf4bc-38c6-4962-a19b-6495abf36c87",
+      "roleId": 5,
+      "settingKey": "c34483b1-914d-4440-b754-eb37383a81db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi"
+    },
+    {
+      "id": "74ed53b3-21db-4105-af03-1d3f1ab19604",
+      "roleId": 5,
+      "settingKey": "490a2398-7f78-4fd5-8dfa-6af017ab77fe",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/sites"
+    },
+    {
+      "id": "af67d288-8140-46ca-8351-1f59b75d0bd2",
+      "roleId": 5,
+      "settingKey": "ce3b3521-532f-4b53-9d11-c66b559d8e38",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/nas-devices"
+    },
+    {
+      "id": "8e531739-ec2f-4445-bace-ffa0439b302d",
+      "roleId": 5,
+      "settingKey": "c998a558-17a5-4321-983d-e9e3db9f5597",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/vendor-profiles"
+    },
+    {
+      "id": "5f80ef0f-9077-40d4-b073-6b6e640db3fc",
+      "roleId": 5,
+      "settingKey": "d9e74164-57f2-44c1-8da8-9e5c8e3ff9a2",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/attribute-catalog"
+    },
+    {
+      "id": "866e5479-d2b0-419e-84b3-068be914420c",
+      "roleId": 5,
+      "settingKey": "1ea680d6-b719-454e-9394-2e6952fe2743",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/plan-policies"
+    },
+    {
+      "id": "4368a7a2-d0c6-45ab-92ce-16e7e39ea778",
+      "roleId": 5,
+      "settingKey": "dac450a9-2e48-4c39-a9ff-815fba388d11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/live-sessions"
+    },
+    {
+      "id": "48b982fc-3630-4dc4-a5ff-38d430ca3adc",
+      "roleId": 5,
+      "settingKey": "d2236f0b-d6df-4088-9d92-cf8f843e944c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/auth-events"
+    },
+    {
+      "id": "263833cc-6806-4885-94d4-da0569c4f363",
+      "roleId": 5,
+      "settingKey": "39c4a24a-f5e9-43ef-aa53-52eb58b86b45",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/sites"
+    },
+    {
+      "id": "2b3181d9-008d-4cce-8ba7-5d32a1fd61e3",
+      "roleId": 5,
+      "settingKey": "3d8751fe-f884-4d34-918f-09b23618c85b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/site-inventory"
+    },
+    {
+      "id": "f2628945-8ea4-4603-8605-b0e2becfb886",
+      "roleId": 5,
+      "settingKey": "2c919872-457a-44d3-a0b7-6d191f5e9f11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/nas-inventory"
+    },
+    {
+      "id": "7fd5eb28-c41c-4c37-b696-edcf9a5acf26",
+      "roleId": 5,
+      "settingKey": "c3d9667e-03c4-4aaf-8efe-bf84c438363a",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/session-traffic"
+    },
+    {
+      "id": "dd22ede8-358e-4225-9ceb-652defbab6d1",
+      "roleId": 5,
+      "settingKey": "3567f1bd-89af-4db6-a14a-0d6a21262369",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/live-ops"
+    },
+    {
+      "id": "797da5bd-39ac-460a-88ac-8aee11ea2c6b",
+      "roleId": 6,
+      "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "overview"
+    },
+    {
+      "id": "3b747274-ac09-467c-a607-075cb25f40d3",
+      "roleId": 6,
+      "settingKey": "953e52f5-6abe-495c-937b-84166231ce73",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "tenant"
+    },
+    {
+      "id": "e41b1d5e-ac25-4a0a-86b6-0f347376f38d",
+      "roleId": 6,
+      "settingKey": "37ab5831-2b6b-4df3-807a-f9d01de613f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "network"
+    },
+    {
+      "id": "0638ae9a-7092-4a6b-abee-f25199c9142d",
+      "roleId": 6,
+      "settingKey": "ce8c31d2-945b-4302-a3ce-50efe4349c40",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "commerce"
+    },
+    {
+      "id": "07483c7d-4370-48ea-bdbb-a6b9728e3e26",
+      "roleId": 6,
+      "settingKey": "4ae755d4-d3b4-4b34-a795-b5387c1b8f1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "analytics"
+    },
+    {
+      "id": "b59338fc-9caf-4f72-af5d-9d69c5197522",
+      "roleId": 6,
+      "settingKey": "f33269de-b52a-42b3-9c3d-51ffd4a28052",
+      "enable": false,
+      "visibility": false,
+      "mngRoleSettingKey": "wifi-billing"
+    },
+    {
+      "id": "8526500a-f642-417f-aab2-2d1bea0a4cec",
+      "roleId": 6,
+      "settingKey": "c34483b1-914d-4440-b754-eb37383a81db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi"
+    },
+    {
+      "id": "4c56cb96-0954-423c-b2b5-fb3c04bee5f6",
+      "roleId": 6,
+      "settingKey": "33d16301-e187-4627-80a6-1182a4ac1a9f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/profile"
+    },
+    {
+      "id": "27a08026-5b97-4a45-b83e-df29e4fa21b0",
+      "roleId": 6,
+      "settingKey": "b8e142e6-1a32-4e0e-ba57-b95b124ca054",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/access-control"
+    },
+    {
+      "id": "3d3ddad0-0c08-4b5d-acee-3905b9af52be",
+      "roleId": 6,
+      "settingKey": "47754789-7780-4fa4-bf65-23215a73e268",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/tenant/activity-log"
+    },
+    {
+      "id": "daaf4bf2-1f46-4ec8-8a79-8917dbdda198",
+      "roleId": 6,
+      "settingKey": "cebb20e7-7d05-464c-960b-114b5590c251",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/catalog/service-plans"
+    },
+    {
+      "id": "521da671-96bb-4f05-bc06-7a13c05b7741",
+      "roleId": 6,
+      "settingKey": "7ae3ba9c-9c53-4e7b-8551-93a7c6b248e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/catalog/retail-pricing"
+    },
+    {
+      "id": "4751a59a-f73e-4e8f-b907-97b2f4f23610",
+      "roleId": 6,
+      "settingKey": "490a2398-7f78-4fd5-8dfa-6af017ab77fe",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/sites"
+    },
+    {
+      "id": "95abd747-41a5-4f50-b539-98b9d8268de5",
+      "roleId": 6,
+      "settingKey": "7398f63b-d4b0-4e09-bdf3-8a9ac68c4a8c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/access/voucher-runs"
+    },
+    {
+      "id": "f0896096-8370-43e5-9b47-8d6273ac1ca8",
+      "roleId": 6,
+      "settingKey": "f1d186a2-c2b7-4969-87bb-d464e457eedf",
+      "enable": false,
+      "visibility": false,
+      "mngRoleSettingKey": "/wifi/billing/subscription"
+    },
+    {
+      "id": "9bf674b2-3c2c-487e-ba89-b3b11c02aa8f",
+      "roleId": 6,
+      "settingKey": "337f81d7-0258-455b-8977-db954e5069b9",
+      "enable": false,
+      "visibility": false,
+      "mngRoleSettingKey": "/wifi/billing/subscription/sites"
+    },
+    {
+      "id": "206a4c9d-ea74-4e2c-b59b-619d429074bc",
+      "roleId": 6,
+      "settingKey": "db876cfb-e64d-4936-b72d-fad69857d8fa",
+      "enable": false,
+      "visibility": false,
+      "mngRoleSettingKey": "/wifi/billing/invoices"
+    },
+    {
+      "id": "a41f4580-eca9-4fdd-a6bf-b6bbf34a870d",
+      "roleId": 6,
+      "settingKey": "c62d30a8-04b8-4bdb-9b20-64ee23b15057",
+      "enable": false,
+      "visibility": false,
+      "mngRoleSettingKey": "/wifi/billing/tier-rates/tenant"
+    },
+    {
+      "id": "ed91a3fc-0deb-4b14-8176-066883b5efb7",
+      "roleId": 6,
+      "settingKey": "ce3b3521-532f-4b53-9d11-c66b559d8e38",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/nas-devices"
+    },
+    {
+      "id": "c84bac04-8ad2-4845-a735-c12a2409cee0",
+      "roleId": 6,
+      "settingKey": "c998a558-17a5-4321-983d-e9e3db9f5597",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/vendor-profiles"
+    },
+    {
+      "id": "a40c9354-6b88-4ce4-87b3-21502dcd954f",
+      "roleId": 6,
+      "settingKey": "d9e74164-57f2-44c1-8da8-9e5c8e3ff9a2",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/attribute-catalog"
+    },
+    {
+      "id": "80643a0d-80c6-4b5f-96da-805a4610a360",
+      "roleId": 6,
+      "settingKey": "1ea680d6-b719-454e-9394-2e6952fe2743",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/plan-policies"
+    },
+    {
+      "id": "e121f43a-92cb-4828-8566-ac33c02626de",
+      "roleId": 6,
+      "settingKey": "dac450a9-2e48-4c39-a9ff-815fba388d11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/live-sessions"
+    },
+    {
+      "id": "f59bc32c-98b0-4a1c-ae87-c8429e731e76",
+      "roleId": 6,
+      "settingKey": "d2236f0b-d6df-4088-9d92-cf8f843e944c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/auth-events"
+    },
+    {
+      "id": "8ece220d-52db-4c43-8049-d7988d8582f7",
+      "roleId": 6,
+      "settingKey": "b840ba5d-1106-49d2-9aaa-916ee7589cfd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners"
+    },
+    {
+      "id": "f4d42509-ba76-4c32-b7ea-9f2fc672d2ad",
+      "roleId": 6,
+      "settingKey": "7a93b378-2095-419c-98bb-87225367218d",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/commissions/rules"
+    },
+    {
+      "id": "c16c0048-9f14-4840-be8d-6a98e6c1a511",
+      "roleId": 6,
+      "settingKey": "3ba3b38d-35ea-46cc-a52e-7959d6bb5ae1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/commissions/payouts"
+    },
+    {
+      "id": "6202e2f8-8e50-4b80-81d4-4fd84b5e8870",
+      "roleId": 6,
+      "settingKey": "39c4a24a-f5e9-43ef-aa53-52eb58b86b45",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/sites"
+    },
+    {
+      "id": "2f48730c-4bc3-4523-83fd-c39bba92b468",
+      "roleId": 6,
+      "settingKey": "84ca06c2-d940-4010-bba0-f2729d1483f4",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/partners"
+    },
+    {
+      "id": "13ad7acd-68b9-4c54-9b38-317a219efb20",
+      "roleId": 6,
+      "settingKey": "7fa5ec48-aacb-41e1-b277-fafc10a1da1e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/service-plans"
+    },
+    {
+      "id": "6f3e417a-c27d-4971-90ca-e56bd67c8b73",
+      "roleId": 6,
+      "settingKey": "5c07ad61-cca6-400d-ba36-b9621c0364fd",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/revenue"
+    },
+    {
+      "id": "7657718e-d460-4f14-bc25-e2e3638914c9",
+      "roleId": 6,
+      "settingKey": "75d1101c-2bff-4d78-8496-175bed616105",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/access-tokens"
+    },
+    {
+      "id": "1cf8836d-2572-4dc6-91d0-4c97e7007943",
+      "roleId": 6,
+      "settingKey": "c3d9667e-03c4-4aaf-8efe-bf84c438363a",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/session-traffic"
+    },
+    {
+      "id": "03bc0ccb-8b71-4205-aaf5-07391191c0cf",
+      "roleId": 6,
+      "settingKey": "bac6939d-2e90-454b-b931-5e0fffa9394b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/voucher-runs"
+    },
+    {
+      "id": "7c0c6c85-8d2d-4321-a149-29ab7efda052",
+      "roleId": 6,
+      "settingKey": "3d8751fe-f884-4d34-918f-09b23618c85b",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/site-inventory"
+    },
+    {
+      "id": "5b3cb862-ba27-4feb-9c9c-e9cf17d7e2b5",
+      "roleId": 6,
+      "settingKey": "2c919872-457a-44d3-a0b7-6d191f5e9f11",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/nas-inventory"
+    },
+    {
+      "id": "8749b0ad-7186-434e-bb8d-ccb0b09cc6ad",
+      "roleId": 6,
+      "settingKey": "f57413dc-6fc0-42db-83c4-66ddda35613e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/settlements"
+    },
+    {
+      "id": "50a60d66-22bb-4728-8922-fbd3f0a486a9",
+      "roleId": 6,
+      "settingKey": "9997d9e7-436a-4cee-b5f5-87cb4edb03e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/reconciliation/approvals"
+    },
+    {
+      "id": "2c01d452-4449-4381-abfb-184d999e101c",
+      "roleId": 6,
+      "settingKey": "3567f1bd-89af-4db6-a14a-0d6a21262369",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/analytics/live-ops"
+    },
+    {
+      "id": "6913dabe-d0b7-4c0a-8c56-02b6c41cc97e",
+      "roleId": 7,
+      "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "overview"
+    },
+    {
+      "id": "62cd9c2d-99d6-4539-b73c-e913563932e6",
+      "roleId": 7,
+      "settingKey": "ce8c31d2-945b-4302-a3ce-50efe4349c40",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "commerce"
+    },
+    {
+      "id": "43b23a28-9534-4704-82ca-9d52e64b698e",
+      "roleId": 7,
+      "settingKey": "c34483b1-914d-4440-b754-eb37383a81db",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi"
+    },
+    {
+      "id": "6f9c6728-055d-41d1-aec2-9b2a11a2c1a8",
+      "roleId": 7,
+      "settingKey": "c914e073-5476-4c48-b3dd-2a10be6ccb7c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners/workspace"
+    },
+    {
+      "id": "725f94f1-9efc-4767-b30a-6967810b5223",
+      "roleId": 7,
+      "settingKey": "6d5d8c13-b248-401f-bf9f-8750cec217b1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/access-tokens"
+    },
+    {
+      "id": "60b99bcf-4baa-4a76-bc5c-1224fa51dc15",
+      "roleId": 7,
+      "settingKey": "15655da2-360a-4e2e-85c4-994897b6d311",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/transactions/orders"
+    },
+    {
+      "id": "0f66f0f2-f0d9-4f3a-9067-d04d407456a4",
+      "roleId": 7,
+      "settingKey": "10cc617a-7be4-4c57-90ff-39818697e74f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/transactions/payments"
+    },
+    {
+      "id": "4d4ee9d8-a18d-4f6b-9617-ca67de636dfe",
+      "roleId": 7,
+      "settingKey": "0b4c83d2-1dad-4fe9-9557-0e8d55967ee7",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/partners/insights"
+    },
+    {
+      "id": "944cda2f-c22a-449d-ba1c-16ad4c54453d",
+      "roleId": 1,
+      "settingKey": "20912c1a-05a4-4640-b051-ead8d7347840",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "system"
+    },
+    {
+      "id": "70e7c4ae-4d99-4cbc-a23a-5341f67f1b5e",
+      "roleId": 1,
+      "settingKey": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-users"
+    },
+    {
+      "id": "209e75b2-7210-408b-9db7-86b09f76a763",
+      "roleId": 1,
+      "settingKey": "95ae5b7a-93de-4211-b618-727cbe55e387",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-roles"
+    },
+    {
+      "id": "30658f3d-9466-4f7e-b9fe-e24057e3f70e",
+      "roleId": 1,
+      "settingKey": "1a65fcb0-1eed-44a4-82d4-8d4ec7ae9a6c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/settings"
+    },
+    {
+      "id": "a390d180-db01-4bc1-87ce-ac2e25fb3a85",
+      "roleId": 1,
+      "settingKey": "45edd57f-f1eb-4017-8623-a83a095fe901",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/audit-logs"
+    },
+    {
+      "id": "773814d6-524e-4a05-9580-bc53a4f2c152",
+      "roleId": 1,
+      "settingKey": "a553b4c4-2640-410e-ac3b-d490a136a42f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/conversations"
+    },
+    {
+      "id": "20ba23f3-8772-4e59-908b-2ada1047a7f9",
+      "roleId": 3,
+      "settingKey": "20912c1a-05a4-4640-b051-ead8d7347840",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "system"
+    },
+    {
+      "id": "43a0a81b-b7fc-4ccd-b94b-4776406f3e8b",
+      "roleId": 3,
+      "settingKey": "6dc0243c-8289-4559-b89a-51ad19529bef",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "development"
+    },
+    {
+      "id": "89b49e12-093f-4153-8ba5-a13f34ea9643",
+      "roleId": 3,
+      "settingKey": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-users"
+    },
+    {
+      "id": "53adeeac-769d-4370-810d-8144091a4162",
+      "roleId": 3,
+      "settingKey": "95ae5b7a-93de-4211-b618-727cbe55e387",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/admin-roles"
+    },
+    {
+      "id": "9eed6a24-257e-4329-8a8d-97daa360fb58",
+      "roleId": 3,
+      "settingKey": "1a65fcb0-1eed-44a4-82d4-8d4ec7ae9a6c",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/settings"
+    },
+    {
+      "id": "57128a1e-ce46-4b96-9c7b-6317e07cbd36",
+      "roleId": 3,
+      "settingKey": "45edd57f-f1eb-4017-8623-a83a095fe901",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/audit-logs"
+    },
+    {
+      "id": "39f4b355-a47b-4a80-aaec-fe66217552a9",
+      "roleId": 3,
+      "settingKey": "a553b4c4-2640-410e-ac3b-d490a136a42f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/conversations"
+    },
+    {
+      "id": "d7086242-ea5f-46cd-bfc2-aa8059b924db",
+      "roleId": 3,
+      "settingKey": "fbbc87ef-b6d2-4de0-83a0-ec70c86d8cee",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/permissions"
+    },
+    {
+      "id": "bd6e2872-3074-41bc-9f81-be51e4de5f07",
+      "roleId": 3,
+      "settingKey": "85b32f2d-23fe-44b1-8fd6-80f067b1995f",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/settings"
+    },
+    {
+      "id": "96194eb1-300e-4b6f-85dd-142fd31a3a90",
+      "roleId": 3,
+      "settingKey": "50f07f21-0c6e-411d-913e-12e6ee27768e",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/menu-management"
+    },
+    {
+      "id": "2e74c7e2-768d-46f3-8610-d284a2338310",
+      "roleId": 3,
+      "settingKey": "98340ed7-5afb-4e83-8496-75787669b3e9",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/themes"
+    },
+    {
+      "id": "898068a9-b310-4a4b-89b8-45b038cd45d5",
+      "roleId": 3,
+      "settingKey": "20cb40f6-c5d4-42a7-bbd2-44b5c59c8035",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/files"
+    },
+    {
+      "id": "bce56763-a2e2-4ba9-8381-74b29026bd39",
+      "roleId": 3,
+      "settingKey": "8b639b43-758d-4cb9-8d62-9555481d7088",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/contents"
+    },
+    {
+      "id": "f1f6945f-86eb-497f-8cb2-bf82af7c8bf9",
+      "roleId": 3,
+      "settingKey": "408bf462-f3e9-4d80-afdf-b411821c2fe3",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/receipts"
+    },
+    {
+      "id": "87417e6f-8000-4882-b2e1-6b7f2362558f",
+      "roleId": 3,
+      "settingKey": "db715f62-492a-43ba-9271-635cb1ac26de",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/system/contact-support"
+    }
+  ]
+}

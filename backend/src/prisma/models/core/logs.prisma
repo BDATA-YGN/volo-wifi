@@ -1,0 +1,31 @@
+model RegisterLog {
+  id        Int       @id @default(autoincrement()) @map("id")
+  phone     String?   @map("phone")
+  requestId String?   @map("request_id")
+  otpCount  Int?      @map("otp_count")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("tbl_register_logs")
+}
+
+/// High-volume append-only log — BIGINT PK avoids Int32 overflow (~2.1B rows).
+model LoginLog {
+  id            BigInt    @id @default(autoincrement()) @map("l_id") @db.BigInt
+  userId        String?   @map("user_id")
+  userEmail     String?   @map("user_email")
+  loginDateTime DateTime? @map("login_date_time")
+  loginDevices  String?   @map("login_devices")
+  loginPlatform String?   @map("login_platform")
+  ipAddress     String?   @map("ip_address")
+  type          String?   @map("type")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  @@index([loginDateTime])
+  @@index([userId])
+  @@index([type])
+  @@map("tbl_login_log")
+}

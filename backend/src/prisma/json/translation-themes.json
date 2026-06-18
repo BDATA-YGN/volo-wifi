@@ -1,0 +1,1036 @@
+{
+  "version": 1,
+  "exportedAt": "2026-06-11T02:49:21.219Z",
+  "translations": [
+    {
+      "id": 1,
+      "locale": "en",
+      "messages": {
+        "home": {
+          "desc": "Volo WiFi Admin console",
+          "title": "Volo WiFi Admin",
+          "guideTitle": "Volo WiFi Guide",
+          "guideSubtitle": "Admin guide for tenant onboarding, billing, network, commerce, and analytics.",
+          "welcome": "This console manages WiFi tenant registration, site licensing, service plans, partner commerce, RADIUS network configuration, and operational analytics. Use the sidebar to open modules your role can access.",
+          "accessNote": "This home page is available to every signed-in user. Individual menus and actions depend on your assigned role and permissions.",
+          "modulesTitle": "Modules & features",
+          "workflowsTitle": "Core workflows",
+          "rulesTitle": "Business rules",
+          "rolesTitle": "Roles & access",
+          "modules": {
+            "overview": {
+              "title": "Overview",
+              "summary": "Operational KPI dashboard for sales and RADIUS usage.",
+              "f1": "Dashboard — daily sales and session metrics"
+            },
+            "tenant": {
+              "title": "Tenant",
+              "summary": "Tenant directory, profile, access control, catalog, sites, and vouchers.",
+              "f1": "Tenant Directory — platform-wide org list",
+              "f2": "Access Control — internal accounts and role assignment",
+              "f3": "Service Plans & Retail Pricing — sellable products",
+              "f4": "Site Directory — capacity-tiered WiFi sites",
+              "f5": "Voucher Runs — bulk credential generation"
+            },
+            "billing": {
+              "title": "Billing",
+              "summary": "License onboarding, tier rates, subscriptions, and SaaS invoices.",
+              "f1": "Tenant Registration — create org + subscription",
+              "f2": "Capacity Tiers & Tier Rates — platform and tenant pricing",
+              "f3": "Subscription & Licensed Sites — active license and billable sites",
+              "f4": "Invoices — monthly SaaS billing by site tier"
+            },
+            "network": {
+              "title": "Network",
+              "summary": "NAS inventory and RADIUS policy configuration.",
+              "f1": "NAS Devices — routers, APs, and NAS inventory",
+              "f2": "Vendor Profiles & Attribute Catalog — RADIUS dictionary",
+              "f3": "Plan RADIUS Policies — per-plan reply attributes",
+              "f4": "Live Sessions & Auth Events — operational visibility"
+            },
+            "commerce": {
+              "title": "Commerce",
+              "summary": "Partner setup, access tokens, orders, and commissions.",
+              "f1": "Partner Directory — site mapping and entitlements",
+              "f2": "Access Tokens — partner-issued credentials",
+              "f3": "Orders & Payments — sales ledger",
+              "f4": "Partner Insights — reseller-scoped analytics"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "summary": "Usage, revenue, reconciliation, and inventory reporting.",
+              "f1": "Site & Partner Analytics — performance by site and reseller",
+              "f2": "Revenue Analytics — order and payment trends",
+              "f3": "Settlements & Reconciliation — financial attestation workflow",
+              "f4": "Live Operations — near-real-time ops view"
+            },
+            "system": {
+              "title": "System",
+              "summary": "Platform administration, security, and configuration.",
+              "f1": "Admin Users — staff accounts and token control",
+              "f2": "Roles & Permissions — menu and action access by role",
+              "f3": "Settings — company and application configuration",
+              "f4": "Audit Logs — security and action history",
+              "f5": "Files, Contact & Support, Conversations (when enabled)"
+            }
+          },
+          "workflows": {
+            "onboarding": {
+              "title": "Tenant onboarding",
+              "steps": "1. Register tenant and subscription (license).\n2. Provision internal accounts and assign roles.\n3. Configure service plans, pricing, and sites with capacity tiers.\n4. Onboard partners with site mapping and entitlements.\n5. Partners issue access tokens to end users."
+            },
+            "licensing": {
+              "title": "Site licensing & invoicing",
+              "steps": "1. Define platform capacity tiers and default tier rates.\n2. Optionally override tier rates per tenant.\n3. Add licensed sites grouped by tier.\n4. Generate monthly SaaS invoices (one line per site tier)."
+            },
+            "commerce": {
+              "title": "Partner commerce",
+              "steps": "1. Create partner and map sellable sites.\n2. Entitle plans the partner may sell.\n3. Partner issues access tokens from workspace.\n4. Track orders, payments, and commission rules."
+            },
+            "network": {
+              "title": "Network & RADIUS",
+              "steps": "1. Register NAS devices per site.\n2. Configure vendor profiles and attribute catalog.\n3. Attach RADIUS reply policies to service plans.\n4. Monitor live sessions and auth events."
+            }
+          },
+          "rules": {
+            "r1": "Every authenticated user can open this home page; other menus require role permissions.",
+            "r2": "Tenant registration creates org, license, and owner membership in one flow.",
+            "r3": "Monthly license billing is calculated per site capacity tier.",
+            "r4": "Partners can only sell plans and sites they are entitled to.",
+            "r5": "Access tokens require configured plans, pricing, and entitlements.",
+            "r6": "Platform billing setup menus are restricted to platform administrators.",
+            "r7": "Internal account provisioning only — no external email invites.",
+            "r8": "Soft-deleted records remain in the database but are hidden from normal lists."
+          },
+          "roles": {
+            "admin": {
+              "title": "Platform Administrator",
+              "description": "Full access to tenant registration, platform billing setup, all WiFi modules, and system configuration."
+            },
+            "orgAdmin": {
+              "title": "Org Administrator",
+              "description": "Tenant configuration — members, catalog, sites, partners, network, and commerce."
+            },
+            "orgFinance": {
+              "title": "Org Finance",
+              "description": "Subscription, invoices, reconciliation analytics, and revenue reporting."
+            },
+            "stationOps": {
+              "title": "Station Operator",
+              "description": "Site directory, NAS/RADIUS operations, and site-level analytics."
+            },
+            "partner": {
+              "title": "Partner (Reseller)",
+              "description": "Partner workspace, access tokens, transactions, and partner insights."
+            },
+            "orgViewer": {
+              "title": "Org Viewer",
+              "description": "Read-only dashboard and analytics for tenant users."
+            }
+          }
+        },
+        "menu": {
+          "menus": {
+            "files": "Files",
+            "client": "Content Editor",
+            "review": "Menu Management",
+            "themes": "Theme Editor",
+            "settings": "Settings",
+            "audit-logs": "Audit Logs",
+            "admin-users": "Admin Users",
+            "permissions": "Permissions",
+            "conversations": "Conversations",
+            "receipt-editor": "Receipt Editor",
+            "contact-support": "Contact & Support",
+            "system-settings": "Settings",
+            "admin-roles-permissions": "Admin Roles & Permissions",
+            "wifi": {
+              "overview": {
+                "dashboard": "Dashboard"
+              },
+              "tenant": {
+                "directory": "Tenant Directory",
+                "profile": "Tenant Profile",
+                "access-control": "Access Control",
+                "activity-log": "Activity Log"
+              },
+              "catalog": {
+                "service-plans": "Service Plans",
+                "retail-pricing": "Retail Pricing"
+              },
+              "sites": {
+                "directory": "Site Directory"
+              },
+              "access": {
+                "voucher-runs": "Voucher Runs"
+              },
+              "billing": {
+                "tenant-registration": "Tenant Registration",
+                "capacity-tiers": "Capacity Tiers",
+                "tier-rates": {
+                  "platform": "Platform Tier Rates",
+                  "tenant": "Tenant Tier Rates"
+                },
+                "subscription": {
+                  "$self": "Subscription",
+                  "sites": "Licensed Sites",
+                  "changelog": "Subscription Changelog"
+                },
+                "invoices": "Invoices"
+              },
+              "network": {
+                "nas-devices": "NAS Devices",
+                "radius": {
+                  "vendor-profiles": "Vendor Profiles",
+                  "attribute-catalog": "Attribute Catalog",
+                  "plan-policies": "Plan RADIUS Policies",
+                  "live-sessions": "Live Sessions",
+                  "auth-events": "Auth Events"
+                }
+              },
+              "commerce": {
+                "partners": {
+                  "directory": "Partner Directory",
+                  "workspace": "Partner Workspace",
+                  "insights": "Partner Insights"
+                },
+                "access-tokens": "Access Tokens",
+                "transactions": {
+                  "orders": "Orders",
+                  "payments": "Payments"
+                },
+                "commissions": {
+                  "rules": "Commission Rules",
+                  "payouts": "Commission Payouts"
+                }
+              },
+              "analytics": {
+                "tenants": "Tenant Analytics",
+                "sites": "Site Analytics",
+                "partners": "Partner Analytics",
+                "service-plans": "Plan Analytics",
+                "revenue": "Revenue Analytics",
+                "access-tokens": "Access Token Analytics",
+                "session-traffic": "Session Traffic",
+                "voucher-runs": "Voucher Run Analytics",
+                "site-inventory": "Site Inventory",
+                "nas-inventory": "NAS Inventory",
+                "reconciliation": {
+                  "settlements": "Settlements",
+                  "approvals": "Reconciliation Approvals",
+                  "coverage": "Data Coverage"
+                },
+                "live-ops": "Live Operations"
+              }
+            }
+          },
+          "title": "Volo WiFi Admin",
+          "version": "version@1.0.0",
+          "top-menu": {
+            "home": "Home",
+            "logout": "LOGOUT"
+          },
+          "menu-group": {
+            "system": "System",
+            "devmode": "Development Mode",
+            "wifi": {
+              "overview": "Overview",
+              "tenant": "Tenant",
+              "billing": "Billing",
+              "network": "Network",
+              "commerce": "Commerce",
+              "analytics": "Analytics"
+            }
+          }
+        },
+        "page": {
+          "desc": "English Language Translation",
+          "title": "English Lang"
+        },
+        "modals": {
+          "delete": {
+            "title": "Delete",
+            "okText": "Yes",
+            "content": "Are you sure you want to delete this item?",
+            "cancelText": "No"
+          },
+          "logout": {
+            "title": "Logout",
+            "okText": "Yes",
+            "content": "Are you sure you want to logout?",
+            "cancelText": "No"
+          },
+          "confirm": {
+            "title": "Confirm",
+            "okText": "Yes",
+            "content": "Are you sure?",
+            "cancelText": "No"
+          }
+        },
+        "tester": {
+          "testing": "testing testing"
+        },
+        "buttons": {
+          "add": "Add",
+          "back": "Back",
+          "edit": "Update",
+          "next": "Next",
+          "save": "Save",
+          "view": "View",
+          "close": "Close",
+          "reset": "Reset",
+          "cancel": "Cancel",
+          "create": "Create",
+          "delete": "Delete",
+          "export": "Export",
+          "filter": "Filter",
+          "import": "Import",
+          "search": "Search",
+          "submit": "Submit",
+          "update": "Update",
+          "upload": "Upload",
+          "refresh": "Refresh",
+          "download": "Download",
+          "previous": "Previous"
+        },
+        "login_page": {
+          "login_text": "Volo WiFi Admin",
+          "label_email": "Username",
+          "window_desc": "Volo WiFi Admin",
+          "window_title": "Volo WiFi Admin",
+          "label_password": "Password",
+          "sign_in_success": "Welcome!",
+          "login_button_text": "Sign In",
+          "placeholder_email": "Enter your username",
+          "error_message_email": "Please enter your username",
+          "placeholder_password": "Enter your password",
+          "sign_in_success_desc": "You have successfully signed in.",
+          "error_invalid_account": "We could not find an account with those details.",
+          "error_message_password": "Please enter your password",
+          "error_invalid_credentials": "Something went wrong! Please try again.",
+          "error_message_email_invalid": "Please enter a valid username"
+        },
+        "application": {
+          "app_name": "Volo WiFi Admin"
+        },
+        "permissions": {
+          "title": "Permissions",
+          "access": "Access",
+          "action": "Action",
+          "roleId": "Role ID",
+          "search": "Search",
+          "kindMenu": "Menu",
+          "roleName": "Role Name",
+          "allAccess": "All Access",
+          "createdAt": "Created At",
+          "updatedAt": "Updated At",
+          "allVisible": "All Visible",
+          "kindButton": "Button",
+          "selectRole": "Select Role",
+          "settingKey": "Setting Key",
+          "visibility": "Visibility",
+          "description": "Description",
+          "kindFeature": "Feature",
+          "manageRoles": "Manage Roles",
+          "permissions": "Permissions",
+          "settingKind": "Type",
+          "kindFilterAll": "All",
+          "kindMenuGroup": "Menu group",
+          "kindFilterManual": "Manual",
+          "managePermissions": "Manage Permissions",
+          "pleaseInputRoleId": "Please input the role ID!",
+          "mapRolePermissions": "Map Roles Permissions",
+          "pleaseInputRoleName": "Please input the role name!",
+          "pleaseInputSettingKey": "Please input the Setting Key!",
+          "selectRolePlaceholder": "Select a role",
+          "pleaseInputDescription": "Please input the description!",
+          "pleaseChooseSettingKind": "Please choose a type"
+        },
+        "menuItemForm": {
+          "key": "Key",
+          "url": "URL",
+          "icon": "Icon",
+          "name": "Name",
+          "error": "Error",
+          "title": "Menu Group Form",
+          "action": "Action",
+          "noIcons": "No icons found",
+          "success": "Success",
+          "createdAt": "Created At",
+          "updatedAt": "Updated At",
+          "description": "Description",
+          "noIconsDesc": "No icons found in the database. Please add some icons.",
+          "keyValidation": "Key must be at least 3 characters long",
+          "urlValidation": "URL must be at least 3 characters long",
+          "iconValidation": "Icon must be at least 3 characters long",
+          "keyPlaceholder": "Enter menu group key",
+          "urlPlaceholder": "Enter menu group URL",
+          "iconPlaceholder": "Enter menu group icon",
+          "pleaseInputName": "Please input the name!",
+          "titlePlaceholder": "Enter menu group title",
+          "pleaseInputDescription": "Please input the description!"
+        },
+        "menuGroupForm": {
+          "key": "Key",
+          "icon": "Icon",
+          "name": "Name",
+          "error": "Error",
+          "title": "Menu Group Form",
+          "action": "Action",
+          "noIcons": "No icons found",
+          "success": "Success",
+          "createdAt": "Created At",
+          "updatedAt": "Updated At",
+          "description": "Description",
+          "noIconsDesc": "No icons found in the database. Please add some icons.",
+          "keyValidation": "Key must be at least 3 characters long",
+          "iconValidation": "Icon must be at least 3 characters long",
+          "keyPlaceholder": "Enter menu group key",
+          "iconPlaceholder": "Enter menu group icon",
+          "pleaseInputName": "Please input the name!",
+          "titlePlaceholder": "Enter menu group title",
+          "pleaseInputDescription": "Please input the description!"
+        },
+        "LocaleSwitcher": {
+          "en": "English",
+          "fr": "French",
+          "hi": "Hindi",
+          "ja": "Japanese",
+          "ko": "Korean",
+          "my": "Burmese",
+          "ta": "Tamil",
+          "zh": "Chinese",
+          "label": "Language"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "locale": "my",
+      "messages": {
+        "home": {
+          "desc": "Volo WiFi Admin console",
+          "title": "Volo WiFi Admin",
+          "guideTitle": "Volo WiFi လမ်းညွှန်",
+          "guideSubtitle": "Tenant onboarding, billing, network, commerce နှင့် analytics အတွက် admin လမ်းညွှန်။",
+          "welcome": "ဤ console သည် WiFi tenant စာရင်းသွင်း၊ site licensing၊ service plans၊ partner commerce၊ RADIUS network configuration နှင့် operational analytics များကို စီမံခန့်ခွဲပါသည်။ Sidebar မှ သင့် role ခွင့်ပြုထားသော module များကို ဖွင့်ပါ။",
+          "accessNote": "This home page is available to every signed-in user. Individual menus and actions depend on your assigned role and permissions.",
+          "modulesTitle": "Modules & features",
+          "workflowsTitle": "Core workflows",
+          "rulesTitle": "Business rules",
+          "rolesTitle": "Roles & access",
+          "modules": {
+            "overview": {
+              "title": "Overview",
+              "summary": "Operational KPI dashboard for sales and RADIUS usage.",
+              "f1": "Dashboard — daily sales and session metrics"
+            },
+            "tenant": {
+              "title": "Tenant",
+              "summary": "Tenant directory, profile, access control, catalog, sites, and vouchers.",
+              "f1": "Tenant Directory — platform-wide org list",
+              "f2": "Access Control — internal accounts and role assignment",
+              "f3": "Service Plans & Retail Pricing — sellable products",
+              "f4": "Site Directory — capacity-tiered WiFi sites",
+              "f5": "Voucher Runs — bulk credential generation"
+            },
+            "billing": {
+              "title": "Billing",
+              "summary": "License onboarding, tier rates, subscriptions, and SaaS invoices.",
+              "f1": "Tenant Registration — create org + subscription",
+              "f2": "Capacity Tiers & Tier Rates — platform and tenant pricing",
+              "f3": "Subscription & Licensed Sites — active license and billable sites",
+              "f4": "Invoices — monthly SaaS billing by site tier"
+            },
+            "network": {
+              "title": "Network",
+              "summary": "NAS inventory and RADIUS policy configuration.",
+              "f1": "NAS Devices — routers, APs, and NAS inventory",
+              "f2": "Vendor Profiles & Attribute Catalog — RADIUS dictionary",
+              "f3": "Plan RADIUS Policies — per-plan reply attributes",
+              "f4": "Live Sessions & Auth Events — operational visibility"
+            },
+            "commerce": {
+              "title": "Commerce",
+              "summary": "Partner setup, access tokens, orders, and commissions.",
+              "f1": "Partner Directory — site mapping and entitlements",
+              "f2": "Access Tokens — partner-issued credentials",
+              "f3": "Orders & Payments — sales ledger",
+              "f4": "Partner Insights — reseller-scoped analytics"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "summary": "Usage, revenue, reconciliation, and inventory reporting.",
+              "f1": "Site & Partner Analytics — performance by site and reseller",
+              "f2": "Revenue Analytics — order and payment trends",
+              "f3": "Settlements & Reconciliation — financial attestation workflow",
+              "f4": "Live Operations — near-real-time ops view"
+            },
+            "system": {
+              "title": "System",
+              "summary": "Platform administration, security, and configuration.",
+              "f1": "Admin Users — staff accounts and token control",
+              "f2": "Roles & Permissions — menu and action access by role",
+              "f3": "Settings — company and application configuration",
+              "f4": "Audit Logs — security and action history",
+              "f5": "Files, Contact & Support, Conversations (when enabled)"
+            }
+          },
+          "workflows": {
+            "onboarding": {
+              "title": "Tenant onboarding",
+              "steps": "1. Register tenant and subscription (license).\n2. Provision internal accounts and assign roles.\n3. Configure service plans, pricing, and sites with capacity tiers.\n4. Onboard partners with site mapping and entitlements.\n5. Partners issue access tokens to end users."
+            },
+            "licensing": {
+              "title": "Site licensing & invoicing",
+              "steps": "1. Define platform capacity tiers and default tier rates.\n2. Optionally override tier rates per tenant.\n3. Add licensed sites grouped by tier.\n4. Generate monthly SaaS invoices (one line per site tier)."
+            },
+            "commerce": {
+              "title": "Partner commerce",
+              "steps": "1. Create partner and map sellable sites.\n2. Entitle plans the partner may sell.\n3. Partner issues access tokens from workspace.\n4. Track orders, payments, and commission rules."
+            },
+            "network": {
+              "title": "Network & RADIUS",
+              "steps": "1. Register NAS devices per site.\n2. Configure vendor profiles and attribute catalog.\n3. Attach RADIUS reply policies to service plans.\n4. Monitor live sessions and auth events."
+            }
+          },
+          "rules": {
+            "r1": "Every authenticated user can open this home page; other menus require role permissions.",
+            "r2": "Tenant registration creates org, license, and owner membership in one flow.",
+            "r3": "Monthly license billing is calculated per site capacity tier.",
+            "r4": "Partners can only sell plans and sites they are entitled to.",
+            "r5": "Access tokens require configured plans, pricing, and entitlements.",
+            "r6": "Platform billing setup menus are restricted to platform administrators.",
+            "r7": "Internal account provisioning only — no external email invites.",
+            "r8": "Soft-deleted records remain in the database but are hidden from normal lists."
+          },
+          "roles": {
+            "admin": {
+              "title": "Platform Administrator",
+              "description": "Full access to tenant registration, platform billing setup, all WiFi modules, and system configuration."
+            },
+            "orgAdmin": {
+              "title": "Org Administrator",
+              "description": "Tenant configuration — members, catalog, sites, partners, network, and commerce."
+            },
+            "orgFinance": {
+              "title": "Org Finance",
+              "description": "Subscription, invoices, reconciliation analytics, and revenue reporting."
+            },
+            "stationOps": {
+              "title": "Station Operator",
+              "description": "Site directory, NAS/RADIUS operations, and site-level analytics."
+            },
+            "partner": {
+              "title": "Partner (Reseller)",
+              "description": "Partner workspace, access tokens, transactions, and partner insights."
+            },
+            "orgViewer": {
+              "title": "Org Viewer",
+              "description": "Read-only dashboard and analytics for tenant users."
+            }
+          }
+        },
+        "menu": {
+          "menus": {
+            "files": "ဖိုင်များ",
+            "client": "Content Editor",
+            "review": "Menu Management",
+            "themes": "Theme Editor",
+            "settings": "ဆက်တင်များ",
+            "audit-logs": "Audit လော့ဂ်များ",
+            "admin-users": "အက်ဒမင်အသုံးပြုသူများ",
+            "permissions": "ခွင့်ပြုချက်များ",
+            "conversations": "စကားပြောဆိုမှုများ",
+            "receipt-editor": "Receipt Editor",
+            "contact-support": "ဆက်သွယ်ရန်နှင့် အကူအညီ",
+            "system-settings": "ဆက်တင်များ",
+            "admin-roles-permissions": "အက်ဒမင်အခန်းကဏ္ဍ/ခွင့်ပြုချက်",
+            "wifi": {
+              "overview": {
+                "dashboard": "ဒက်ရှ်ဘုတ်"
+              },
+              "tenant": {
+                "directory": "Tenant စာရင်း",
+                "profile": "Tenant ပရိုဖိုင်",
+                "access-control": "ဝင်ရောက်ခွင့် ထိန်းချုပ်မှု",
+                "activity-log": "လုပ်ဆောင်ချက် မှတ်တမ်း"
+              },
+              "catalog": {
+                "service-plans": "ဝန်ဆောင်မှု အစီအစဉ်များ",
+                "retail-pricing": "ရောင်းချ စျေးနှုန်း"
+              },
+              "sites": {
+                "directory": "Site စာရင်း"
+              },
+              "access": {
+                "voucher-runs": "Voucher ထုတ်လုပ်မှု"
+              },
+              "billing": {
+                "tenant-registration": "Tenant စာရင်းသွင်း",
+                "capacity-tiers": "Capacity Tier များ",
+                "tier-rates": {
+                  "platform": "Platform Tier Rates",
+                  "tenant": "Tenant Tier Rates"
+                },
+                "subscription": {
+                  "$self": "Subscription",
+                  "sites": "Licensed Sites",
+                  "changelog": "Subscription Changelog"
+                },
+                "invoices": "ဘေလ်စာများ"
+              },
+              "network": {
+                "nas-devices": "NAS စက်ပစ္စည်းများ",
+                "radius": {
+                  "vendor-profiles": "Vendor Profiles",
+                  "attribute-catalog": "Attribute Catalog",
+                  "plan-policies": "Plan RADIUS Policies",
+                  "live-sessions": "Live Sessions",
+                  "auth-events": "Auth Events"
+                }
+              },
+              "commerce": {
+                "partners": {
+                  "directory": "Partner စာရင်း",
+                  "workspace": "Partner Workspace",
+                  "insights": "Partner Insights"
+                },
+                "access-tokens": "Access Tokens",
+                "transactions": {
+                  "orders": "အော်ဒါများ",
+                  "payments": "ငွေပေးချေမှုများ"
+                },
+                "commissions": {
+                  "rules": "Commission Rules",
+                  "payouts": "Commission Payouts"
+                }
+              },
+              "analytics": {
+                "tenants": "Tenant Analytics",
+                "sites": "Site Analytics",
+                "partners": "Partner Analytics",
+                "service-plans": "Plan Analytics",
+                "revenue": "Revenue Analytics",
+                "access-tokens": "Access Token Analytics",
+                "session-traffic": "Session Traffic",
+                "voucher-runs": "Voucher Run Analytics",
+                "site-inventory": "Site Inventory",
+                "nas-inventory": "NAS Inventory",
+                "reconciliation": {
+                  "settlements": "Settlements",
+                  "approvals": "Reconciliation Approvals",
+                  "coverage": "Data Coverage"
+                },
+                "live-ops": "Live Operations"
+              }
+            }
+          },
+          "title": "Volo WiFi Admin",
+          "version": "version@1.0.0",
+          "top-menu": {
+            "home": "ပင်မစာမျက်နှာ",
+            "logout": "ထွက်ရန်"
+          },
+          "menu-group": {
+            "system": "စနစ်",
+            "devmode": "Development Mode",
+            "wifi": {
+              "overview": "အကျဉ်းချုပ်",
+              "tenant": "Tenant",
+              "billing": "Billing",
+              "network": "Network",
+              "commerce": "Commerce",
+              "analytics": "Analytics"
+            }
+          }
+        },
+        "page": {
+          "desc": "အင်္ဂလိပ်ဘာသာပြန်ကူးမှု",
+          "title": "အင်္ဂလိပ်ဘာသာ"
+        },
+        "modals": {
+          "delete": {
+            "title": "ဖျက်ရန်",
+            "okText": "ဟုတ်ကဲ့",
+            "content": "ဤအရာကို ဖျက်ရန် သေချာပါသလား။",
+            "cancelText": "မဟုတ်ပါ"
+          },
+          "logout": {
+            "title": "ထွက်ရန်",
+            "okText": "ဟုတ်ကဲ့",
+            "content": "ထွက်ရန် သေချာပါသလား။",
+            "cancelText": "မဟုတ်ပါ"
+          },
+          "confirm": {
+            "title": "အတည်ပြုရန်",
+            "okText": "ဟုတ်ကဲ့",
+            "content": "သေချာပါသလား။",
+            "cancelText": "မဟုတ်ပါ"
+          }
+        },
+        "tester": {
+          "testing": "testing testing"
+        },
+        "buttons": {
+          "add": "Add",
+          "back": "Back",
+          "edit": "Update",
+          "next": "Next",
+          "save": "Save",
+          "view": "View",
+          "close": "Close",
+          "reset": "Reset",
+          "cancel": "Cancel",
+          "create": "Create",
+          "delete": "Delete",
+          "export": "Export",
+          "filter": "Filter",
+          "import": "Import",
+          "search": "Search",
+          "submit": "Submit",
+          "update": "Update",
+          "upload": "Upload",
+          "refresh": "Refresh",
+          "download": "Download",
+          "previous": "Previous"
+        },
+        "login_page": {
+          "login_text": "Volo WiFi Admin",
+          "label_email": "အသုံးပြုသူအမည်",
+          "window_desc": "Volo WiFi Admin",
+          "window_title": "Volo WiFi Admin",
+          "label_password": "စကားဝှက်",
+          "sign_in_success": "ကြိုဆိုပါတယ်။",
+          "login_button_text": "ဝင်ရောက်ရန်",
+          "placeholder_email": "သင့်အသုံးပြုသူအမည်ထည့်ပါ",
+          "error_message_email": "အသုံးပြုသူအမည်ထည့်ပါ",
+          "placeholder_password": "သင့်စကားဝှက်ထည့်ပါ",
+          "sign_in_success_desc": "သင်အောင်မြင်စွာ ဝင်ရောက်ပြီးပါပြီ။",
+          "error_invalid_account": "ဤအချက်အလက်များနှင့် အကောင့်မတွေ့ပါ။",
+          "error_message_password": "စကားဝှက်ထည့်ပါ",
+          "error_invalid_credentials": "တစ်ခုခုမမှန်ကန်ပါ။ ထပ်မံကြိုးစားပါ။",
+          "error_message_email_invalid": "ကျေးဇူးပြု၍ မမှန်ကန်သော အသုံးပြုသူအမည်ထည့်ပါ"
+        },
+        "application": {
+          "app_name": "Volo WiFi Admin"
+        },
+        "permissions": {
+          "title": "ခွင့်ပြုချက်များ",
+          "access": "ဝင်ရောက်ခွင့်",
+          "action": "လုပ်ဆောင်ချက်",
+          "roleId": "အခန်းကဏ္ဍ ID",
+          "search": "ရှာဖွေရန်",
+          "kindMenu": "မီနူး",
+          "roleName": "အခန်းကဏ္ဍအမည်",
+          "allAccess": "အားလုံးဝင်ရောက်ခွင့်",
+          "createdAt": "ဖန်တီးချိန်",
+          "updatedAt": "အပ်ဒိတ်ချိန်",
+          "allVisible": "အားလုံးမြင်နိုင်သည်",
+          "kindButton": "ခလုတ်",
+          "selectRole": "အခန်းကဏ္ဍရွေးရန်",
+          "settingKey": "ဆက်တင်ကီး",
+          "visibility": "မြင်နိုင်မှု",
+          "description": "ဖော်ပြချက်",
+          "kindFeature": "လုပ်ဆောင်ချက်",
+          "manageRoles": "အခန်းကဏ္ဍများစီမံခန့်ခွဲရန်",
+          "permissions": "ခွင့်ပြုချက်များ",
+          "settingKind": "အမျိုးအစား",
+          "kindFilterAll": "အားလုံး",
+          "kindMenuGroup": "မီနူးအုပ်စု",
+          "kindFilterManual": "လက်ဖြင့်",
+          "managePermissions": "ခွင့်ပြုချက်များစီမံခန့်ခွဲရန်",
+          "pleaseInputRoleId": "အခန်းကဏ္ဍ ID ထည့်ပါ။",
+          "mapRolePermissions": "အခန်းကဏ္ဍခွင့်ပြုချက်များချိတ်ဆက်ရန်",
+          "pleaseInputRoleName": "အခန်းကဏ္ဍအမည်ထည့်ပါ။",
+          "pleaseInputSettingKey": "ဆက်တင်ကီးထည့်ပါ။",
+          "selectRolePlaceholder": "အခန်းကဏ္ဍတစ်ခုရွေးပါ",
+          "pleaseInputDescription": "ဖော်ပြချက်ထည့်ပါ။",
+          "pleaseChooseSettingKind": "အမျိုးအစားရွေးပါ"
+        },
+        "menuItemForm": {
+          "key": "ကီး",
+          "url": "URL",
+          "icon": "အိုင်ကွန်",
+          "name": "အမည်",
+          "error": "အမှား",
+          "title": "မီနူးအုပ်စုဖောင်ပုံစံ",
+          "action": "လုပ်ဆောင်ချက်",
+          "noIcons": "အိုင်ကွန်များမတွေ့ပါ",
+          "success": "အောင်မြင်သည်",
+          "createdAt": "ဖန်တီးချိန်",
+          "updatedAt": "အပ်ဒိတ်ချိန်",
+          "description": "ဖော်ပြချက်",
+          "noIconsDesc": "ဒေတာဘေ့စ်တွင် အိုင်ကွန်များမတွေ့ပါ။ အိုင်ကွန်အချို့ထည့်ပါၬ",
+          "keyValidation": "ကီးသည် အနည်းဆုံး စာလုံး ၃ လုံးရှိရမည်",
+          "urlValidation": "URL သည် အနည်းဆုံး စာလုံး ၃ လုံးရှိရမည်",
+          "iconValidation": "အိုင်ကွန်သည် အနည်းဆုံး စာလုံး ၃ လုံးရှိရမည်",
+          "keyPlaceholder": "မီနူးအုပ်စုကီးထည့်ပါ",
+          "urlPlaceholder": "မီနူးအုပ်စု URL ထည့်ပါ",
+          "iconPlaceholder": "မီနူးအုပ်စုအိုင်ကွန်ထည့်ပါ",
+          "pleaseInputName": "အမည်ထည့်ပါ။",
+          "titlePlaceholder": "မီနူးအုပ်စုခေါင်းစဉ်ထည့်ပါ",
+          "pleaseInputDescription": "ဖော်ပြချက်ထည့်ပါၬ"
+        },
+        "menuGroupForm": {
+          "key": "ကီး",
+          "icon": "အိုင်ကွန်",
+          "name": "အမည်",
+          "error": "အမှား",
+          "title": "မီနူးအုပ်စုဖောင်ပုံစံ",
+          "action": "လုပ်ဆောင်ချက်",
+          "noIcons": "အိုင်ကွန်များမတွေ့ပါ",
+          "success": "အောင်မြင်သည်",
+          "createdAt": "ဖန်တီးချိန်",
+          "updatedAt": "အပ်ဒိတ်ချိန်",
+          "description": "ဖော်ပြချက်",
+          "noIconsDesc": "ဒေတာဘေ့စ်တွင် အိုင်ကွန်များမတွေ့ပါ။ အိုင်ကွန်အချို့ထည့်ပါၬ",
+          "keyValidation": "ကီးသည် အနည်းဆုံး စာလုံး ၃ လုံးရှိရမည်",
+          "iconValidation": "အိုင်ကွန်သည် အနည်းဆုံး စာလုံး ၃ လုံးရှိရမည်",
+          "keyPlaceholder": "မီနူးအုပ်စုကီးထည့်ပါ",
+          "iconPlaceholder": "မီနူးအုပ်စုအိုင်ကွန်ထည့်ပါ",
+          "pleaseInputName": "အမည်ထည့်ပါၬ",
+          "titlePlaceholder": "မီနူးအုပ်စုခေါင်းစဉ်ထည့်ပါ",
+          "pleaseInputDescription": "ဖော်ပြချက်ထည့်ပါၬ"
+        },
+        "LocaleSwitcher": {
+          "en": "English",
+          "fr": "French",
+          "hi": "Hindi",
+          "ja": "Japanese",
+          "ko": "Korean",
+          "my": "မြန်မာ",
+          "ta": "Tamil",
+          "zh": "Chinese",
+          "label": "ဘာသာစကား"
+        }
+      }
+    }
+  ],
+  "themes": [
+    {
+      "id": "ba848e44-c86c-4899-bf12-829099346afa",
+      "name": "APP2",
+      "lightTheme": {
+        "token": {
+          "colorInfo": "#2563eb",
+          "colorLink": "#1d4ed8",
+          "colorError": "#dc2626",
+          "borderRadius": 6,
+          "colorPrimary": "#2563eb",
+          "colorSuccess": "#16a34a",
+          "colorWarning": "#d97706"
+        },
+        "components": {
+          "Menu": {
+            "colorText": "rgba(15, 23, 42, 0.88)",
+            "itemHoverBg": "rgba(37, 99, 235, 0.06)",
+            "colorPrimary": "#2563eb",
+            "subMenuItemBg": "transparent",
+            "itemSelectedBg": "rgba(37, 99, 235, 0.12)",
+            "itemSelectedColor": "#1e40af"
+          },
+          "Layout": {
+            "bodyBg": "#f1f5f9",
+            "siderBg": "#ffffff",
+            "footerBg": "#f1f5f9",
+            "headerBg": "#ffffff"
+          },
+          "Breadcrumb": {
+            "itemColor": "rgba(15, 23, 42, 0.45)",
+            "lastItemColor": "#2563eb"
+          }
+        }
+      },
+      "darkTheme": {
+        "token": {
+          "colorInfo": "#60a5fa",
+          "colorLink": "#93c5fd",
+          "colorError": "#f87171",
+          "borderRadius": 6,
+          "colorPrimary": "#60a5fa",
+          "colorSuccess": "#4ade80",
+          "colorWarning": "#fbbf24",
+          "colorBgLayout": "#0f1419",
+          "colorBgContainer": "#151b24"
+        },
+        "components": {
+          "Menu": {
+            "itemBg": "transparent",
+            "colorText": "rgba(226, 232, 240, 0.88)",
+            "itemHoverBg": "rgba(148, 163, 184, 0.08)",
+            "colorPrimary": "#60a5fa",
+            "subMenuItemBg": "transparent",
+            "itemSelectedBg": "rgba(96, 165, 250, 0.16)",
+            "itemSelectedColor": "#e2e8f0"
+          },
+          "Layout": {
+            "bodyBg": "#0f1419",
+            "siderBg": "#151b24",
+            "footerBg": "#0f1419",
+            "headerBg": "#151b24",
+            "triggerBg": "#1e2736"
+          },
+          "Breadcrumb": {
+            "itemColor": "rgba(148, 163, 184, 0.75)",
+            "lastItemColor": "#93c5fd"
+          }
+        }
+      },
+      "isDefault": false,
+      "isActive": false
+    },
+    {
+      "id": "8b65cbd8-7f87-41a9-9439-724dce5e8255",
+      "name": "APP1",
+      "lightTheme": {
+        "token": {
+          "fontSize": 12,
+          "sizeStep": 4,
+          "sizeUnit": 3,
+          "colorInfo": "#0369a1",
+          "colorLink": "#0369a1",
+          "colorError": "#b91c1c",
+          "borderRadius": 4,
+          "colorPrimary": "#0c4a6e",
+          "colorSuccess": "#15803d",
+          "colorWarning": "#b45309"
+        },
+        "components": {
+          "Menu": {
+            "colorText": "rgba(15, 23, 42, 0.88)",
+            "itemHoverBg": "rgba(12, 74, 110, 0.06)",
+            "colorPrimary": "#0c4a6e",
+            "subMenuItemBg": "transparent",
+            "itemSelectedBg": "rgba(12, 74, 110, 0.1)",
+            "itemSelectedColor": "#0c4a6e"
+          },
+          "Button": {
+            "borderColorDisabled": "rgba(148, 163, 184, 0.5)"
+          },
+          "Layout": {
+            "bodyBg": "#f0f4f8",
+            "siderBg": "#ffffff",
+            "footerBg": "#f0f4f8",
+            "headerBg": "#ffffff"
+          },
+          "Breadcrumb": {
+            "itemColor": "rgba(15, 23, 42, 0.45)",
+            "lastItemColor": "#0c4a6e"
+          }
+        }
+      },
+      "darkTheme": {
+        "token": {
+          "colorInfo": "#38bdf8",
+          "colorLink": "#7dd3fc",
+          "colorError": "#f87171",
+          "borderRadius": 4,
+          "colorPrimary": "#38bdf8",
+          "colorSuccess": "#4ade80",
+          "colorWarning": "#fbbf24",
+          "colorBgLayout": "#0f1419",
+          "colorBgContainer": "#151b24"
+        },
+        "components": {
+          "Menu": {
+            "itemBg": "transparent",
+            "colorText": "rgba(226, 232, 240, 0.88)",
+            "itemHoverBg": "rgba(148, 163, 184, 0.08)",
+            "colorPrimary": "#38bdf8",
+            "subMenuItemBg": "transparent",
+            "itemSelectedBg": "rgba(56, 189, 248, 0.14)",
+            "itemSelectedColor": "#e0f2fe"
+          },
+          "Layout": {
+            "bodyBg": "#0f1419",
+            "siderBg": "#151b24",
+            "footerBg": "#0f1419",
+            "headerBg": "#151b24",
+            "triggerBg": "#1e2736"
+          },
+          "Breadcrumb": {
+            "itemColor": "rgba(148, 163, 184, 0.75)",
+            "lastItemColor": "#7dd3fc"
+          }
+        }
+      },
+      "isDefault": false,
+      "isActive": false
+    },
+    {
+      "id": "ba1aacbf-ac86-4db8-bae5-e9a4d9257152",
+      "name": "APP3",
+      "lightTheme": {
+        "token": {
+          "colorInfo": "#ea580c",
+          "colorLink": "#c2410c",
+          "colorError": "#dc2626",
+          "borderRadius": 6,
+          "colorPrimary": "#ea580c",
+          "colorSuccess": "#16a34a",
+          "colorWarning": "#ca8a04"
+        },
+        "components": {
+          "Menu": {
+            "colorText": "rgba(15, 23, 42, 0.88)",
+            "itemHoverBg": "rgba(234, 88, 12, 0.06)",
+            "colorPrimary": "#ea580c",
+            "subMenuItemBg": "transparent",
+            "itemSelectedBg": "rgba(234, 88, 12, 0.12)",
+            "itemSelectedColor": "#9a3412"
+          },
+          "Layout": {
+            "bodyBg": "#faf8f5",
+            "siderBg": "#ffffff",
+            "footerBg": "#faf8f5",
+            "headerBg": "#ffffff"
+          },
+          "Breadcrumb": {
+            "itemColor": "rgba(15, 23, 42, 0.45)",
+            "lastItemColor": "#ea580c"
+          }
+        }
+      },
+      "darkTheme": {
+        "token": {
+          "sizeStep": 4,
+          "colorInfo": "#fb923c",
+          "colorLink": "#fdba74",
+          "colorError": "#f87171",
+          "borderRadius": 6,
+          "colorPrimary": "#fb923c",
+          "colorSuccess": "#4ade80",
+          "colorWarning": "#fbbf24",
+          "colorBgLayout": "#0f1419",
+          "colorBgContainer": "#151b24"
+        },
+        "components": {
+          "Menu": {
+            "itemBg": "transparent",
+            "colorText": "rgba(226, 232, 240, 0.88)",
+            "itemHoverBg": "rgba(251, 146, 60, 0.08)",
+            "colorPrimary": "#fb923c",
+            "subMenuItemBg": "transparent",
+            "itemSelectedBg": "rgba(251, 146, 60, 0.16)",
+            "itemSelectedColor": "#ffedd5"
+          },
+          "Layout": {
+            "bodyBg": "#0f1419",
+            "siderBg": "#151b24",
+            "footerBg": "#0f1419",
+            "headerBg": "#151b24",
+            "triggerBg": "#1e2736",
+            "headerColor": "#e2e8f0"
+          },
+          "Breadcrumb": {
+            "itemColor": "rgba(148, 163, 184, 0.75)",
+            "lastItemColor": "#fdba74"
+          }
+        }
+      },
+      "isDefault": true,
+      "isActive": true
+    }
+  ]
+}

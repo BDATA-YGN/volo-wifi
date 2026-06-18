@@ -1,0 +1,254 @@
+// RADIUS sessions, vendor profiles, plan attributes.
+model RadiusSession {
+  id    String @map("id") @id @default(uuid())
+  orgId String? @map("org_id")
+  org   Org?    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  stationId String? @map("station_id")
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  credentialId String? @map("credential_id")
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  // RADIUS identifiers
+  acctSessionId    String @map("acct_session_id")
+  userName         String? @map("user_name")
+  callingStationId String? // client MAC @map("calling_station_id")
+  framedIpAddress  String? @map("framed_ip_address")
+  nasIpAddress     String? @map("nas_ip_address")
+  nasIdentifier    String? @map("nas_identifier")
+
+  // Accounting status & times
+  status        RadiusAcctStatus @map("status") @default(START)
+  startedAt     DateTime @map("started_at")
+  lastInterimAt DateTime? @map("last_interim_at")
+  stoppedAt     DateTime? @map("stopped_at")
+
+  // usage counters (bytes)
+  inputBytes     BigInt? // Acct-Input-Octets @map("input_bytes")
+  outputBytes    BigInt? // Acct-Output-Octets @map("output_bytes")
+  totalBytes     BigInt? // computed/stored @map("total_bytes")
+  sessionTimeSec Int? // Acct-Session-Time @map("session_time_sec")
+
+  terminateCause String? @map("terminate_cause")
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@unique([acctSessionId, nasIpAddress], map: "uq_wf_radius_session__acct_session_id__nas_ip_address")
+  @@index([orgId, startedAt], map: "idx_wf_radius_session__org_id__started_at")
+  @@index([orgId, credentialId, startedAt], map: "idx_wf_radius_session__org_id__credential_id__started_at")
+  @@index([orgId, stationId, startedAt], map: "idx_wf_radius_session__org_id__station_id__started_at")
+  /// Captive auth / sync: match by FreeRADIUS User-Name (token or username)
+  @@index([userName], map: "idx_wf_radius_session__user_name")
+  @@index([userName, startedAt], map: "idx_wf_radius_session__user_name__started_at")
+  @@index([userName, status], map: "idx_wf_radius_session__user_name__status")
+  @@index([userName, stoppedAt], map: "idx_wf_radius_session__user_name__stopped_at")
+  /// Dashboard + aggregates when credentialId is set (often without orgId on row)
+  @@index([credentialId], map: "idx_wf_radius_session__credential_id")
+  @@index([credentialId, startedAt], map: "idx_wf_radius_session__credential_id__started_at")
+  @@index([credentialId, status, stoppedAt], map: "idx_wf_radius_session__credential_id__status__stopped_at")
+  /// Stale-session cron + status-filtered scans
+  @@index([status, startedAt], map: "idx_wf_radius_session__status__started_at")
+  @@index([startedAt], map: "idx_wf_radius_session__started_at")
+  @@map("wf_radius_session")
+}
+
+/// Cold storage for completed RADIUS sessions purged from the hot table.
+model RadiusSessionArchive {
+  id    String @map("id") @id @default(uuid())
+  sourceId String @map("source_id") @unique
+
+  orgId String? @map("org_id")
+  org   Org?    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  stationId String? @map("station_id")
+  credentialId String? @map("credential_id")
+
+  acctSessionId    String @map("acct_session_id")
+  userName         String? @map("user_name")
+  callingStationId String? @map("calling_station_id")
+  framedIpAddress  String? @map("framed_ip_address")
+  nasIpAddress     String? @map("nas_ip_address")
+  nasIdentifier    String? @map("nas_identifier")
+
+  status        RadiusAcctStatus @map("status")
+  startedAt     DateTime @map("started_at")
+  lastInterimAt DateTime? @map("last_interim_at")
+  stoppedAt     DateTime? @map("stopped_at")
+
+  inputBytes     BigInt? @map("input_bytes")
+  outputBytes    BigInt? @map("output_bytes")
+  totalBytes     BigInt? @map("total_bytes")
+  sessionTimeSec Int? @map("session_time_sec")
+  terminateCause String? @map("terminate_cause")
+
+  archivedAt DateTime @map("archived_at") @default(now())
+
+  @@index([orgId, stoppedAt], map: "idx_wf_radius_session_arc__org_id__stopped_at")
+  @@index([archivedAt], map: "idx_wf_radius_session_arc__archived_at")
+  @@map("wf_radius_session_archive")
+}
+
+enum RadiusAttrPhase {
+  CHECK // request/check items (if you use them)
+  REPLY // reply attributes returned on Access-Accept
+}
+
+enum RadiusAttrValueType {
+  STRING
+  INTEGER
+  IPADDR
+  DATE
+}
+
+enum RadiusProfileAttrRequirement {
+  OPTIONAL
+  MUST
+}
+
+model RadiusVendorProfile {
+  id     String @map("id")  @id @default(uuid())
+  orgId  String @map("org_id")
+  org    Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  name   String // e.g. "Ruijie RG-EG1510XS" @map("name")
+  vendor String @map("vendor")  @default("Ruijie")
+  model  String?
+
+  description String? @map("description")
+
+  // If your NAS supports RFC3576 CoA/Disconnect, store here (useful for data-quota enforcement via your app)
+  supportsCoA Boolean @map("supports_co_a") @default(true)
+  coaPort     Int? @map("coa_port")    @default(3799)
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  planAttributes            PlanRadiusAttribute[]
+  supportedAttributeRows    RadiusVendorProfileSupportedAttribute[]
+  wifiStations              WifiStation[]
+
+  @@index([orgId, deletedAt], map: "idx_wf_radius_vendor_profile__org_id__deleted_at")
+  @@index([orgId, vendor], map: "idx_wf_radius_vendor_profile__org_id__vendor")
+  @@map("wf_radius_vendor_profile")
+}
+
+model RouterSupportedAttribute {
+  id   String @map("id") @id @default(uuid())
+
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  // Name as used in FreeRADIUS (e.g. "Session-Timeout", "Idle-Timeout")
+  freeradiusName String @map("freeradius_name")
+  // User-friendly / display name (e.g. "Session Timeout", "Idle Timeout")
+  displayName String @map("display_name")
+
+  // Operator used in FreeRADIUS (e.g. ":=", "=", "+=")
+  op String @map("op") @default(":=")
+
+  // Optional default value when not overridden per plan
+  defaultValue String? @map("default_value")
+
+  // Value type for validation and UI
+  valueType RadiusAttrValueType @map("value_type") @default(STRING)
+
+  note String? @map("note") @db.Text
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  vendorProfileLinks RadiusVendorProfileSupportedAttribute[]
+
+  @@unique([orgId, freeradiusName], map: "uq_wf_router_supported_attribute__org_id__freeradius_name")
+  @@index([orgId, freeradiusName], map: "idx_wf_router_supported_attribute__org_id__freeradius_name")
+  @@map("wf_router_supported_attribute")
+}
+
+model RadiusVendorProfileSupportedAttribute {
+  id String @map("id") @id @default(uuid())
+
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  vendorProfileId String @map("vendor_profile_id")
+  vendorProfile   RadiusVendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+
+  attributeId String @map("attribute_id")
+  attribute   RouterSupportedAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  /// When MUST, plans using this profile should include this attribute (UI pre-fills; API may validate).
+  requirement RadiusProfileAttrRequirement @map("requirement") @default(OPTIONAL)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@unique([vendorProfileId, attributeId], map: "uq_wf_radius_vendor_profile_supported_attr__vendprofid_attrid")
+  @@index([orgId, vendorProfileId], map: "idx_wf_rvp_sup_attr__org_id__vendor_profile_id")
+  @@index([orgId, attributeId], map: "idx_wf_rvp_sup_attr__org_id__attribute_id")
+  @@index([vendorProfileId], map: "idx_wf_radius_vendor_profile_supported_attr__vendor_profile_id")
+  @@index([attributeId], map: "idx_wf_radius_vendor_profile_supported_attr__attribute_id")
+  @@index([requirement], map: "idx_wf_radius_vendor_profile_supported_attr__requirement")
+  @@map("wf_radius_vendor_profile_supported_attr")
+}
+
+model PlanRadiusAttribute {
+  id String @map("id") @id @default(uuid())
+
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  planId String @map("plan_id")
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  /// When set, these rows apply only to this Wi‑Fi station; legacy rows may be null and match by vendor profile.
+  wifiStationId String? @map("wifi_station_id")
+  wifiStation   WifiStation? @relation(fields: [wifiStationId], references: [id], onDelete: Cascade)
+
+  vendorProfileId String @map("vendor_profile_id")
+  vendorProfile   RadiusVendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Restrict)
+
+  phase RadiusAttrPhase @map("phase") @default(REPLY)
+
+  // RADIUS Attribute (Standard or Vendor Specific)
+  attributeName String // e.g. "Session-Timeout", "Idle-Timeout", "Acct-Interim-Interval", "Class" @map("attribute_name")
+  op            String @map("op")              @default(":=") // ":=", "=", "+=", etc.
+  valueType     RadiusAttrValueType @map("value_type") @default(STRING)
+
+  // Store either a fixed value or a template like "{timeSeconds}" that your policy engine can render
+  value String @map("value")
+
+  // Processing order (lower first)
+  priority Int @map("priority") @default(100)
+
+  note String? @map("note")
+
+  createdAt DateTime @map("created_at")  @default(now())
+  updatedAt DateTime @map("updated_at")  @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@index([orgId, planId], map: "idx_wf_plan_radius_attribute__org_id__plan_id")
+  @@index([orgId, planId, wifiStationId], map: "idx_wf_plan_radius_attribute__org_id__plan_id__wifi_station_id")
+  @@index([vendorProfileId, planId], map: "idx_wf_plan_radius_attribute__vendor_profile_id__plan_id")
+  /// FreeRADIUS views + plan attribute joins (planId, station, phase)
+  @@index([planId, phase, deletedAt], map: "idx_wf_plan_radius_attribute__plan_id__phase__deleted_at")
+  @@index([planId, wifiStationId, phase, deletedAt], map: "idx_wf_plan_radius_attribute__planid_wifistatid_phas_deleat")
+  @@index([wifiStationId, planId, phase], map: "idx_wf_plan_radius_attribute__wifi_station_id__plan_id__phase")
+  @@map("wf_plan_radius_attribute")
+}
+
+model Radpostauth {
+  id               BigInt @map("id")   @id @default(autoincrement())
+  username         String @map("username")
+  pass             String? @map("pass")
+  reply            String? @map("reply")
+  calledStationId  String?  @map("calledstationid")
+  callingStationId String?  @map("callingstationid")
+  authdate         DateTime @map("authdate") @default(now()) @db.Timestamptz(6)
+  class            String?  @map("class")
+
+  @@index([username], map: "radpostauth_username_idx")
+  @@index([class], map: "radpostauth_class_idx")
+  @@map("radpostauth")
+}

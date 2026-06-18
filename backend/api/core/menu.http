@@ -1,0 +1,77 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Menu Groups
+GET {{baseUrl}}/audit/logs
+
+### Get Single Menu Group
+GET {{baseUrl}}/menus-groups/1
+
+### Create Menu Group
+POST {{baseUrl}}/menus-groups
+Content-Type: application/json
+
+{
+  "title": "New Menu Group",
+  "key": "new-menu-group",
+  "icon": "new-icon"
+}
+
+### Update Menu Group
+PUT {{baseUrl}}/menus-groups/1
+Content-Type: application/json
+
+{
+  "title": "Updated Menu Group",
+  "key": "updated-menu-group",
+  "icon": "updated-icon"
+}
+
+### Delete Menu Group
+DELETE {{baseUrl}}/menus-groups/1
+
+### Update Menu Group Positions
+PUT {{baseUrl}}/menus-groups/positions
+Content-Type: application/json
+
+[
+  { "id": 1, "position": 2 },
+  { "id": 2, "position": 1 }
+]
+
+### Get All Menu Items For Group
+GET {{baseUrl}}/menus-groups/1/menu-items
+
+### Get Single Menu Item
+GET {{baseUrl}}/menu-items/1
+
+### Create Menu Item
+POST {{baseUrl}}/menu-items/1/menu-items
+Content-Type: application/json
+
+{
+  "name": "New Menu Item",
+  "description": "New menu item description",
+  "url": "/new-menu-item"
+}
+
+### Update Menu Item
+PUT {{baseUrl}}/menu-items/1
+Content-Type: application/json
+
+{
+  "name": "Updated Menu Item",
+  "description": "Updated menu item description",
+  "url": "/updated-menu-item"
+}
+
+### Delete Menu Item
+DELETE {{baseUrl}}/menu-items/1
+
+### Update Menu Item Position
+PUT {{baseUrl}}/menus-groups/1/menu-items/positions
+Content-Type: application/json
+
+[
+  { "id": 1, "position": 2 },
+  { "id": 2, "position": 1 }
+]

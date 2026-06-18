@@ -1,0 +1,11 @@
+@baseUrl = http://localhost:6688/console
+
+### Upload File
+POST {{baseUrl}}/upload
+Content-Type: multipart/form-data
+
+### Get Uploaded File
+GET {{baseUrl}}/upload/files/1
+
+### Delete Uploaded File
+DELETE {{baseUrl}}/upload/files/1

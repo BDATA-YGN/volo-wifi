@@ -1,0 +1,65 @@
+// Reseller hierarchy (no agent layer).
+model Reseller {
+  id    String @map("id") @id @default(uuid())
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  // Link to Admin account for portal login
+  adminId String? @map("admin_id") @unique
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  code       String     @map("code")
+  name       String     @map("name")
+  phone      String?    @map("phone")
+  email      String?    @map("email")
+  address    String?    @map("address")
+  status     UserStatus @map("status") @default(ACTIVE)
+  stationIds Json       @map("station_ids") @default("[]")
+
+  priceBooks            PlanPriceBook[]
+  credentials           Credential[]
+  voucherBatches        VoucherBatch[]
+  sales                 SaleOrder[]
+  commissionRules       CommissionRule[]
+  payouts               CommissionPayout[]
+  dailyStats            DailySalesStat[]
+  monthlyStats          MonthlySalesStat[]
+  yearlyStats           YearlySalesStat[]
+  dailyRadiusUsageStats DailyRadiusUsageStat[]
+  planEntitlements      ResellerPlanEntitlement[]
+
+  finSettlements        RptFinSettlement[]
+  rptFinSourceCoverages RptFinSourceCoverage[]
+
+  resellerStations ResellerStation[]
+  memberRoles      OrgMemberRole[]
+
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgId, code], map: "uq_wf_reseller__org_id__code")
+  @@index([orgId, status], map: "idx_wf_reseller__org_id__status")
+  @@index([adminId], map: "idx_wf_reseller__admin_id")
+  @@map("wf_reseller")
+}
+
+model ResellerPlanEntitlement {
+  id         String   @map("id") @id @default(uuid())
+  orgId      String   @map("org_id")
+  org        Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  resellerId String   @map("reseller_id")
+  reseller   Reseller @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  planId     String   @map("plan_id")
+  plan       Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  isEnabled  Boolean  @map("is_enabled") @default(true)
+  createdAt  DateTime @map("created_at") @default(now())
+  updatedAt  DateTime @map("updated_at") @updatedAt
+
+  @@unique([resellerId, planId], map: "uq_wf_reseller_plan_entitlement__reseller_id__plan_id")
+  @@index([orgId, resellerId], map: "idx_wf_reseller_plan_entitlement__org_id__reseller_id")
+  @@index([orgId, planId], map: "idx_wf_reseller_plan_entitlement__org_id__plan_id")
+  @@index([resellerId], map: "idx_wf_reseller_plan_entitlement__reseller_id")
+  @@index([planId], map: "idx_wf_reseller_plan_entitlement__plan_id")
+  @@map("wf_reseller_plan_entitlement")
+}

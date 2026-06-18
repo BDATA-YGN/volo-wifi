@@ -1,0 +1,30 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Admin Users
+GET {{baseUrl}}/admin/users
+
+### Get Single Admin User
+GET {{baseUrl}}/admin/users/1
+
+### Create Admin User
+POST {{baseUrl}}/admin/users
+Content-Type: application/json
+
+{
+  "username": "newadmin",
+  "password": "newpassword",
+  "role": "admin"
+}
+
+### Update Admin User
+PUT {{baseUrl}}/admin/users/1
+Content-Type: application/json
+
+{
+  "username": "updatedadmin",
+  "password": "updatedpassword",
+  "role": "superadmin"
+}
+
+### Delete Admin User
+DELETE {{baseUrl}}/admin/users/1

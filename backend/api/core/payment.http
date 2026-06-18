@@ -1,0 +1,30 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Payments
+GET {{baseUrl}}/payments
+
+### Get Single Payment
+GET {{baseUrl}}/payments/1
+
+### Create Payment
+POST {{baseUrl}}/payments
+Content-Type: application/json
+
+{
+  "amount": 100.00,
+  "currency": "USD",
+  "method": "credit_card"
+}
+
+### Update Payment
+PUT {{baseUrl}}/payments/1
+Content-Type: application/json
+
+{
+  "amount": 150.00,
+  "currency": "USD",
+  "method": "paypal"
+}
+
+### Delete Payment
+DELETE {{baseUrl}}/payments/1

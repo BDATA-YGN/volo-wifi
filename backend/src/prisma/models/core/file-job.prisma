@@ -1,0 +1,33 @@
+model FileLog {
+  id           String    @id @default(uuid())
+  fileName     String    @default("") @map("file_name")
+  url          String
+  size         Int
+  type         String?
+  description  String?
+  isPublic     Boolean   @default(false) @map("is_public")
+  originalName String?   @map("original_name")
+  mimeType     String    @default("application/octet-stream") @map("mime_type")
+  category     String    @map("category") // This acts as the bucket/category type
+  bucket       String?   @map("bucket") // The actual storage bucket name
+  folder       String?   @map("folder") // Full path within the bucket
+  isFolder     Boolean   @default(false) @map("is_folder")
+  parentId     String?   @map("parent_id")
+  path         String?   @map("path") // Full directory path for easier searching
+  lastModified DateTime? @map("last_modified")
+  authorId     String?   @map("author_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  parent   FileLog?  @relation("FolderChildren", fields: [parentId], references: [id])
+  children FileLog[] @relation("FolderChildren")
+
+  @@index([authorId])
+  @@index([folder])
+  @@index([parentId])
+  @@index([category])
+  @@index([bucket])
+  @@index([isFolder])
+  @@map("tbl_file_log")
+}

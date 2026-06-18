@@ -1,0 +1,34 @@
+@baseUrl = http://localhost:6688/console
+
+### Get All Themes
+GET {{baseUrl}}/themes
+
+### Get Single Theme
+GET {{baseUrl}}/themes/1
+
+### Create Theme
+POST {{baseUrl}}/themes
+Content-Type: application/json
+
+{
+  "name": "New Theme",
+  "colors": {
+    "primary": "#ffffff",
+    "secondary": "#000000"
+  }
+}
+
+### Update Theme
+PUT {{baseUrl}}/themes/1
+Content-Type: application/json
+
+{
+  "name": "Updated Theme",
+  "colors": {
+    "primary": "#ff0000",
+    "secondary": "#00ff00"
+  }
+}
+
+### Delete Theme
+DELETE {{baseUrl}}/themes/1

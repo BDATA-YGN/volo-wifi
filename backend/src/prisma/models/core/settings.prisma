@@ -1,0 +1,80 @@
+/// Global app settings — single source of truth for all configuration.
+model AppSetting {
+  id    String @id @default(cuid()) @map("id")
+  key   String @unique @map("key")
+  value String @map("value") @db.Text
+
+  /// Original/factory default. Shown as hint; used by "Reset to default" action.
+  defaultValue String? @map("default_value") @db.Text
+
+  /// Enum (string column): STRING | NUMBER | BOOLEAN | JSON
+  valueType String @default("STRING") @map("value_type") @db.VarChar(16)
+
+  /// How the field is rendered in the UI.
+  /// Enum: TEXT | TEXTAREA | MARKDOWN | NUMBER | BOOLEAN | JSON | LIST | IMAGE | IMAGE_LIST | SELECT
+  controlType String? @map("control_type") @db.VarChar(32)
+
+  /// For SELECT controlType: JSON array of {label,value} option objects.
+  options String? @map("options") @db.Text
+
+  category    String? @map("category")
+  sortOrder   Int     @default(0) @map("sort_order")
+  labelEn     String? @map("label_en")
+  labelMy     String? @map("label_my")
+  description String? @map("description") @db.Text
+  isPublic    Boolean @default(false) @map("is_public")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([category, sortOrder])
+  @@map("app_settings")
+}
+
+// OTP Model
+model Otp {
+  id            String    @id @default(uuid()) @map("id")
+  otpId         Int       @map("otp_id")
+  contactMethod String    @map("contact_method")
+  contactValue  String    @map("contact_value")
+  otpHash       String    @map("otp_hash") @db.VarChar(255)
+  expiredTime   DateTime? @map("expired_time") @db.Timestamp(6)
+  generatedTime DateTime? @map("generated_time") @db.Timestamp(6)
+  status        String?   @map("status")
+  useCase       String    @map("use_case")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  @@map("tbl_otp")
+}
+
+model Places {
+  id        Int       @id @default(autoincrement()) @map("id")
+  region    String?   @map("region") @db.VarChar(300)
+  town      String?   @map("town") @db.VarChar(300)
+  ward      String?   @map("ward") @db.VarChar(300)
+  postcode  String?   @map("postcode") @db.VarChar(300)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([region, town, ward])
+  @@index([deletedAt])
+  @@index([region, town, ward])
+  @@index([region, town])
+  @@index([postcode])
+  @@map("tbl_places")
+}
+
+model Databases {
+  id        String    @id @default(uuid()) @map("id")
+  type      String    @map("type")
+  dbName    String    @map("db_name")
+  filePath  String    @map("file_path")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("tbl_databases")
+}
