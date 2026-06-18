@@ -1,0 +1,39 @@
+{
+  "id": "/collector",
+  "name": "VOLO Collector",
+  "short_name": "Collector",
+  "description": "VOLO field collector app — collections, payments, expenses, and support.",
+  "start_url": "/collector",
+  "scope": "/collector",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "categories": ["business", "finance"],
+  "icons": [
+    {
+      "src": "/assets/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Collections",
+      "short_name": "Collections",
+      "url": "/collector/collections"
+    },
+    {
+      "name": "Record payment",
+      "short_name": "Payment",
+      "url": "/collector/payments"
+    }
+  ]
+}

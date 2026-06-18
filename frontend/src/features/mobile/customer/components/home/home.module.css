@@ -1,0 +1,324 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: -0.25rem -0.25rem 0;
+  padding-bottom: 1rem;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(145deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%);
+  color: #fff;
+  box-shadow: var(--mobile-hero-shadow);
+}
+
+.heroGlow {
+  position: absolute;
+  inset: -30% -15% auto;
+  height: 120%;
+  background: radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.2), transparent 55%);
+  pointer-events: none;
+}
+
+.heroTop {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.greeting {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 0.9;
+  margin: 0 0 0.125rem;
+}
+
+.userName {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  line-height: 1.25;
+}
+
+.dateLine {
+  font-size: 0.75rem;
+  opacity: 0.82;
+  margin: 0;
+}
+
+.heroBadge {
+  flex-shrink: 0;
+  padding: 0.3125rem 0.625rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.outstandingBlock {
+  position: relative;
+}
+
+.outstandingLabel {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 0.25rem;
+}
+
+.outstandingValue {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.outstandingSub {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.82;
+  margin-top: 0.25rem;
+}
+
+.alertBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.75rem;
+  background: var(--mobile-warning-soft);
+  border: 1px solid var(--mobile-warning-border);
+  color: var(--mobile-warning-text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-decoration: none;
+}
+
+.alertBanner strong {
+  display: block;
+  margin-bottom: 0.125rem;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+.statCard {
+  padding: 0.875rem;
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+}
+
+.statCardAccent {
+  border-color: var(--mobile-highlight-border);
+  background: var(--mobile-highlight-soft);
+}
+
+.statIconWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  margin-bottom: 0.5rem;
+  background: var(--mobile-info-soft);
+  color: var(--mobile-info-text);
+}
+
+.statLabel {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mobile-muted);
+  margin-bottom: 0.125rem;
+}
+
+.statValue {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+  line-height: 1.2;
+}
+
+.statSub {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--mobile-subtle);
+  margin-top: 0.125rem;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sectionTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+  margin: 0;
+}
+
+.sectionLink {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--mobile-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.quickAction {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.625rem 0.5rem;
+  min-height: 4.75rem;
+  border-radius: 0.75rem;
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quickAction:active {
+  border-color: var(--mobile-accent-border);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.1);
+}
+
+.quickTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.25rem;
+}
+
+.quickIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 0.5rem;
+  background: var(--mobile-highlight-soft);
+  color: var(--mobile-highlight-text);
+  flex-shrink: 0;
+}
+
+.quickCount {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: var(--mobile-text);
+  line-height: 1;
+  margin-left: auto;
+}
+
+.quickCountMuted {
+  color: var(--mobile-subtle);
+}
+
+.quickCountUrgent {
+  color: var(--mobile-danger);
+}
+
+.quickLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--mobile-text);
+  line-height: 1.25;
+}
+
+.quickHint {
+  font-size: 0.625rem;
+  color: var(--mobile-danger);
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.noticeList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.emptyNotices {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-surface);
+  border: 1px dashed var(--mobile-border);
+}
+
+.emptyTitle {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--mobile-text);
+}
+
+.emptyDesc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--mobile-muted);
+}
+
+.loadingWrap,
+.errorWrap {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--mobile-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.errorWrap {
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-danger-soft);
+  border: 1px solid var(--mobile-danger-border);
+  color: var(--mobile-danger);
+  font-size: 0.875rem;
+}
+
+.retryBtn {
+  background: none;
+  border: none;
+  color: var(--mobile-accent);
+  font-weight: 600;
+  cursor: pointer;
+}

@@ -1,0 +1,21 @@
+.ant-table {
+  width: 100%;
+  /* border: 1px solid #f0f0f0; */
+  border-radius: 2px;
+}
+
+.ant-table-thead > tr > th {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.ant-table-tbody > tr > td {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #cacaca;
+}

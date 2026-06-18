@@ -1,0 +1,17 @@
+services:
+  bdata-core-console:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile
+    container_name: ${NEXTJS_CONTAINER_NAME}
+    restart: unless-stopped
+    env_file:
+      - ../.env.local
+    environment:
+      - NODE_ENV=development
+      - PORT=${NEXTJS_PORT}
+      - API_URL=${API_URL}
+      - FILE_SERVER_URL=${FILE_SERVER_URL}
+      - BY_PASS=${BY_PASS}
+      - HOST_NAME=${HOST_NAME}
+    network_mode: host

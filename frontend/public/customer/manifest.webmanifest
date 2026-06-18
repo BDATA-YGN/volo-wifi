@@ -1,0 +1,39 @@
+{
+  "id": "/customer",
+  "name": "StarLink Customer",
+  "short_name": "Customer",
+  "description": "StarLink customer portal — invoices, licenses, payments, and support.",
+  "start_url": "/customer",
+  "scope": "/customer",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "categories": ["business", "utilities"],
+  "icons": [
+    {
+      "src": "/assets/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Invoices",
+      "short_name": "Invoices",
+      "url": "/customer/invoices"
+    },
+    {
+      "name": "Support",
+      "short_name": "Support",
+      "url": "/customer/support"
+    }
+  ]
+}

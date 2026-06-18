@@ -1,0 +1,231 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: -0.25rem -0.25rem 0;
+  padding-bottom: 4.5rem;
+}
+
+.summaryStrip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+.summaryCard {
+  padding: 0.875rem;
+  border-radius: 0.875rem;
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+}
+
+.summaryLabel {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mobile-muted);
+  margin-bottom: 0.25rem;
+}
+
+.summaryValue {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+}
+
+.summarySub {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--mobile-subtle);
+  margin-top: 0.125rem;
+}
+
+.searchWrap {
+  position: relative;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.625rem 0.875rem 0.625rem 2.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  color: var(--mobile-text);
+  font-size: 0.875rem;
+}
+
+.searchInput::placeholder {
+  color: var(--mobile-subtle);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mobile-subtle);
+}
+
+.filterRow {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.125rem;
+  scrollbar-width: none;
+}
+
+.filterRow::-webkit-scrollbar {
+  display: none;
+}
+
+.filterChip {
+  flex-shrink: 0;
+  padding: 0.625rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  color: var(--mobile-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  min-height: var(--mobile-touch-min);
+}
+
+.filterChipActive {
+  background: var(--mobile-accent);
+  border-color: var(--mobile-accent);
+  color: #fff;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.card {
+  padding: 0.875rem;
+  border-radius: 0.875rem;
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.invoiceNo {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.customerLine {
+  font-size: 0.8125rem;
+  color: var(--mobile-muted);
+  margin-bottom: 0.25rem;
+}
+
+.licenseLine {
+  font-size: 0.75rem;
+  color: var(--mobile-muted);
+  margin-bottom: 0.625rem;
+}
+
+.amountRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--mobile-divider);
+}
+
+.amountLabel {
+  font-size: 0.75rem;
+  color: var(--mobile-muted);
+}
+
+.overdueText {
+  color: var(--mobile-danger);
+}
+
+.amountValue {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--mobile-accent);
+}
+
+.cardActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.btnPrimary {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.625rem;
+  border: none;
+  background: var(--mobile-accent);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  color: var(--mobile-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+}
+
+.loadingWrap,
+.errorWrap,
+.emptyWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--mobile-muted);
+  font-size: 0.875rem;
+}
+
+.loadMoreBtn {
+  width: 100%;
+  padding: 0.625rem;
+  min-height: var(--mobile-touch-min);
+  border-radius: 0.75rem;
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  color: var(--mobile-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}

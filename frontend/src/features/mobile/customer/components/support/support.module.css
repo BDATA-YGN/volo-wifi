@@ -1,0 +1,742 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: -0.25rem -0.25rem 0;
+  padding-bottom: 4.5rem;
+}
+
+.hero {
+  position: relative;
+  padding: 1.25rem 1rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: linear-gradient(145deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%);
+  color: #fff;
+  box-shadow: var(--mobile-hero-shadow);
+}
+
+.heroGlow {
+  position: absolute;
+  inset: -30% -15% auto;
+  height: 120%;
+  background: radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.2), transparent 55%);
+  pointer-events: none;
+}
+
+.heroIcon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.16);
+  margin-bottom: 0.75rem;
+}
+
+.heroTitle {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 0.375rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.heroDesc {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+.section {
+  background: var(--mobile-surface);
+  border-radius: var(--mobile-radius);
+  border: 1px solid var(--mobile-border);
+  overflow: hidden;
+}
+
+.sectionHeader {
+  padding: 0.875rem 1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mobile-muted);
+}
+
+.contactCard {
+  padding: 1rem;
+  border-top: 1px solid var(--mobile-divider);
+}
+
+.contactCard:first-of-type {
+  border-top: none;
+}
+
+.contactLabel {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mobile-muted);
+  margin-bottom: 0.25rem;
+}
+
+.contactValue {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+  line-height: 1.35;
+}
+
+.contactLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  color: var(--mobile-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.statusPill {
+  display: inline-flex;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background: var(--mobile-success-soft);
+  color: var(--mobile-success-text);
+  border: 1px solid var(--mobile-success-border);
+}
+
+.statusPillOff {
+  background: var(--mobile-surface-alt);
+  color: var(--mobile-muted);
+  border-color: var(--mobile-border);
+}
+
+.helpGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.helpLink {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--mobile-radius);
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  text-decoration: none;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.helpLink:active {
+  background: var(--mobile-surface-alt);
+}
+
+.helpIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.625rem;
+  background: var(--mobile-highlight-soft);
+  color: var(--mobile-highlight-text);
+  flex-shrink: 0;
+}
+
+.helpBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.helpTitle {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--mobile-text);
+}
+
+.helpDesc {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--mobile-muted);
+  margin-top: 0.125rem;
+}
+
+.helpChevron {
+  flex-shrink: 0;
+  color: var(--mobile-subtle);
+}
+
+.loadingWrap,
+.errorWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--mobile-muted);
+  font-size: 0.875rem;
+}
+
+.retryBtn {
+  min-height: var(--mobile-touch-min);
+  border: none;
+  background: none;
+  color: var(--mobile-accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.summaryStrip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+.summaryCard {
+  padding: 0.875rem;
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+}
+
+.summaryLabel {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mobile-muted);
+  margin-bottom: 0.25rem;
+}
+
+.summaryValue {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: var(--mobile-touch-min);
+  padding: 0.625rem 0.875rem 0.625rem 2.25rem;
+  border-radius: var(--mobile-radius);
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  font-size: 0.875rem;
+  color: var(--mobile-text);
+}
+
+.searchInput::placeholder {
+  color: var(--mobile-subtle);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mobile-subtle);
+}
+
+.createBtn {
+  flex-shrink: 0;
+  min-height: var(--mobile-touch-min);
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--mobile-radius);
+  border: none;
+  background: var(--mobile-accent);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filterRow {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filterRow::-webkit-scrollbar {
+  display: none;
+}
+
+.filterChip {
+  flex-shrink: 0;
+  padding: 0.625rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  color: var(--mobile-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: var(--mobile-touch-min);
+}
+
+.filterChipActive {
+  background: var(--mobile-accent);
+  border-color: var(--mobile-accent);
+  color: #fff;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.ticketCard {
+  display: block;
+  padding: 0.875rem;
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+  text-decoration: none;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ticketTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+}
+
+.ticketNo {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mobile-muted);
+}
+
+.ticketSubject {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+}
+
+.ticketMeta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--mobile-muted);
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.badge {
+  padding: 0.1875rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.emptyWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--mobile-muted);
+  font-size: 0.875rem;
+}
+
+.loadMoreBtn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  min-height: var(--mobile-touch-min);
+  border-radius: var(--mobile-radius);
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface);
+  color: var(--mobile-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--mobile-accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  min-height: var(--mobile-touch-min);
+}
+
+.detailHero {
+  padding: 1rem;
+  border-radius: var(--mobile-radius);
+  background: linear-gradient(145deg, #2563eb 0%, #1d4ed8 55%, #1e40af 100%);
+  color: #fff;
+  box-shadow: var(--mobile-hero-shadow);
+}
+
+.detailHeroTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.liveBadge {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.detailSubject {
+  margin: 0.375rem 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.detailMeta {
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.92;
+}
+
+.awaitingHint {
+  margin: 0.625rem 0 0;
+  font-size: 0.8125rem;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+}
+
+.messageList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.messageBubble {
+  padding: 0.875rem;
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+}
+
+.messageBubbleStaff {
+  border-color: var(--mobile-accent-border);
+  background: var(--mobile-accent-soft);
+}
+
+.messageBubbleCustomer {
+  border-color: var(--mobile-bubble-customer-border);
+  background: var(--mobile-bubble-customer-bg);
+}
+
+.messageAuthor {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--mobile-muted);
+  margin-bottom: 0.25rem;
+}
+
+.messageBody {
+  font-size: 0.875rem;
+  color: var(--mobile-text);
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.messageTime {
+  font-size: 0.6875rem;
+  color: var(--mobile-subtle);
+  margin-top: 0.375rem;
+}
+
+.replyBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.875rem 0;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--mobile-radius);
+  border: 1px solid var(--mobile-border);
+  font-size: 0.875rem;
+  background: var(--mobile-surface);
+  color: var(--mobile-text);
+  resize: vertical;
+}
+
+.btnPrimary {
+  min-height: 3rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--mobile-radius);
+  border: none;
+  background: var(--mobile-accent);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Ant Design drawer portals outside .mobileShell — bring theme tokens in locally. */
+.drawerPortalTheme,
+.drawerFooter {
+  --mobile-touch-min: 2.75rem;
+  --mobile-radius: 0.875rem;
+  --mobile-accent: #2563eb;
+  --mobile-accent-hover: #1d4ed8;
+  --mobile-surface: #ffffff;
+  --mobile-surface-alt: #f8fafc;
+  --mobile-border: #e2e8f0;
+  --mobile-text: #0f172a;
+  --mobile-muted: #64748b;
+  --mobile-subtle: #94a3b8;
+}
+
+.drawerPortalTheme[data-theme="dark"],
+.drawerFooter[data-theme="dark"] {
+  --mobile-accent: #60a5fa;
+  --mobile-accent-hover: #93c5fd;
+  --mobile-surface: #1e293b;
+  --mobile-surface-alt: #334155;
+  --mobile-border: #334155;
+  --mobile-text: #f1f5f9;
+  --mobile-muted: #94a3b8;
+  --mobile-subtle: #64748b;
+}
+
+.drawerPortalTheme {
+  padding: 1rem 1rem 0.5rem;
+}
+
+.drawerFooter {
+  padding: 0.875rem 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  background: var(--mobile-surface);
+  border-top: 1px solid var(--mobile-border);
+}
+
+.submitBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.875rem 1.25rem;
+  border: none;
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-accent);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+}
+
+.drawerFooter[data-theme="dark"] .submitBtn {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.submitBtn:active:not(:disabled) {
+  background: var(--mobile-accent-hover);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.closedNote {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border-radius: var(--mobile-radius);
+  background: var(--mobile-surface-alt);
+  border: 1px solid var(--mobile-border);
+  font-size: 0.8125rem;
+  color: var(--mobile-muted);
+  text-align: center;
+}
+
+.drawerHint {
+  margin: 0 0 1.125rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--mobile-muted);
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.formLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--mobile-text);
+}
+
+.formInput,
+.formSelect,
+.formTextarea {
+  width: 100%;
+  min-height: var(--mobile-touch-min);
+  padding: 0.75rem 1rem;
+  border-radius: var(--mobile-radius);
+  border: 1px solid var(--mobile-border);
+  font-size: 1rem;
+  background: var(--mobile-surface-alt);
+  color: var(--mobile-text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.formInput::placeholder,
+.formTextarea::placeholder {
+  color: var(--mobile-subtle);
+}
+
+.formSelect {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--mobile-muted) 50%),
+    linear-gradient(135deg, var(--mobile-muted) 50%, transparent 50%);
+  background-position: calc(100% - 1.125rem) calc(50% - 0.125rem),
+    calc(100% - 0.75rem) calc(50% - 0.125rem);
+  background-size: 0.375rem 0.375rem, 0.375rem 0.375rem;
+  background-repeat: no-repeat;
+  padding-right: 2.25rem;
+}
+
+.formTextarea {
+  min-height: 6.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.ticketStatusOpen,
+.ticketStatusInProgress,
+.ticketStatusWaiting,
+.ticketStatusResolved,
+.ticketStatusClosed,
+.categoryBadge,
+.metaBadgeNeutral,
+.metaBadgeAttention {
+  display: inline-flex;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.ticketStatusOpen {
+  background: var(--mobile-info-soft);
+  color: var(--mobile-info-text);
+  border-color: var(--mobile-info-border);
+}
+
+.ticketStatusInProgress {
+  background: var(--mobile-highlight-soft);
+  color: var(--mobile-highlight-text);
+  border-color: var(--mobile-highlight-border);
+}
+
+.ticketStatusWaiting {
+  background: var(--mobile-caution-soft);
+  color: var(--mobile-caution-text);
+  border-color: var(--mobile-caution-border);
+}
+
+.ticketStatusResolved {
+  background: var(--mobile-success-soft);
+  color: var(--mobile-success-text);
+  border-color: var(--mobile-success-border);
+}
+
+.ticketStatusClosed {
+  background: var(--mobile-neutral-soft);
+  color: var(--mobile-neutral-text);
+  border-color: var(--mobile-border);
+}
+
+.categoryBadge {
+  background: var(--mobile-highlight-soft);
+  color: var(--mobile-highlight-text);
+  border-color: var(--mobile-highlight-border);
+}
+
+.metaBadgeNeutral {
+  background: var(--mobile-neutral-soft);
+  color: var(--mobile-neutral-text);
+  border-color: var(--mobile-border);
+}
+
+.metaBadgeAttention {
+  background: var(--mobile-caution-soft);
+  color: var(--mobile-caution-text);
+  border-color: var(--mobile-caution-border);
+}
+
+.heroStatusBadge {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--mobile-info-text);
+  border-color: rgba(255, 255, 255, 0.95);
+}

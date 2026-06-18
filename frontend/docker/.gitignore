@@ -1,0 +1,24 @@
+# Node modules
+npm-debug.log
+yarn-error.log
+!node_modules
+
+# Next.js build output
+.next
+out
+
+# Git
+.git
+
+# Environment files (except when explicitly copied)
+.env*
+!.env.example
+
+# Testing
+coverage
+*.test.js
+*.spec.js
+
+# Misc
+*.log
+*.md

@@ -1,0 +1,51 @@
+.badge {
+  display: inline-flex;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  line-height: 1.2;
+}
+
+.toneInfo {
+  background: var(--mobile-info-soft);
+  color: var(--mobile-info-text);
+  border-color: var(--mobile-info-border);
+}
+
+.toneSuccess {
+  background: var(--mobile-success-soft);
+  color: var(--mobile-success-text);
+  border-color: var(--mobile-success-border);
+}
+
+.toneCaution {
+  background: var(--mobile-caution-soft);
+  color: var(--mobile-caution-text);
+  border-color: var(--mobile-caution-border);
+}
+
+.toneWarning {
+  background: var(--mobile-warning-soft);
+  color: var(--mobile-warning-text);
+  border-color: var(--mobile-warning-border);
+}
+
+.toneDanger {
+  background: var(--mobile-danger-soft);
+  color: var(--mobile-danger);
+  border-color: var(--mobile-danger-border);
+}
+
+.toneHighlight {
+  background: var(--mobile-highlight-soft);
+  color: var(--mobile-highlight-text);
+  border-color: var(--mobile-highlight-border);
+}
+
+.toneNeutral {
+  background: var(--mobile-neutral-soft);
+  color: var(--mobile-neutral-text);
+  border-color: var(--mobile-border);
+}

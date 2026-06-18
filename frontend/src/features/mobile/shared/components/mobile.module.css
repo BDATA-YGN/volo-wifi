@@ -1,0 +1,477 @@
+.mobileShell {
+  --mobile-logo-mark-stroke: #ffffff;
+
+  --mobile-header-h: 3.25rem;
+  --mobile-nav-h: 4rem;
+  --mobile-touch-min: 2.75rem;
+  --mobile-radius: 0.875rem;
+  --mobile-radius-sm: 0.75rem;
+
+  --mobile-accent: #0f766e;
+  --mobile-accent-hover: #0d9488;
+  --mobile-accent-soft: #f0fdfa;
+  --mobile-accent-border: #99f6e4;
+
+  --mobile-bg: #f8fafc;
+  --mobile-surface: #ffffff;
+  --mobile-surface-alt: #f1f5f9;
+  --mobile-divider: #f1f5f9;
+  --mobile-border: #e2e8f0;
+  --mobile-text: #0f172a;
+  --mobile-muted: #64748b;
+  --mobile-subtle: #94a3b8;
+
+  --mobile-danger: #dc2626;
+  --mobile-danger-soft: #fef2f2;
+  --mobile-danger-border: #fecaca;
+  --mobile-warning-soft: #fff7ed;
+  --mobile-warning-border: #fed7aa;
+  --mobile-warning-text: #9a3412;
+
+  --mobile-success-soft: #dcfce7;
+  --mobile-success-text: #15803d;
+  --mobile-success-border: #bbf7d0;
+  --mobile-caution-soft: #fef3c7;
+  --mobile-caution-text: #b45309;
+  --mobile-caution-border: #fed7aa;
+  --mobile-info-soft: #dbeafe;
+  --mobile-info-text: #1d4ed8;
+  --mobile-info-border: #bfdbfe;
+  --mobile-highlight-soft: #eff6ff;
+  --mobile-highlight-text: #2563eb;
+  --mobile-highlight-border: #bfdbfe;
+  --mobile-bubble-customer-bg: #eff6ff;
+  --mobile-bubble-customer-border: #bfdbfe;
+  --mobile-neutral-soft: #f1f5f9;
+  --mobile-neutral-text: #64748b;
+  --mobile-qr-bg: #ffffff;
+
+  --mobile-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  --mobile-hero-shadow: 0 12px 32px rgba(15, 118, 110, 0.28);
+  --mobile-camera-bg: #0f172a;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--mobile-bg);
+  color: var(--mobile-text);
+  font-family: "NotoSansMyanmar", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+
+.mobileShell[data-actor="customer"] {
+  --mobile-accent: #2563eb;
+  --mobile-accent-hover: #1d4ed8;
+  --mobile-accent-soft: #eff6ff;
+  --mobile-accent-border: #bfdbfe;
+  --mobile-hero-shadow: 0 12px 32px rgba(37, 99, 235, 0.28);
+}
+
+.mobileShell[data-actor="partner"] {
+  --mobile-accent: #7c3aed;
+  --mobile-accent-hover: #6d28d9;
+  --mobile-accent-soft: #f5f3ff;
+  --mobile-accent-border: #ddd6fe;
+  --mobile-hero-shadow: 0 12px 32px rgba(124, 58, 237, 0.28);
+}
+
+.mobileShell[data-theme="dark"] {
+  --mobile-logo-plate-bg: rgba(255, 255, 255, 0.06);
+  --mobile-logo-plate-border: rgba(148, 163, 184, 0.18);
+
+  --mobile-accent: #2dd4bf;
+  --mobile-accent-hover: #5eead4;
+  --mobile-accent-soft: #134e4a;
+  --mobile-accent-border: #0f766e;
+
+  --mobile-bg: #0f172a;
+  --mobile-surface: #1e293b;
+  --mobile-surface-alt: #334155;
+  --mobile-divider: #334155;
+  --mobile-border: #334155;
+  --mobile-text: #f1f5f9;
+  --mobile-muted: #94a3b8;
+  --mobile-subtle: #64748b;
+
+  --mobile-danger-soft: #450a0a;
+  --mobile-danger-border: #7f1d1d;
+  --mobile-warning-soft: #431407;
+  --mobile-warning-border: #9a3412;
+  --mobile-warning-text: #fdba74;
+
+  --mobile-success-soft: #052e16;
+  --mobile-success-text: #86efac;
+  --mobile-success-border: #166534;
+  --mobile-caution-soft: #451a03;
+  --mobile-caution-text: #fcd34d;
+  --mobile-caution-border: #92400e;
+  --mobile-info-soft: #1e3a8a;
+  --mobile-info-text: #93c5fd;
+  --mobile-info-border: #1d4ed8;
+  --mobile-highlight-soft: #172554;
+  --mobile-highlight-text: #93c5fd;
+  --mobile-highlight-border: #1e40af;
+  --mobile-bubble-customer-bg: #172554;
+  --mobile-bubble-customer-border: #1e40af;
+  --mobile-neutral-soft: #334155;
+  --mobile-neutral-text: #94a3b8;
+  --mobile-qr-bg: #0f172a;
+
+  --mobile-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --mobile-hero-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --mobile-camera-bg: #020617;
+
+  color-scheme: dark;
+}
+
+/* Partner purple accent in dark mode. */
+.mobileShell[data-actor="partner"][data-theme="dark"] {
+  --mobile-accent: #a78bfa;
+  --mobile-accent-hover: #c4b5fd;
+  --mobile-accent-soft: #4c1d95;
+  --mobile-accent-border: #6d28d9;
+  --mobile-hero-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Customer blue accent must override collector teal in dark mode. */
+.mobileShell[data-actor="customer"][data-theme="dark"] {
+  --mobile-accent: #60a5fa;
+  --mobile-accent-hover: #93c5fd;
+  --mobile-accent-soft: #1e3a8a;
+  --mobile-accent-border: #1d4ed8;
+  --mobile-hero-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--mobile-header-h);
+  padding: 0 1rem;
+  background: var(--mobile-surface);
+  border-bottom: 1px solid var(--mobile-border);
+}
+
+.headerBrand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.headerTitle {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  padding-bottom: calc(var(--mobile-nav-h) + 1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.bottomNav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: stretch;
+  min-height: var(--mobile-nav-h);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  background: var(--mobile-surface);
+  border-top: 1px solid var(--mobile-border);
+}
+
+.navItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1875rem;
+  min-height: var(--mobile-touch-min);
+  padding: 0.375rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--mobile-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navItemActive {
+  color: var(--mobile-accent);
+}
+
+.navIcon {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+.themeSegmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.themeOption {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--mobile-touch-min);
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--mobile-radius-sm);
+  border: 1px solid var(--mobile-border);
+  background: var(--mobile-surface-alt);
+  color: var(--mobile-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.themeOptionActive {
+  background: var(--mobile-accent-soft);
+  border-color: var(--mobile-accent-border);
+  color: var(--mobile-accent);
+}
+
+.loginPage {
+  --mobile-accent: #0f766e;
+  --mobile-accent-hover: #0d9488;
+  --mobile-accent-soft: #f0fdfa;
+  --mobile-accent-border: #99f6e4;
+  --mobile-bg: #f8fafc;
+  --mobile-surface: #ffffff;
+  --mobile-border: #e2e8f0;
+  --mobile-text: #0f172a;
+  --mobile-muted: #64748b;
+  --mobile-danger: #dc2626;
+  --mobile-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  --mobile-logo-mark-stroke: #ffffff;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 1.5rem;
+  background: var(--mobile-bg);
+  color: var(--mobile-text);
+  color-scheme: light;
+  font-family: "NotoSansMyanmar", system-ui, -apple-system, sans-serif;
+}
+
+.loginPage[data-actor="customer"] {
+  --mobile-accent: #2563eb;
+  --mobile-accent-hover: #1d4ed8;
+  --mobile-accent-soft: #eff6ff;
+  --mobile-accent-border: #bfdbfe;
+}
+
+.loginPage[data-actor="customer"][data-theme="dark"] {
+  --mobile-accent: #60a5fa;
+  --mobile-accent-hover: #93c5fd;
+  --mobile-accent-soft: #1e3a8a;
+  --mobile-accent-border: #1d4ed8;
+  --mobile-logo-plate-bg: #0b1120;
+  --mobile-logo-plate-border: #1e3a8a;
+}
+
+.loginPage[data-theme="dark"] {
+  --mobile-accent: #2dd4bf;
+  --mobile-accent-hover: #5eead4;
+  --mobile-accent-soft: #134e4a;
+  --mobile-accent-border: #0f766e;
+  --mobile-bg: #0f172a;
+  --mobile-surface: #1e293b;
+  --mobile-surface-alt: #334155;
+  --mobile-border: #334155;
+  --mobile-text: #f1f5f9;
+  --mobile-muted: #94a3b8;
+  --mobile-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --mobile-logo-mark-stroke: #ffffff;
+  --mobile-logo-plate-bg: #0f172a;
+  --mobile-logo-plate-border: #334155;
+
+  color-scheme: dark;
+}
+
+.loginPwaWrap {
+  width: 100%;
+  max-width: 24rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.loginCard {
+  width: 100%;
+  max-width: 24rem;
+  margin: 0;
+  padding: 1.5rem;
+  background: var(--mobile-surface);
+  border-radius: 1rem;
+  border: 1px solid var(--mobile-border);
+  box-shadow: var(--mobile-shadow);
+}
+
+.loginBrand {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.loginBrandLogo {
+  margin: 0 auto 0.75rem;
+}
+
+.loginBrandTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.loginBrandSub {
+  font-size: 0.875rem;
+  color: var(--mobile-muted);
+  margin: 0;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.screenTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.screenDesc {
+  font-size: 0.875rem;
+  color: var(--mobile-muted);
+  margin: 0;
+}
+
+.placeholder {
+  padding: 1rem;
+  border-radius: var(--mobile-radius-sm);
+  background: var(--mobile-surface);
+  border: 1px dashed var(--mobile-border);
+  font-size: 0.875rem;
+  color: var(--mobile-muted);
+}
+
+.errorText {
+  color: var(--mobile-danger);
+  font-size: 0.875rem;
+  min-height: 1.25rem;
+}
+
+.generalErrorRoot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1.5rem 1rem;
+}
+
+.generalErrorStandalone {
+  --mobile-accent: #0f766e;
+  --mobile-bg: #f8fafc;
+  --mobile-surface: #ffffff;
+  --mobile-border: #e2e8f0;
+  --mobile-text: #0f172a;
+  --mobile-muted: #64748b;
+  --mobile-danger-soft: #fef2f2;
+  --mobile-danger-border: #fecaca;
+  --mobile-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--mobile-bg);
+  color: var(--mobile-text);
+  color-scheme: light;
+  font-family: "NotoSansMyanmar", system-ui, -apple-system, sans-serif;
+}
+
+.generalErrorStandalone[data-theme="dark"] {
+  --mobile-accent: #2dd4bf;
+  --mobile-bg: #0f172a;
+  --mobile-surface: #1e293b;
+  --mobile-border: #334155;
+  --mobile-text: #f1f5f9;
+  --mobile-muted: #94a3b8;
+  --mobile-danger-soft: #450a0a;
+  --mobile-danger-border: #7f1d1d;
+  --mobile-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  color-scheme: dark;
+}
+
+.generalErrorCard {
+  width: 100%;
+  max-width: 22rem;
+  padding: 1.5rem;
+  text-align: center;
+  border-radius: var(--mobile-radius, 0.875rem);
+  background: var(--mobile-surface);
+  border: 1px solid var(--mobile-border);
+  box-shadow: var(--mobile-shadow);
+}
+
+.generalErrorStandalone .generalErrorCard {
+  background: var(--mobile-surface);
+}
+
+.generalErrorEyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mobile-muted);
+}
+
+.generalErrorTitle {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--mobile-text);
+}
+
+.generalErrorMessage {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--mobile-muted);
+}
+
+.generalErrorActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.generalErrorHomeLink {
+  display: block;
+  width: 100%;
+}

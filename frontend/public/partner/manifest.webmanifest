@@ -1,0 +1,39 @@
+{
+  "id": "/partner",
+  "name": "Volo Partner",
+  "short_name": "Partner",
+  "description": "Volo Partner — sell WiFi tokens, orders, and payments on the go.",
+  "start_url": "/partner",
+  "scope": "/partner",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#7c3aed",
+  "categories": ["business", "finance"],
+  "icons": [
+    {
+      "src": "/assets/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/fav.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Issue tokens",
+      "short_name": "Tokens",
+      "url": "/partner/tokens"
+    },
+    {
+      "name": "Orders",
+      "short_name": "Orders",
+      "url": "/partner/orders"
+    }
+  ]
+}
