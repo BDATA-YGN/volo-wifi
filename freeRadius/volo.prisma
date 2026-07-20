@@ -1,0 +1,801 @@
+// schema.prisma (PostgreSQL)
+// Volo Wifi Station Management System
+
+//////////////////////////////
+// Enums
+//////////////////////////////
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum StationStatus {
+  ACTIVE
+  MAINTENANCE
+  DISABLED
+}
+
+enum DeviceType {
+  ROUTER
+  AP
+  CONTROLLER
+  SWITCH
+}
+
+enum CredentialType {
+  VOUCHER_TOKEN // token only
+  USER_PASSWORD // username & password
+}
+
+enum CredentialStatus {
+  NEW
+  SOLD
+  ACTIVE
+  EXPIRED
+  REVOKED
+  CONSUMED
+  ACTIVATED
+}
+
+enum PlanQuotaType {
+  TIME_ONLY
+  DATA_ONLY
+  TIME_AND_DATA
+}
+
+enum UnitTime {
+  MINUTE
+  HOUR
+  DAY
+}
+
+enum SaleStatus {
+  DRAFT
+  PAID
+  VOID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CARD
+  OTHER
+}
+
+enum RadiusAcctStatus {
+  START
+  INTERIM
+  STOP
+}
+
+enum CommissionType {
+  FIXED
+  PERCENT
+}
+
+enum PayoutStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+//////////////////////////////
+// Core Multi-tenant
+//////////////////////////////
+
+model Org {
+  id          String  @id @default(uuid())
+  code        String
+  name        String
+  description String?
+
+  timezone String @default("Asia/Yangon")
+  currency String @default("MMK")
+
+  isActive Boolean @default(true)
+
+  // Link to Admin account for portal login
+  adminId String? @unique
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  wifiAuditLogs   WifiAuditLog[]
+  resellers       Reseller[]
+  agents          Agent[]
+  stations        WifiStation[]
+  devices         StationDevice[]
+  plans           Plan[]
+  priceBooks      PlanPriceBook[]
+  planPrices      PlanPrice[]
+  voucherBatches  VoucherBatch[]
+  credentials     Credential[]
+  sales           SaleOrder[]
+  saleItems       SaleItem[]
+  payments        Payment[]
+  commissionRules CommissionRule[]
+  payouts         CommissionPayout[]
+  radiusSessions  RadiusSession[]
+  dailyStats      DailySalesStat[]
+  monthlyStats    MonthlySalesStat[]
+  yearlyStats     YearlySalesStat[]
+
+  @@map("wf_org")
+}
+
+model WifiAuditLog {
+  id      String  @id @default(uuid())
+  orgId   String
+  org     Org     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  adminId String?
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  action   String
+  entity   String?
+  entityId String?
+  meta     Json?
+
+  ip        String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([orgId, entity, entityId])
+  @@index([adminId])
+  @@map("wf_audit_log")
+}
+
+//////////////////////////////
+// Reseller / Agent
+//////////////////////////////
+
+model Reseller {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  // Link to Admin account for portal login
+  adminId String? @unique
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  code       String
+  name       String
+  phone      String?
+  email      String?
+  address    String?
+  status     UserStatus @default(ACTIVE)
+  stationIds Json       @default("[]")
+
+  agents          Agent[]
+  priceBooks      PlanPriceBook[]
+  credentials     Credential[]
+  voucherBatches  VoucherBatch[]
+  sales           SaleOrder[]
+  commissionRules CommissionRule[]
+  payouts         CommissionPayout[]
+  dailyStats      DailySalesStat[]
+  monthlyStats    MonthlySalesStat[]
+  yearlyStats     YearlySalesStat[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([orgId, code])
+  @@index([orgId, status])
+  @@index([adminId])
+  @@map("wf_reseller")
+}
+
+model Agent {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  resellerId String
+  reseller   Reseller @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+
+  // Link to Admin account for portal login
+  adminId String? @unique
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  code   String
+  name   String
+  phone  String?
+  email  String?
+  status UserStatus @default(ACTIVE)
+
+  priceBooks      PlanPriceBook[]
+  credentials     Credential[]
+  voucherBatches  VoucherBatch[]
+  sales           SaleOrder[]
+  commissionRules CommissionRule[]
+  payouts         CommissionPayout[]
+  dailyStats      DailySalesStat[]
+  monthlyStats    MonthlySalesStat[]
+  yearlyStats     YearlySalesStat[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, code])
+  @@index([orgId, resellerId])
+  @@index([orgId, status])
+  @@index([adminId])
+  @@map("wf_agent")
+}
+
+//////////////////////////////
+// Wifi Stations & Devices
+//////////////////////////////
+
+model WifiStation {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  code     String //TODO format?
+  name     String
+  location String?
+  address  String?
+
+  status StationStatus @default(ACTIVE)
+
+  // Captive portal / NAS settings
+  portalBaseUrl  String? // e.g. https://portal.example.com
+  nasIdentifier  String? // NAS-Identifier (if you use)
+  radiusClientIp String? // The NAS IP as seen by RADIUS
+  radiusSecret   String? // (optional) if you manage shared secret centrally
+  vlanId         Int?
+
+  // Link to Admin account for portal login
+  adminId String? @unique
+  admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  devices        StationDevice[]
+  priceBooks     PlanPriceBook[]
+  credentials    Credential[]
+  voucherBatches VoucherBatch[]
+  sales          SaleOrder[]
+  sessions       RadiusSession[]
+  dailyStats     DailySalesStat[]
+  monthlyStats   MonthlySalesStat[]
+  yearlyStats    YearlySalesStat[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([orgId, code])
+  @@index([orgId, status])
+  @@map("wf_station")
+}
+
+model StationDevice {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  type     DeviceType @default(ROUTER)
+  vendor   String? // Ruijie, etc.
+  model    String? // RG-EG1510XS
+  serialNo String?
+  macAddr  String?
+  ipAddr   String?
+  note     String?
+
+  // RADIUS client fields (if device is a NAS)
+  isRadiusClient Boolean @default(false)
+  radiusSecret   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([orgId, stationId])
+  @@index([orgId, isRadiusClient])
+  @@map("wf_station_device")
+}
+
+//////////////////////////////
+// Plans & Pricing
+//////////////////////////////
+
+model Plan {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  code        String
+  name        String
+  description String?
+  quotaType   PlanQuotaType @default(TIME_ONLY)
+
+  // time quota (optional depending on quotaType)
+  timeAmount Int?
+  timeUnit   UnitTime?
+
+  // data quota (MB)
+  dataMb Int?
+
+  // validity (days) from first activation
+  validityDays Int? @default(1) //TODO do we need on time based ?
+
+  // concurrency / device limit
+  maxDevices Int? @default(1)
+
+  isActive Boolean @default(true)
+
+  prices          PlanPrice[]
+  credentials     Credential[]
+  voucherBatches  VoucherBatch[]
+  salesItems      SaleItem[]
+  commissionRules CommissionRule[]
+  dailyStats      DailySalesStat[]
+  monthlyStats    MonthlySalesStat[]
+  yearlyStats     YearlySalesStat[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([orgId, code])
+  @@index([orgId, quotaType])
+  @@index([orgId, isActive])
+  @@map("wf_plan")
+}
+
+model PlanPriceBook {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  name      String
+  isDefault Boolean @default(false)
+
+  // Optional: limit to reseller/agent or station
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  prices PlanPrice[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([orgId, isDefault])
+  @@index([orgId, resellerId])
+  @@index([orgId, agentId])
+  @@index([orgId, stationId])
+  @@map("wf_plan_price_book")
+}
+
+model PlanPrice {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  priceBookId String
+  priceBook   PlanPriceBook @relation(fields: [priceBookId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // Price + cost
+  retailPrice Decimal  @db.Decimal(18, 2)
+  costPrice   Decimal? @db.Decimal(18, 2)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([priceBookId, planId])
+  @@index([orgId, planId])
+  @@index([orgId, isActive])
+  @@map("wf_plan_price")
+}
+
+//////////////////////////////
+// Credentials: Voucher Token OR Username/Password
+//////////////////////////////
+
+model Credential {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  type   CredentialType   @default(VOUCHER_TOKEN)
+  status CredentialStatus @default(NEW)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // Token or login credentials
+  token        String? @unique
+  username     String?
+  passwordHash String?
+
+  // Optional binding to station / reseller / agent
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  // Lifecycle
+  soldAt      DateTime?
+  activatedAt DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+
+  // For data/time tracking
+  timeRemainingSec Int? // optional if you want remaining cache
+  dataRemainingMb  Int?
+
+  salesItems SaleItem[]
+  sessions   RadiusSession[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([orgId, type, status])
+  @@index([orgId, planId])
+  @@index([orgId, stationId])
+  @@index([orgId, resellerId])
+  @@index([orgId, agentId])
+  @@map("wf_credential")
+}
+
+model VoucherBatch {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  batchNo String
+  planId  String
+  plan    Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  quantity          Int
+  remainingQuantity Int
+  prefix            String? // manually add but unique check
+  note              String?
+
+  // (optional) default assignment
+  stationId  String?
+  station    WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  resellerId String?
+  reseller   Reseller?    @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+  agentId    String?
+  agent      Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([orgId, batchNo])
+  @@index([orgId, planId])
+  @@map("wf_voucher_batch")
+}
+
+//////////////////////////////
+// Sales / Payments / Commission
+//////////////////////////////
+
+model SaleOrder {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  orderNo String
+  status  SaleStatus @default(DRAFT)
+
+  // who sold
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  // summary
+  subtotal Decimal @default(0) @db.Decimal(18, 2)
+  discount Decimal @default(0) @db.Decimal(18, 2)
+  total    Decimal @default(0) @db.Decimal(18, 2)
+
+  currency String  @default("MMK")
+  note     String?
+
+  items    SaleItem[]
+  payments Payment[]
+
+  soldAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([orgId, orderNo])
+  @@index([orgId, status, soldAt])
+  @@index([orgId, resellerId, soldAt])
+  @@index([orgId, agentId, soldAt])
+  @@map("wf_sale_order")
+}
+
+model SaleItem {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  orderId String
+  order   SaleOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // the sold credential (token/account)
+  credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  qty       Int     @default(1)
+  unitPrice Decimal @db.Decimal(18, 2)
+  lineTotal Decimal @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, orderId])
+  @@index([orgId, planId])
+  @@index([orgId, credentialId])
+  @@map("wf_sale_item")
+}
+
+model Payment {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  orderId String?
+  order   SaleOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  method PaymentMethod @default(CASH)
+  amount Decimal       @db.Decimal(18, 2)
+  refNo  String?
+  paidAt DateTime      @default(now())
+  note   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId, paidAt])
+  @@index([orgId, orderId])
+  @@map("wf_payment")
+}
+
+model CommissionRule {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  // scope
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  type  CommissionType @default(PERCENT)
+  value Decimal        @db.Decimal(18, 6) // percent (e.g. 0.10) or fixed amount
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, isActive])
+  @@index([orgId, resellerId])
+  @@index([orgId, agentId])
+  @@index([orgId, planId])
+  @@map("wf_commission_rule")
+}
+
+model CommissionPayout {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  periodFrom DateTime
+  periodTo   DateTime
+
+  amount Decimal      @db.Decimal(18, 2)
+  status PayoutStatus @default(PENDING)
+
+  paidAt DateTime?
+  note   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, status])
+  @@index([orgId, resellerId, periodFrom])
+  @@index([orgId, agentId, periodFrom])
+  @@map("wf_commission_payout")
+}
+
+//////////////////////////////
+// RADIUS Accounting / Usage
+//////////////////////////////
+
+model RadiusSession {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  // RADIUS identifiers
+  acctSessionId    String
+  userName         String?
+  callingStationId String? // client MAC
+  framedIpAddress  String?
+  nasIpAddress     String?
+  nasIdentifier    String?
+
+  // Accounting status & times
+  status        RadiusAcctStatus @default(START)
+  startedAt     DateTime
+  lastInterimAt DateTime?
+  stoppedAt     DateTime?
+
+  // usage counters (bytes)
+  inputBytes     BigInt? // Acct-Input-Octets
+  outputBytes    BigInt? // Acct-Output-Octets
+  totalBytes     BigInt? // computed/stored
+  sessionTimeSec Int? // Acct-Session-Time
+
+  terminateCause String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, acctSessionId])
+  @@index([orgId, startedAt])
+  @@index([orgId, credentialId, startedAt])
+  @@index([orgId, stationId, startedAt])
+  @@map("wf_radius_session")
+}
+
+//////////////////////////////
+// Reporting / Aggregations
+//////////////////////////////
+
+model DailySalesStat {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  date      DateTime // store as date (00:00 UTC), handle in app
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  ordersCount Int     @default(0)
+  itemsCount  Int     @default(0)
+  revenue     Decimal @default(0) @db.Decimal(18, 2)
+  commission  Decimal @default(0) @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, date])
+  @@index([orgId, stationId, date])
+  @@index([orgId, resellerId, date])
+  @@index([orgId, agentId, date])
+  @@index([orgId, planId, date])
+  @@map("wf_daily_sales_stat")
+}
+
+model MonthlySalesStat {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  year  Int
+  month Int // 1..12
+
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  ordersCount Int     @default(0)
+  itemsCount  Int     @default(0)
+  revenue     Decimal @default(0) @db.Decimal(18, 2)
+  commission  Decimal @default(0) @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, year, month, stationId, resellerId, agentId, planId])
+  @@index([orgId, year, month])
+  @@map("wf_monthly_sales_stat")
+}
+
+model YearlySalesStat {
+  id    String @id @default(uuid())
+  orgId String
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  year Int
+
+  stationId String?
+  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  resellerId String?
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  ordersCount Int     @default(0)
+  itemsCount  Int     @default(0)
+  revenue     Decimal @default(0) @db.Decimal(18, 2)
+  commission  Decimal @default(0) @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, year, stationId, resellerId, agentId, planId])
+  @@index([orgId, year])
+  @@map("wf_yearly_sales_stat")
+}

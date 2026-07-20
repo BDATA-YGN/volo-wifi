@@ -1,0 +1,13 @@
+# Override for local debugging — do not use in production on Dokploy.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up
+
+services:
+  freeradius:
+    entrypoint: ["freeradius"]
+    command:
+      - -X
+      - -d
+      - /etc/raddb
+    healthcheck:
+      disable: true

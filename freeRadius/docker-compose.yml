@@ -1,0 +1,52 @@
+# Volo FreeRADIUS — production compose (Dokploy / Docker)
+#
+# Deploy:
+#   docker compose up -d
+#
+# Dokploy → Logs → select container "freeradius"
+#   You should see: Login OK / Login incorrect / ACCEPT / REJECT
+#
+# Debug (full packet dump — do not leave on in production):
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up
+#
+# Requires:
+#   - ./raddb mounted at /etc/raddb (includes certs/do-ca-certificate.crt)
+#   - DB connection in raddb/mods-available/sql (DO Managed PostgreSQL + SSL)
+
+services:
+  freeradius:
+    image: freeradius/freeradius-server:3.2.8
+    container_name: freeradius
+    restart: unless-stopped
+    network_mode: "host"
+    ports:
+      - "1812:1812/udp"   # Authentication
+      - "1813:1813/udp"   # Accounting
+
+    volumes:
+      - ./raddb:/etc/raddb
+      - freeradius-logs:/var/log/freeradius
+
+    # One container only (so Dokploy Logs is not confused with a cleanup sidecar).
+    # Auth lines come from radiusd.conf (destination=stdout, auth=yes) + linelog /dev/stdout.
+    # Background: purge old files once per day.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        (
+          while true; do
+            sleep 86400
+            KEEP_DAYS=3 MAX_MB=50 /bin/sh /etc/raddb/scripts/cleanup-logs.sh || true
+          done
+        ) &
+        exec freeradius -f -d /etc/raddb
+
+    # Same stream Dokploy shows — keep it from filling disk
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  freeradius-logs:

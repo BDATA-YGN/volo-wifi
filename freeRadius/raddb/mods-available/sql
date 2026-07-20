@@ -1,0 +1,322 @@
+# -*- text -*-
+##
+## mods-available/sql -- SQL modules
+##
+##	$Id: 38a8f76b64e88b1dd2f2b4288576825553fa675a $
+
+######################################################################
+#
+#  Configuration for the SQL module
+#
+#  The database schemas and queries are located in subdirectories:
+#
+#	sql/<DB>/main/schema.sql	Schema
+#	sql/<DB>/main/queries.conf	Authorisation and Accounting queries
+#
+#  Where "DB" is mysql, mssql, oracle, or postgresql.
+#
+#  The name used to query SQL is sql_user_name, which is set in the file
+#
+#     raddb/mods-config/sql/main/${dialect}/queries.conf
+#
+#  If you are using realms, that configuration should be changed to use
+#  the Stripped-User-Name attribute.  See the comments around sql_user_name
+#  for more information.
+#
+
+sql {
+	#
+	#  The dialect of SQL being used.
+	#
+	#  Allowed dialects are:
+	#
+	#	mssql
+	#	mysql
+	#	oracle
+	#	postgresql
+	#	sqlite
+	#	mongo
+	#
+	dialect = "postgresql"
+
+	#
+	#  The driver module used to execute the queries.
+	#
+	driver = "rlm_sql_postgresql"
+
+	#
+	#  Driver-specific subsections.  They will only be loaded and
+	#  used if "driver" is something other than "rlm_sql_null".
+	#  When a real driver is used, the relevant driver
+	#  configuration section is loaded, and all other driver
+	#  configuration sections are ignored.
+	#
+	postgresql {
+		# Send application_name to the postgres server
+		# Only supported in PG 9.0 and greater. Defaults to no.
+		send_application_name = yes
+
+		#
+		#  The default application name is "FreeRADIUS - .." with the current version.
+		#  The application name can be customized here to any non-zero value.
+		#
+#		application_name = ""
+	}
+
+	# Connection info for PostgreSQL
+	# You can use either format:
+	#   1. Separate parameters (server, port, login, password, radius_db)
+	#   2. Single radius_db connection string (commented example below)
+	#
+	# IMPORTANT: Update these with your actual PostgreSQL connection details!
+	#
+	# --- Local Postgres (separate parameters) ---
+	# These are IGNORED when "radius_db" below is a full connection string
+	# (i.e. when it contains '='). Kept here for local/dev use.
+	#server = "127.0.0.1"
+	#port = 5430
+	#login = "postgres"
+	#password = "ypUMAdJpOOaSCFkEftBc"
+	#radius_db = "volo_db"
+
+	# --- DigitalOcean Managed PostgreSQL (SSL) ---
+	# libpq connection string. With sslrootcert set + sslmode=verify-full the
+	# server certificate is validated against DO's CA (recommended).
+	# Use sslmode=require if you only want encryption without CA verification.
+	#
+	# CA file (committed in repo, deployed with raddb):
+	#   ${confdir}/certs/do-ca-certificate.crt
+	#   → /etc/raddb/certs/do-ca-certificate.crt  (Docker / -d /etc/raddb)
+	#
+	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_db user=version201 password=AVNS_W_QYN6Biiq9Ajlk6fxS sslmode=require sslrootcert=${confdir}/certs/do-ca-certificate.crt"
+
+	# If you want both stop and start records logged to the
+	# same SQL table, leave this as is.  If you want them in
+	# different tables, put the start table in acct_table1
+	# and stop table in acct_table2
+	acct_table1 = "radacct"
+	acct_table2 = "radacct"
+
+	# Allow for storing data after authentication
+	postauth_table = "radpostauth"
+
+	# Tables containing 'check' items
+	# Note: These are not used with wf_credential, but kept for compatibility
+	authcheck_table = "radcheck"
+	groupcheck_table = "radgroupcheck"
+
+	# Tables containing 'reply' items
+	# Note: These are not used with wf_credential, but kept for compatibility
+	authreply_table = "radreply"
+	groupreply_table = "radgroupreply"
+
+	# Table to keep group info
+	usergroup_table = "radusergroup"
+
+	# If set to 'yes' (default) we read the group tables unless Fall-Through = no in the reply table.
+	# If set to 'no' we do not read the group tables unless Fall-Through = yes in the reply table.
+#	read_groups = yes
+
+	# If set to 'yes' (default) we read profiles unless Fall-Through = no in the groupreply table.
+	# If set to 'no' we do not read profiles unless Fall-Through = yes in the groupreply table.
+#	read_profiles = yes
+
+	# Remove stale session if checkrad does not see a double login
+	delete_stale_sessions = yes
+
+	# Write SQL queries to a logfile. This is potentially useful for tracing
+	# issues with authorization queries.  See also "logfile" directives in
+	# mods-config/sql/main/*/queries.conf.  You can enable per-section logging
+	# by enabling "logfile" there, or global logging by enabling "logfile" here.
+	#
+	# Per-section logging can be disabled by setting "logfile = ''"
+	#
+	#  Volo: KEEP DISABLED in production — every SQL query is appended and
+	#  the file grows until the disk fills. Uncomment only while debugging.
+#	logfile = ${logdir}/sqllog.sql
+
+	#  Set the maximum query duration and connection timeout
+	#  for rlm_sql_postgresql.
+#	query_timeout = 5
+
+	#  As of v3, the "pool" section has replaced the
+	#  following v2 configuration items:
+	#
+	#  num_sql_socks
+	#  connect_failure_retry_delay
+	#  lifetime
+	#  max_queries
+
+	#
+	#  The connection pool is used to pool outgoing connections.
+	#
+	# When the server is not threaded, the connection pool
+	# limits are ignored, and only one connection is used.
+	#
+	# If you want to have multiple SQL modules re-use the same
+	# connection pool, use "pool = name" instead of a "pool"
+	# section.  e.g.
+	#
+	#	sql sql1 {
+	#	    ...
+	#	    pool {
+	#	    	 ...
+	#	    }
+	#	}
+	#
+	#	# sql2 will use the connection pool from sql1
+	#	sql sql2 {
+	#	     ...
+	#	     pool = sql1
+	#	}
+	#
+	pool {
+		#  Connections to create during module instantiation.
+		#  If the server cannot create specified number of
+		#  connections during instantiation it will exit.
+		#  Set to 0 to allow the server to start without the
+		#  database being available.
+		start = ${thread[pool].start_servers}
+
+		#  Minimum number of connections to keep open
+		min = ${thread[pool].min_spare_servers}
+
+		#  Maximum number of connections
+		#
+		#  If these connections are all in use and a new one
+		#  is requested, the request will NOT get a connection.
+		#
+		#  Setting 'max' to LESS than the number of threads means
+		#  that some threads may starve, and you will see errors
+		#  like 'No connections available and at max connection limit'
+		#
+		#  Setting 'max' to MORE than the number of threads means
+		#  that there are more connections than necessary.
+		#
+		#  The setting here should be lower than the maximum
+		#  number of connections allowed by the database.
+		#
+		#  i.e. There is no point in telling FreeRADIUS to use
+		#  64 connections, while the database is limited to 32
+		#  connections.  That configuration will cause the
+		#  server to be "starved" of connections, and it will
+		#  block during normal operations, even when the
+		#  database is largely idle.
+		#
+		#  At the same time, if the database is slow, there is
+		#  no point in increasing "max".  More connections
+		#  will just cause the database to run more slowly.
+		#  The correct fix for a slow database is to fix it, so
+		#  that it responds to FreeRADIUS quickly.
+		#
+		max = ${thread[pool].max_servers}
+
+		#  Spare connections to be left idle
+		#
+		#  NOTE: Idle connections WILL be closed if "idle_timeout"
+		#  is set.  This should be less than or equal to "max" above.
+		spare = ${thread[pool].max_spare_servers}
+
+		#  Number of uses before the connection is closed
+		#
+		#  0 means "infinite"
+		uses = 0
+
+		#  The number of seconds to wait after the server tries
+		#  to open a connection, and fails.  During this time,
+		#  no new connections will be opened.
+		retry_delay = 30
+
+		# The lifetime (in seconds) of the connection
+		lifetime = 0
+
+		#  idle timeout (in seconds).  A connection which is
+		#  unused for this length of time will be closed.
+		idle_timeout = 60
+
+		#  NOTE: All configuration settings are enforced.  If a
+		#  connection is closed because of "idle_timeout",
+		#  "uses", or "lifetime", then the total number of
+		#  connections MAY fall below "min".  When that
+		#  happens, it will open a new connection.  It will
+		#  also log a WARNING message.
+		#
+		#  The solution is to either lower the "min" connections,
+		#  or increase lifetime/idle_timeout.
+
+		#  Maximum number of times an operation can be retried
+		#  if it returns an error which indicates the connection
+		#  needs to be restarted.  This includes timeouts.
+		max_retries = 5
+	}
+
+	# Set to 'yes' to read radius clients from the database ('nas' table)
+	# Clients will ONLY be read on server startup.
+	#
+	#  A client can be link to a virtual server via the SQL
+	#  module.  This link is done via the following process:
+	#
+	#  If there is no listener in a virtual server, SQL clients
+	#  are added to the global list for that virtual server.
+	#
+	#  If there is a listener, and the first listener does not
+	#  have a "clients=..." configuration item, SQL clients are
+	#  added to the global list.
+	#
+	#  If there is a listener, and the first one does have a
+	#  "clients=..." configuration item, SQL clients are added to
+	#  that list.  The client { ...} ` configured in that list are
+	#  also added for that listener.
+	#
+	#  The only issue is if you have multiple listeners in a
+	#  virtual server, each with a different client list, then
+	#  the SQL clients are added only to the first listener.
+	#
+	read_clients = yes
+
+	# Table to keep radius client info (view in DB maps wf_station -> nas)
+	client_table = "nas"
+
+	#
+	# The group attribute specific to this instance of rlm_sql
+	#
+
+	# This entry should be used for additional instances (sql foo {})
+	# of the SQL module.
+#	group_attribute = "${.:instance}-SQL-Group"
+
+	# This entry should be used for the default instance (sql {})
+	# of the SQL module.
+	group_attribute = "SQL-Group"
+
+	#  When attributes read from the network are used in SQL queries
+	#  their values are escaped to make them safe.
+	#  By default FreeRADIUS uses its escaping routine which replaces
+	#  unsafe characters with their mime-encoded equivalent.
+	#  The list of safe characters is conservative, to allow for differences
+	#  between different SQL implementations.
+	#
+	#  If you are using the mysql or postgresql drivers, those have their
+	#  own escaping functions which only escape characters as required
+	#  by those databases.
+	#
+	#  Set this option to yes to use the database driver provided escape
+	#  function.
+#	auto_escape = no
+
+	#  When the SQL module is called in accounting and post-auth one or
+	#  more queries may be run, until at least one record is updated.
+	#
+	#  It can be helpful to know which query was run.  E.g. the default
+	#  queries for Interim-Update handling, start with an UPDATE and
+	#  if that does not update any records, an INSERT is run.  Knowing
+	#  which query updated data indicates the state of the data prior
+	#  to the update.
+	#
+	#  Setting this to 'yes', will cause `&control:SQL-Query-Number` to be
+	#  populated with the number of the query which updated data.
+#	record_query_number = no
+
+	# Read database-specific queries
+	$INCLUDE ${modconfdir}/${.:name}/main/${dialect}/queries.conf
+}
