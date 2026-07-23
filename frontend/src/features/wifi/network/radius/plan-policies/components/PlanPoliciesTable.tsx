@@ -3,21 +3,20 @@
 import React from "react";
 import { Button, Empty, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { PlanPolicyRecord } from "../types";
-import { PHASE_COLOR, VALUE_TYPE_COLOR } from "../constant";
+import type { PlanPolicyGroupRecord } from "../types";
 import { buildWifiTablePagination } from "@/features/wifi/shared/pagination";
 
 const { Text } = Typography;
 
 type Props = {
-  data: PlanPolicyRecord[];
+  data: PlanPolicyGroupRecord[];
   loading?: boolean;
   page: number;
   pageSize: number;
   total: number;
   onPaginationChange: (page: number, pageSize: number) => void;
-  onEdit: (record: PlanPolicyRecord) => void;
-  onDelete: (record: PlanPolicyRecord) => void;
+  onEdit: (record: PlanPolicyGroupRecord) => void;
+  onDelete: (record: PlanPolicyGroupRecord) => void;
 };
 
 const PlanPoliciesTable: React.FC<Props> = ({
@@ -30,14 +29,7 @@ const PlanPoliciesTable: React.FC<Props> = ({
   onEdit,
   onDelete,
 }) => {
-  const columns: ColumnsType<PlanPolicyRecord> = [
-    {
-      title: "Priority",
-      dataIndex: "priority",
-      width: 80,
-      align: "right",
-      render: (p: number) => <Text strong>{p}</Text>,
-    },
+  const columns: ColumnsType<PlanPolicyGroupRecord> = [
     {
       title: "Plan / Tenant",
       key: "plan",
@@ -56,54 +48,66 @@ const PlanPoliciesTable: React.FC<Props> = ({
       ),
     },
     {
-      title: "Attribute",
-      key: "attr",
+      title: "Scope",
+      key: "scope",
+      width: 220,
+      render: (_, row) => {
+        const stations = row.wifiStations?.length
+          ? row.wifiStations
+          : row.wifiStation
+            ? [row.wifiStation]
+            : [];
+        if (!stations.length || row.isGlobal) {
+          return <Tag color="blue">All sites (global)</Tag>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            <Tag>Site override</Tag>
+            {stations.slice(0, 3).map((s) => (
+              <Tag key={s.id} style={{ fontSize: 11 }}>
+                {s.code}
+              </Tag>
+            ))}
+            {stations.length > 3 ? (
+              <Tag style={{ fontSize: 11 }}>+{stations.length - 3}</Tag>
+            ) : null}
+          </div>
+        );
+      },
+    },
+    {
+      title: "Vendor profile",
+      key: "vendor",
+      width: 160,
+      ellipsis: true,
       render: (_, row) => (
         <div>
-          <Text code style={{ fontSize: 12 }}>
-            {row.attributeName}
-          </Text>
+          <Text style={{ fontSize: 12 }}>{row.vendorProfile.name}</Text>
           <div>
-            <Tag color={PHASE_COLOR[row.phase]}>{row.phase}</Tag>
-            <Tag color={VALUE_TYPE_COLOR[row.valueType] ?? "default"}>{row.valueType}</Tag>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              {row.vendorProfile.vendor}
+            </Text>
           </div>
         </div>
       ),
     },
     {
-      title: "Value",
-      key: "value",
+      title: "Attributes",
+      key: "attrs",
       render: (_, row) => (
-        <Text>
-          <Text code>{row.op}</Text> {row.value}
-        </Text>
-      ),
-    },
-    {
-      title: "Scope",
-      key: "scope",
-      width: 160,
-      render: (_, row) =>
-        row.wifiStation ? (
-          <div>
-            <Text style={{ fontSize: 12 }}>{row.wifiStation.name}</Text>
-            <div>
-              <Tag>Site override</Tag>
-            </div>
-          </div>
-        ) : (
-          <Tag>All sites</Tag>
-        ),
-    },
-    {
-      title: "Vendor profile",
-      key: "vendor",
-      width: 140,
-      ellipsis: true,
-      render: (_, row) => (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {row.vendorProfile.name}
-        </Text>
+        <div className="flex flex-wrap gap-1">
+          <Tag color="cyan">{row.attributeCount}</Tag>
+          {(row.attributes ?? []).slice(0, 4).map((attr) => (
+            <Tag key={`${attr.phase}-${attr.attributeName}`} style={{ fontSize: 11 }}>
+              <Text code style={{ fontSize: 11 }}>
+                {attr.attributeName}
+              </Text>
+            </Tag>
+          ))}
+          {row.attributeCount > 4 ? (
+            <Tag style={{ fontSize: 11 }}>+{row.attributeCount - 4}</Tag>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -128,14 +132,14 @@ const PlanPoliciesTable: React.FC<Props> = ({
     return (
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="No plan RADIUS policies yet. Map reply attributes to WiFi plans per vendor profile."
+        description="No plan RADIUS policies yet. Create a policy for a plan + vendor profile, then add attribute rows."
       />
     );
   }
 
   return (
-    <Table<PlanPolicyRecord>
-      rowKey="id"
+    <Table<PlanPolicyGroupRecord>
+      rowKey={(r) => r.policyBundleId || r.groupKey}
       size="middle"
       loading={loading}
       columns={columns}
@@ -145,7 +149,7 @@ const PlanPoliciesTable: React.FC<Props> = ({
         pageSize,
         total,
         onChange: onPaginationChange,
-        itemLabel: "rule"
+        itemLabel: "policy",
       })}
       onRow={(record) => ({
         onClick: () => onEdit(record),

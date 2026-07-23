@@ -21,6 +21,7 @@ const stationSelect = {
   code: true,
   name: true,
   location: true,
+  township: true,
   address: true,
   status: true,
   stationSizeId: true,
@@ -98,6 +99,7 @@ function buildListWhere(
   const status = typeof query.status === 'string' ? query.status.trim().toUpperCase() : '';
   const stationSizeId =
     typeof query.stationSizeId === 'string' ? query.stationSizeId.trim() : '';
+  const township = typeof query.township === 'string' ? query.township.trim() : '';
 
   if (status && (STATION_STATUSES as readonly string[]).includes(status)) {
     where.status = status as StationStatus;
@@ -107,11 +109,16 @@ function buildListWhere(
     where.stationSizeId = stationSizeId;
   }
 
+  if (township) {
+    where.township = { equals: township, mode: 'insensitive' };
+  }
+
   if (search) {
     where.OR = [
       { code: { contains: search, mode: 'insensitive' } },
       { name: { contains: search, mode: 'insensitive' } },
       { location: { contains: search, mode: 'insensitive' } },
+      { township: { contains: search, mode: 'insensitive' } },
       { address: { contains: search, mode: 'insensitive' } },
       { nasIdentifier: { contains: search, mode: 'insensitive' } },
       { radiusClientIp: { contains: search, mode: 'insensitive' } },
@@ -447,6 +454,9 @@ export class SitesController {
             ...(value.location !== undefined
               ? { location: value.location || null }
               : {}),
+            ...(value.township !== undefined
+              ? { township: value.township || null }
+              : {}),
             ...(value.address !== undefined ? { address: value.address || null } : {}),
             ...(value.stationSizeId !== undefined
               ? { stationSizeId: value.stationSizeId }
@@ -518,6 +528,7 @@ export class SitesController {
           code: value.code,
           name: value.name,
           location: value.location || null,
+          township: value.township || null,
           address: value.address || null,
           stationSizeId: value.stationSizeId,
           status: value.status ?? 'ACTIVE',

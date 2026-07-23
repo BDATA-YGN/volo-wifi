@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
 import { Alert, App, Col, Row, Spin, Typography, theme } from "antd";
@@ -24,23 +24,19 @@ const TenantProfilePage: React.FC = () => {
   const {
     profile,
     meta,
+    memberships,
     loading,
     error,
     requiresSelection,
+    canSwitchOrg,
     orgId,
     selectOrg,
     refresh,
     updateProfile,
   } = useTenantProfile();
 
-  useEffect(() => {
-    if (requiresSelection && meta?.memberships?.length === 1) {
-      selectOrg(meta.memberships[0].id);
-    }
-  }, [requiresSelection, meta?.memberships, selectOrg]);
-
-  const memberships = meta?.memberships ?? [];
-  const showSwitcher = requiresSelection || (meta?.canSwitchOrg && memberships.length > 1);
+  const showSwitcher =
+    (requiresSelection || canSwitchOrg) && memberships.length > 0;
 
   const handleSubmit = async (values: TenantProfileFormValues) => {
     setSaving(true);
@@ -105,7 +101,26 @@ const TenantProfilePage: React.FC = () => {
                 type="info"
                 showIcon
                 title="Select an organization to continue"
-                description="Choose a tenant from the list above to load profile settings."
+                description={
+                  memberships.length > 0
+                    ? "Developer mode — choose a tenant from the list above to load profile settings."
+                    : "No tenant organizations exist yet. Register a tenant first, then select it here."
+                }
+              />
+            ) : null}
+
+            {requiresSelection && !orgId && memberships.length === 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                title="No organizations yet"
+                description={
+                  <>
+                    Create a tenant first via{" "}
+                    <Link href="/wifi/billing/tenant-registration">Tenant registration</Link>, then
+                    select it here.
+                  </>
+                }
               />
             ) : null}
 

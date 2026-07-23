@@ -4,7 +4,7 @@ const deviceTypes = ['ROUTER', 'AP', 'CONTROLLER', 'SWITCH'] as const;
 
 const deviceFields = {
   orgId: Joi.string().uuid().required(),
-  stationId: Joi.string().uuid().allow(null).optional(),
+  stationId: Joi.string().uuid().required(),
   type: Joi.string().valid(...deviceTypes).default('ROUTER'),
   vendor: Joi.string().max(100).allow('', null).optional(),
   model: Joi.string().max(100).allow('', null).optional(),
@@ -13,19 +13,16 @@ const deviceFields = {
   ipAddr: Joi.string().max(64).allow('', null).optional(),
   note: Joi.string().max(500).allow('', null).optional(),
   isRadiusClient: Joi.boolean().default(false),
+  radiusProfileId: Joi.string().uuid().allow('', null).optional(),
   radiusSecret: Joi.string().max(255).allow('', null).optional(),
   nasShortname: Joi.string().max(100).allow('', null).optional(),
-  nasType: Joi.string().max(50).allow('', null).optional(),
-  nasPorts: Joi.number().integer().min(0).max(65535).allow(null).optional(),
-  nasServer: Joi.string().max(64).allow('', null).optional(),
-  nasCommunity: Joi.string().max(100).allow('', null).optional(),
 };
 
 export const NetworkNasDevicesCreateSchema = Joi.object(deviceFields).unknown(false);
 
 export const NetworkNasDevicesUpdateSchema = Joi.object({
   orgId: Joi.string().uuid().optional(),
-  stationId: Joi.string().uuid().allow(null).optional(),
+  stationId: Joi.string().uuid().required(),
   type: Joi.string().valid(...deviceTypes).optional(),
   vendor: Joi.string().max(100).allow('', null).optional(),
   model: Joi.string().max(100).allow('', null).optional(),
@@ -34,10 +31,7 @@ export const NetworkNasDevicesUpdateSchema = Joi.object({
   ipAddr: Joi.string().max(64).allow('', null).optional(),
   note: Joi.string().max(500).allow('', null).optional(),
   isRadiusClient: Joi.boolean().optional(),
+  radiusProfileId: Joi.string().uuid().allow('', null).optional(),
   radiusSecret: Joi.string().max(255).allow('', null).optional(),
   nasShortname: Joi.string().max(100).allow('', null).optional(),
-  nasType: Joi.string().max(50).allow('', null).optional(),
-  nasPorts: Joi.number().integer().min(0).max(65535).allow(null).optional(),
-  nasServer: Joi.string().max(64).allow('', null).optional(),
-  nasCommunity: Joi.string().max(100).allow('', null).optional(),
 }).unknown(false);

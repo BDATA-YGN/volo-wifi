@@ -19,6 +19,7 @@ type Props = {
   onPaginationChange: (page: number, pageSize: number) => void;
   onView: (record: OrgMemberRecord) => void;
   onEdit: (record: OrgMemberRecord) => void;
+  onResetPassword: (record: OrgMemberRecord) => void;
   onRemove: (record: OrgMemberRecord) => void;
 };
 
@@ -31,6 +32,7 @@ const MembersTable: React.FC<Props> = ({
   onPaginationChange,
   onView,
   onEdit,
+  onResetPassword,
   onRemove,
 }) => {
   const columns: ColumnsType<OrgMemberRecord> = [
@@ -108,7 +110,7 @@ const MembersTable: React.FC<Props> = ({
     {
       title: "",
       key: "actions",
-      width: 160,
+      width: 280,
       align: "right",
       fixed: "right",
       render: (_, row) => (
@@ -118,6 +120,9 @@ const MembersTable: React.FC<Props> = ({
           </Button>
           <Button type="link" size="small" onClick={() => onEdit(row)}>
             Edit
+          </Button>
+          <Button type="link" size="small" onClick={() => onResetPassword(row)}>
+            Reset password
           </Button>
           <Button type="link" size="small" danger onClick={() => onRemove(row)}>
             Remove
@@ -134,7 +139,7 @@ const MembersTable: React.FC<Props> = ({
       loading={loading}
       columns={columns}
       dataSource={data}
-      scroll={{ x: 980 }}
+      scroll={{ x: 1100 }}
       locale={{
         emptyText: (
           <Empty

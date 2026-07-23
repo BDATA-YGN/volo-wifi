@@ -88,12 +88,13 @@ const SiteDetailDrawer: React.FC<Props> = ({
                 type="info"
                 showIcon
                 className="mb-4"
-                message="Counts toward subscription license"
+                title="Counts toward subscription license"
                 description="Active sites consume one licensed slot and are billed at this capacity tier."
               />
             ) : null}
 
             <Descriptions column={1} size="small" bordered>
+              <Descriptions.Item label="Township">{row.township ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Location">{row.location ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Address">{row.address ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Capacity tier">

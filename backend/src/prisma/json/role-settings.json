@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-06-11T02:46:59.284Z",
+  "exportedAt": "2026-07-21T20:53:52.492Z",
   "mngRoles": [
     {
       "id": 1,
@@ -176,7 +176,7 @@
     {
       "id": "af887b2e-990c-416f-ba91-64c0775659c0",
       "settingKey": "profile",
-      "description": null,
+      "description": "feature.profile",
       "parentId": null,
       "level": "app",
       "kind": "feature"
@@ -369,6 +369,14 @@
       "id": "ce3b3521-532f-4b53-9d11-c66b559d8e38",
       "settingKey": "/wifi/network/nas-devices",
       "description": "menus.wifi.network.nas-devices",
+      "parentId": "network",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
+      "id": "a7c4e2b1-9f80-4d3a-b6e5-12f90c84d3a1",
+      "settingKey": "/wifi/network/radius/servers",
+      "description": "menus.wifi.network.radius.servers",
       "parentId": "network",
       "level": "app",
       "kind": "menu"
@@ -600,14 +608,6 @@
       "mngRoleSettingKey": "system"
     },
     {
-      "id": "2343609d-512a-4d18-81f0-0462714481cc",
-      "roleId": 1,
-      "settingKey": "6dc0243c-8289-4559-b89a-51ad19529bef",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "development"
-    },
-    {
       "id": "e1d9eb4d-5e71-45fc-aa35-823326cf3a22",
       "roleId": 1,
       "settingKey": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
@@ -646,70 +646,6 @@
       "enable": true,
       "visibility": true,
       "mngRoleSettingKey": "/system/conversations"
-    },
-    {
-      "id": "fe5ff7e2-a7a8-49bf-90ce-c49c2759a7f6",
-      "roleId": 1,
-      "settingKey": "fbbc87ef-b6d2-4de0-83a0-ec70c86d8cee",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/permissions"
-    },
-    {
-      "id": "56ad086a-01da-490e-8a09-d9c666ad37f3",
-      "roleId": 1,
-      "settingKey": "85b32f2d-23fe-44b1-8fd6-80f067b1995f",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/settings"
-    },
-    {
-      "id": "46caaaf1-28ee-4a8e-a86d-3d65123a3610",
-      "roleId": 1,
-      "settingKey": "50f07f21-0c6e-411d-913e-12e6ee27768e",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/menu-management"
-    },
-    {
-      "id": "5f765e11-c2af-43e7-8fc1-7fda288055d1",
-      "roleId": 1,
-      "settingKey": "98340ed7-5afb-4e83-8496-75787669b3e9",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/themes"
-    },
-    {
-      "id": "55af83a4-52d7-4f97-b11f-2856006f2026",
-      "roleId": 1,
-      "settingKey": "20cb40f6-c5d4-42a7-bbd2-44b5c59c8035",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/files"
-    },
-    {
-      "id": "b8136c2e-d09f-4ebb-bcf0-1c2c6da98080",
-      "roleId": 1,
-      "settingKey": "8b639b43-758d-4cb9-8d62-9555481d7088",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/contents"
-    },
-    {
-      "id": "36cfc906-b218-4d16-b633-6ca65845aabd",
-      "roleId": 1,
-      "settingKey": "408bf462-f3e9-4d80-afdf-b411821c2fe3",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/receipts"
-    },
-    {
-      "id": "1cd77f17-252f-413c-b8c0-e128c9f60ae6",
-      "roleId": 1,
-      "settingKey": "db715f62-492a-43ba-9271-635cb1ac26de",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/contact-support"
     },
     {
       "id": "a409e289-c8ed-4f16-a309-47f5a4b15ced",
@@ -902,6 +838,14 @@
       "enable": true,
       "visibility": true,
       "mngRoleSettingKey": "/wifi/network/nas-devices"
+    },
+    {
+      "id": "b1a2c3d4-e5f6-4789-a012-3456789abc01",
+      "roleId": 1,
+      "settingKey": "a7c4e2b1-9f80-4d3a-b6e5-12f90c84d3a1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/servers"
     },
     {
       "id": "51491170-8efb-48ce-b452-c14a5a779cbd",
@@ -1488,6 +1432,14 @@
       "mngRoleSettingKey": "/wifi/network/nas-devices"
     },
     {
+      "id": "b1a2c3d4-e5f6-4789-a012-3456789abc03",
+      "roleId": 3,
+      "settingKey": "a7c4e2b1-9f80-4d3a-b6e5-12f90c84d3a1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/servers"
+    },
+    {
       "id": "c474d4f6-c8e1-40c2-8884-447a6b41d3b9",
       "roleId": 3,
       "settingKey": "c998a558-17a5-4321-983d-e9e3db9f5597",
@@ -1864,6 +1816,14 @@
       "mngRoleSettingKey": "/wifi/network/nas-devices"
     },
     {
+      "id": "b1a2c3d4-e5f6-4789-a012-3456789abc05",
+      "roleId": 5,
+      "settingKey": "a7c4e2b1-9f80-4d3a-b6e5-12f90c84d3a1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/servers"
+    },
+    {
       "id": "8e531739-ec2f-4445-bace-ffa0439b302d",
       "roleId": 5,
       "settingKey": "c998a558-17a5-4321-983d-e9e3db9f5597",
@@ -2096,6 +2056,14 @@
       "mngRoleSettingKey": "/wifi/network/nas-devices"
     },
     {
+      "id": "b1a2c3d4-e5f6-4789-a012-3456789abc06",
+      "roleId": 6,
+      "settingKey": "a7c4e2b1-9f80-4d3a-b6e5-12f90c84d3a1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/network/radius/servers"
+    },
+    {
       "id": "c84bac04-8ad2-4845-a735-c12a2409cee0",
       "roleId": 6,
       "settingKey": "c998a558-17a5-4321-983d-e9e3db9f5597",
@@ -2320,172 +2288,74 @@
       "mngRoleSettingKey": "/wifi/commerce/partners/insights"
     },
     {
-      "id": "944cda2f-c22a-449d-ba1c-16ad4c54453d",
+      "id": "3e171479-356b-4b77-b0f6-cd798ea1562f",
       "roleId": 1,
-      "settingKey": "20912c1a-05a4-4640-b051-ead8d7347840",
+      "settingKey": "af887b2e-990c-416f-ba91-64c0775659c0",
       "enable": true,
       "visibility": true,
-      "mngRoleSettingKey": "system"
+      "createdAt": "2026-07-21T20:53:52.491Z",
+      "updatedAt": null,
+      "deletedAt": null
     },
     {
-      "id": "70e7c4ae-4d99-4cbc-a23a-5341f67f1b5e",
-      "roleId": 1,
-      "settingKey": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
+      "id": "23461113-9fa2-4a25-a84d-c219499da162",
+      "roleId": 2,
+      "settingKey": "af887b2e-990c-416f-ba91-64c0775659c0",
       "enable": true,
       "visibility": true,
-      "mngRoleSettingKey": "/system/admin-users"
+      "createdAt": "2026-07-21T20:53:52.492Z",
+      "updatedAt": null,
+      "deletedAt": null
     },
     {
-      "id": "209e75b2-7210-408b-9db7-86b09f76a763",
-      "roleId": 1,
-      "settingKey": "95ae5b7a-93de-4211-b618-727cbe55e387",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/admin-roles"
-    },
-    {
-      "id": "30658f3d-9466-4f7e-b9fe-e24057e3f70e",
-      "roleId": 1,
-      "settingKey": "1a65fcb0-1eed-44a4-82d4-8d4ec7ae9a6c",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/settings"
-    },
-    {
-      "id": "a390d180-db01-4bc1-87ce-ac2e25fb3a85",
-      "roleId": 1,
-      "settingKey": "45edd57f-f1eb-4017-8623-a83a095fe901",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/audit-logs"
-    },
-    {
-      "id": "773814d6-524e-4a05-9580-bc53a4f2c152",
-      "roleId": 1,
-      "settingKey": "a553b4c4-2640-410e-ac3b-d490a136a42f",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/conversations"
-    },
-    {
-      "id": "20ba23f3-8772-4e59-908b-2ada1047a7f9",
+      "id": "7e9f8666-364c-41e4-a432-070fd042798d",
       "roleId": 3,
-      "settingKey": "20912c1a-05a4-4640-b051-ead8d7347840",
+      "settingKey": "af887b2e-990c-416f-ba91-64c0775659c0",
       "enable": true,
       "visibility": true,
-      "mngRoleSettingKey": "system"
+      "createdAt": "2026-07-21T20:53:52.492Z",
+      "updatedAt": null,
+      "deletedAt": null
     },
     {
-      "id": "43a0a81b-b7fc-4ccd-b94b-4776406f3e8b",
-      "roleId": 3,
-      "settingKey": "6dc0243c-8289-4559-b89a-51ad19529bef",
+      "id": "ab8d0731-9c1b-4e25-97bb-d9602ffe5e2a",
+      "roleId": 4,
+      "settingKey": "af887b2e-990c-416f-ba91-64c0775659c0",
       "enable": true,
       "visibility": true,
-      "mngRoleSettingKey": "development"
+      "createdAt": "2026-07-21T20:53:52.492Z",
+      "updatedAt": null,
+      "deletedAt": null
     },
     {
-      "id": "89b49e12-093f-4153-8ba5-a13f34ea9643",
-      "roleId": 3,
-      "settingKey": "d59ccc46-f992-47d2-9c08-8ccfe45a700f",
+      "id": "9b1bc0d6-f4ba-4077-a4d2-d46c54fadc27",
+      "roleId": 5,
+      "settingKey": "af887b2e-990c-416f-ba91-64c0775659c0",
       "enable": true,
       "visibility": true,
-      "mngRoleSettingKey": "/system/admin-users"
+      "createdAt": "2026-07-21T20:53:52.492Z",
+      "updatedAt": null,
+      "deletedAt": null
     },
     {
-      "id": "53adeeac-769d-4370-810d-8144091a4162",
-      "roleId": 3,
-      "settingKey": "95ae5b7a-93de-4211-b618-727cbe55e387",
+      "id": "a9281cbf-b2ee-43fe-a592-40dd433bb8d4",
+      "roleId": 6,
+      "settingKey": "af887b2e-990c-416f-ba91-64c0775659c0",
       "enable": true,
       "visibility": true,
-      "mngRoleSettingKey": "/system/admin-roles"
+      "createdAt": "2026-07-21T20:53:52.492Z",
+      "updatedAt": null,
+      "deletedAt": null
     },
     {
-      "id": "9eed6a24-257e-4329-8a8d-97daa360fb58",
-      "roleId": 3,
-      "settingKey": "1a65fcb0-1eed-44a4-82d4-8d4ec7ae9a6c",
+      "id": "d9ed91c4-358d-4c73-b57f-0986272fbc96",
+      "roleId": 7,
+      "settingKey": "af887b2e-990c-416f-ba91-64c0775659c0",
       "enable": true,
       "visibility": true,
-      "mngRoleSettingKey": "/system/settings"
-    },
-    {
-      "id": "57128a1e-ce46-4b96-9c7b-6317e07cbd36",
-      "roleId": 3,
-      "settingKey": "45edd57f-f1eb-4017-8623-a83a095fe901",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/audit-logs"
-    },
-    {
-      "id": "39f4b355-a47b-4a80-aaec-fe66217552a9",
-      "roleId": 3,
-      "settingKey": "a553b4c4-2640-410e-ac3b-d490a136a42f",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/conversations"
-    },
-    {
-      "id": "d7086242-ea5f-46cd-bfc2-aa8059b924db",
-      "roleId": 3,
-      "settingKey": "fbbc87ef-b6d2-4de0-83a0-ec70c86d8cee",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/permissions"
-    },
-    {
-      "id": "bd6e2872-3074-41bc-9f81-be51e4de5f07",
-      "roleId": 3,
-      "settingKey": "85b32f2d-23fe-44b1-8fd6-80f067b1995f",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/settings"
-    },
-    {
-      "id": "96194eb1-300e-4b6f-85dd-142fd31a3a90",
-      "roleId": 3,
-      "settingKey": "50f07f21-0c6e-411d-913e-12e6ee27768e",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/menu-management"
-    },
-    {
-      "id": "2e74c7e2-768d-46f3-8610-d284a2338310",
-      "roleId": 3,
-      "settingKey": "98340ed7-5afb-4e83-8496-75787669b3e9",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/themes"
-    },
-    {
-      "id": "898068a9-b310-4a4b-89b8-45b038cd45d5",
-      "roleId": 3,
-      "settingKey": "20cb40f6-c5d4-42a7-bbd2-44b5c59c8035",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/files"
-    },
-    {
-      "id": "bce56763-a2e2-4ba9-8381-74b29026bd39",
-      "roleId": 3,
-      "settingKey": "8b639b43-758d-4cb9-8d62-9555481d7088",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/contents"
-    },
-    {
-      "id": "f1f6945f-86eb-497f-8cb2-bf82af7c8bf9",
-      "roleId": 3,
-      "settingKey": "408bf462-f3e9-4d80-afdf-b411821c2fe3",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/receipts"
-    },
-    {
-      "id": "87417e6f-8000-4882-b2e1-6b7f2362558f",
-      "roleId": 3,
-      "settingKey": "db715f62-492a-43ba-9271-635cb1ac26de",
-      "enable": true,
-      "visibility": true,
-      "mngRoleSettingKey": "/system/contact-support"
+      "createdAt": "2026-07-21T20:53:52.492Z",
+      "updatedAt": null,
+      "deletedAt": null
     }
   ]
 }

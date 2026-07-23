@@ -7,18 +7,19 @@ import {
   Drawer,
   Form,
   Input,
-  InputNumber,
   Select,
   Space,
   Switch,
   Tabs,
   Typography,
 } from "antd";
-import type { NasDeviceFormValues, NasDeviceRecord, NasDeviceStation } from "../types";
-import {
-  DEVICE_TYPE_FORM_OPTIONS,
-  NAS_TYPE_SUGGESTIONS,
-} from "../constant";
+import type {
+  NasDeviceFormValues,
+  NasDeviceRadiusProfileOption,
+  NasDeviceRecord,
+  NasDeviceStation,
+} from "../types";
+import { DEVICE_TYPE_FORM_OPTIONS } from "../constant";
 import type { NasDeviceOrg } from "../types";
 
 const { TextArea } = Input;
@@ -31,6 +32,7 @@ type Props = {
   orgs: NasDeviceOrg[];
   lockedOrgId?: string;
   loadStations: (orgId: string) => Promise<NasDeviceStation[]>;
+  loadRadiusProfiles: (orgId: string) => Promise<NasDeviceRadiusProfileOption[]>;
   onClose: () => void;
   onSubmit: (values: NasDeviceFormValues) => Promise<void>;
 };
@@ -42,12 +44,15 @@ const NasDeviceFormDrawer: React.FC<Props> = ({
   orgs,
   lockedOrgId,
   loadStations,
+  loadRadiusProfiles,
   onClose,
   onSubmit,
 }) => {
   const [form] = Form.useForm<NasDeviceFormValues>();
   const [stations, setStations] = useState<NasDeviceStation[]>([]);
+  const [radiusProfiles, setRadiusProfiles] = useState<NasDeviceRadiusProfileOption[]>([]);
   const [stationsLoading, setStationsLoading] = useState(false);
+  const [profilesLoading, setProfilesLoading] = useState(false);
   const isRadiusClient = Form.useWatch("isRadiusClient", form);
   const orgId = Form.useWatch("orgId", form);
 
@@ -66,47 +71,85 @@ const NasDeviceFormDrawer: React.FC<Props> = ({
         ipAddr: editing.ipAddr ?? "",
         note: editing.note ?? "",
         isRadiusClient: editing.isRadiusClient,
-        radiusSecret: editing.radiusSecret ?? "",
+        radiusProfileId: editing.radiusProfileId ?? undefined,
+        radiusSecret: "",
         nasShortname: editing.nasShortname ?? "",
-        nasType: editing.nasType ?? "other",
-        nasPorts: editing.nasPorts ?? undefined,
-        nasServer: editing.nasServer ?? "",
-        nasCommunity: editing.nasCommunity ?? "",
       });
       void loadStations(editing.orgId).then(setStations);
+      void loadRadiusProfiles(editing.orgId).then(setRadiusProfiles);
     } else {
       form.resetFields();
       form.setFieldsValue({
         orgId: lockedOrgId,
         type: "ROUTER",
         isRadiusClient: false,
-        nasType: "other",
       });
       setStations([]);
+      setRadiusProfiles([]);
       if (lockedOrgId) {
         void loadStations(lockedOrgId).then(setStations);
+        void loadRadiusProfiles(lockedOrgId).then(setRadiusProfiles);
       }
     }
-  }, [open, editing, form, loadStations, lockedOrgId]);
+  }, [open, editing, form, loadStations, loadRadiusProfiles, lockedOrgId]);
 
   useEffect(() => {
     if (!open || !orgId) return;
     setStationsLoading(true);
+    setProfilesLoading(true);
     void loadStations(orgId)
       .then(setStations)
       .finally(() => setStationsLoading(false));
-  }, [orgId, open, loadStations]);
+    void loadRadiusProfiles(orgId)
+      .then(setRadiusProfiles)
+      .finally(() => setProfilesLoading(false));
+  }, [orgId, open, loadStations, loadRadiusProfiles]);
 
   const handleOrgChange = (value: string) => {
     form.setFieldValue("stationId", undefined);
-    if (value) void loadStations(value).then(setStations);
+    form.setFieldValue("radiusProfileId", undefined);
+    if (value) {
+      void loadStations(value).then(setStations);
+      void loadRadiusProfiles(value).then(setRadiusProfiles);
+    }
   };
 
   const handleFinish = async (values: NasDeviceFormValues) => {
-    await onSubmit({
+    // Inactive tab panes can omit fields from submit values — never wipe RADIUS on partial save.
+    const isRadiusClient =
+      typeof values.isRadiusClient === "boolean"
+        ? values.isRadiusClient
+        : Boolean(editing?.isRadiusClient);
+
+    const radiusProfileId = isRadiusClient
+      ? (typeof values.radiusProfileId === "string" && values.radiusProfileId.trim()
+          ? values.radiusProfileId.trim()
+          : editing?.radiusProfileId || null)
+      : null;
+
+    const nasShortname = isRadiusClient
+      ? (typeof values.nasShortname === "string" && values.nasShortname.trim()
+          ? values.nasShortname.trim()
+          : editing?.nasShortname || undefined)
+      : undefined;
+
+    const payload: NasDeviceFormValues = {
       ...values,
-      stationId: values.stationId || null,
-    });
+      isRadiusClient,
+      radiusProfileId: radiusProfileId ?? undefined,
+      nasShortname,
+    };
+
+    // Blank secret on edit means "keep existing" — do not send empty string.
+    if (editing && !values.radiusSecret?.trim()) {
+      delete payload.radiusSecret;
+    }
+    // If profile id is still empty on edit, omit so API keeps existing.
+    if (editing && !payload.radiusProfileId) {
+      delete payload.radiusProfileId;
+    }
+
+    await onSubmit(payload);
   };
 
   const generalTab = (
@@ -131,9 +174,12 @@ const NasDeviceFormDrawer: React.FC<Props> = ({
         </Form.Item>
       )}
 
-      <Form.Item name="stationId" label="WiFi site (optional)">
+      <Form.Item
+        name="stationId"
+        label="WiFi site"
+        rules={[{ required: true, message: "Select a WiFi site" }]}
+      >
         <Select
-          allowClear
           showSearch
           loading={stationsLoading}
           placeholder="Link to a licensed site"
@@ -186,43 +232,53 @@ const NasDeviceFormDrawer: React.FC<Props> = ({
       {isRadiusClient ? (
         <>
           <Form.Item
+            name="radiusProfileId"
+            label="FreeRADIUS server"
+            rules={[{ required: true, message: "Select a FreeRADIUS server" }]}
+            extra="Org-scoped FreeRADIUS server this NAS client talks to."
+          >
+            <Select
+              showSearch
+              loading={profilesLoading}
+              placeholder="Select FreeRADIUS server"
+              optionFilterProp="label"
+              options={radiusProfiles.map((p) => ({
+                value: p.id,
+                label: p.serverHost ? `${p.name} (${p.serverHost})` : p.name,
+              }))}
+              notFoundContent={
+                profilesLoading
+                  ? "Loading…"
+                  : "No servers — create one under Network → FreeRADIUS Servers"
+              }
+            />
+          </Form.Item>
+
+          <Form.Item
             name="nasShortname"
             label="NAS short name"
-            extra="FreeRADIUS nasname / shortname"
+            extra="FreeRADIUS nasname / shortname for this device"
           >
             <Input placeholder="site-router-01" />
           </Form.Item>
 
-          <Form.Item name="radiusSecret" label="RADIUS shared secret">
+          <Form.Item
+            name="radiusSecret"
+            label="NAS shared secret"
+            extra={
+              editing?.hasRadiusSecret
+                ? "Leave blank to keep the existing device secret."
+                : "Required unless the FreeRADIUS server has a default secret."
+            }
+          >
             <Input.Password
               placeholder={editing?.hasRadiusSecret ? "Leave blank to keep existing" : ""}
             />
           </Form.Item>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Form.Item name="nasType" label="NAS type">
-              <Select
-                showSearch
-                allowClear
-                options={NAS_TYPE_SUGGESTIONS.map((v) => ({ value: v, label: v }))}
-              />
-            </Form.Item>
-            <Form.Item name="nasPorts" label="NAS ports">
-              <InputNumber min={0} max={65535} style={{ width: "100%" }} />
-            </Form.Item>
-          </div>
-
-          <Form.Item name="nasServer" label="NAS server IP">
-            <Input placeholder="Optional RADIUS server IP" />
-          </Form.Item>
-
-          <Form.Item name="nasCommunity" label="SNMP community">
-            <Input />
-          </Form.Item>
         </>
       ) : (
         <Text type="secondary" style={{ fontSize: 13 }}>
-          Enable RADIUS client to configure FreeRADIUS NAS attributes for this device.
+          Enable RADIUS client, then select which FreeRADIUS server this device uses.
         </Text>
       )}
     </div>
@@ -242,9 +298,10 @@ const NasDeviceFormDrawer: React.FC<Props> = ({
 
       <Form form={form} layout="vertical" requiredMark="optional" onFinish={(v) => void handleFinish(v)}>
         <Tabs
+          destroyInactiveTabPane={false}
           items={[
-            { key: "general", label: "General", children: generalTab },
-            { key: "radius", label: "RADIUS / NAS", children: radiusTab },
+            { key: "general", label: "General", forceRender: true, children: generalTab },
+            { key: "radius", label: "RADIUS / NAS", forceRender: true, children: radiusTab },
           ]}
         />
 

@@ -19,10 +19,11 @@ import {
   loadOrgMembershipOptions,
   resolveOrgIdForAdmin,
 } from '@/features/wifi/shared/resolve-org';
-import { PROVISION_MEMBER_ROLE_CODES } from './constants';
+import { MEMBER_ROLE_CODES, PROVISION_MEMBER_ROLE_CODES, LOCKED_MEMBER_ROLE_CODES, isLockedMemberRoleCode, pickConsoleRoleName } from './constants';
 import {
   TenantAccessControlCreateSchema,
   TenantAccessControlUpdateSchema,
+  TenantAccessControlResetPasswordSchema,
 } from './schema';
 
 const memberSelect = {
@@ -103,9 +104,15 @@ async function syncMemberRoles(
   roleCodes: string[],
   assignedByAdminId: string
 ) {
-  const uniqueCodes = [...new Set(roleCodes)].filter((code) => code !== 'PARTNER');
+  // Never add/remove Admin (ORG_ADMIN) or Partner here — platform ADMIN/DEVELOPER are not member roles.
+  const uniqueCodes = [...new Set(roleCodes)].filter((code) => !isLockedMemberRoleCode(code));
   const existing = await tx.orgMemberRole.findMany({
-    where: { orgMemberId, deletedAt: null, scopeKey: '', roleCode: { not: 'PARTNER' } },
+    where: {
+      orgMemberId,
+      deletedAt: null,
+      scopeKey: '',
+      roleCode: { notIn: [...LOCKED_MEMBER_ROLE_CODES] },
+    },
     select: { id: true, roleCode: true },
   });
 
@@ -268,6 +275,8 @@ export class TenantAccessControlController {
             stations,
             resellers,
             roleCodes: PROVISION_MEMBER_ROLE_CODES,
+            canSwitchOrg: canSwitchOrgContext(req.user!),
+            requiresOrgSelection: canSwitchOrgContext(req.user!) && !orgId,
           },
         });
       }
@@ -292,9 +301,39 @@ export class TenantAccessControlController {
         return responseSuccess(res, { message: 'Success', data: member });
       }
 
-      const orgId = await resolveOrgFromRequest(this.prisma, req);
+      const requestedOrgId =
+        typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+      const resolved = await resolveOrgIdForAdmin(
+        this.prisma,
+        adminId,
+        req.user!,
+        requestedOrgId || undefined
+      );
+
+      if ('requiresSelection' in resolved) {
+        return responseSuccess(res, {
+          message: 'Success',
+          data: [],
+          meta: {
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 1,
+            activeCount: 0,
+            suspendedCount: 0,
+            roleAssignments: 0,
+            memberships: resolved.memberships,
+            requiresOrgSelection: true,
+            canSwitchOrg: true,
+          },
+        });
+      }
+
+      const orgId = resolved.orgId;
       const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
       const status = typeof req.query.status === 'string' ? req.query.status.trim().toUpperCase() : '';
+      const roleCodeRaw =
+        typeof req.query.roleCode === 'string' ? req.query.roleCode.trim().toUpperCase() : '';
       const { page, limit, skip, take } = parsePagination(req.query);
 
       const where: Prisma.OrgMemberWhereInput = {
@@ -304,6 +343,19 @@ export class TenantAccessControlController {
 
       if (status && ['ACTIVE', 'SUSPENDED', 'DISABLED'].includes(status)) {
         where.status = status;
+      }
+
+      if (
+        roleCodeRaw &&
+        (MEMBER_ROLE_CODES as readonly string[]).includes(roleCodeRaw)
+      ) {
+        where.roles = {
+          some: {
+            deletedAt: null,
+            isActive: true,
+            roleCode: roleCodeRaw,
+          },
+        };
       }
 
       if (search) {
@@ -355,7 +407,8 @@ export class TenantAccessControlController {
           suspendedCount,
           roleAssignments,
           memberships,
-          canSwitchOrg: canSwitchOrgContext(req.user!) && memberships.length > 1,
+          canSwitchOrg: canSwitchOrgContext(req.user!),
+          requiresOrgSelection: false,
         },
       });
     }),
@@ -444,6 +497,16 @@ export class TenantAccessControlController {
           if (value.stationIds) {
             await syncStationScopes(tx, orgId, recordId!, value.stationIds as string[]);
           }
+
+          const nextPassword =
+            typeof value.password === 'string' ? value.password.trim() : '';
+          if (nextPassword) {
+            const hashedPassword = await hashPassword(nextPassword);
+            await tx.admin.update({
+              where: { id: existing.adminId },
+              data: { password: hashedPassword, updatedBy: actorAdminId },
+            });
+          }
         });
 
         if (value.status === 'SUSPENDED' || value.status === 'DISABLED') {
@@ -481,15 +544,16 @@ export class TenantAccessControlController {
 
       const username = (value.username as string).trim();
 
-      const orgAdminRole = await this.prisma.mngRoles.findFirst({
-        where: { roleName: 'ORG_ADMIN', deletedAt: null },
+      const consoleRoleName = pickConsoleRoleName(value.roleCodes as string[]);
+      const consoleRole = await this.prisma.mngRoles.findFirst({
+        where: { roleName: consoleRoleName, deletedAt: null },
         select: { roleId: true },
       });
 
-      if (!orgAdminRole) {
+      if (!consoleRole) {
         return responseError(res, 500, {
           code: 'ROLE_NOT_FOUND',
-          message: 'ORG_ADMIN console role is not configured.',
+          message: `${consoleRoleName} console role is not configured.`,
         });
       }
 
@@ -512,7 +576,7 @@ export class TenantAccessControlController {
           email: value.email?.trim() || null,
           phoneNumber: value.phoneNumber?.trim() || null,
           password: hashedPassword,
-          roleId: orgAdminRole.roleId,
+          roleId: consoleRole.roleId,
           isActive: true,
           isVerified: true,
           isBlocked: false,
@@ -613,6 +677,44 @@ export class TenantAccessControlController {
       await revokeConsoleSessionsIfFullyBlocked(this.prisma, existing.adminId);
 
       responseSuccess(res, { message: 'Member removed' });
+    }),
+  ];
+
+  public resetPassword = [
+    asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+      const idParam = req.params?.id as string;
+      const actorAdminId = req.userId!;
+      const orgId = await resolveOrgFromRequest(this.prisma, req);
+
+      const { error, value } = TenantAccessControlResetPasswordSchema.validate(req.body, {
+        abortEarly: false,
+        allowUnknown: false,
+      });
+      if (error) {
+        return responseError(res, 400, {
+          code: 'VALIDATION_ERROR',
+          message: error.details.map((d) => d.message).join(', '),
+        });
+      }
+
+      const existing = await this.prisma.orgMember.findFirst({
+        where: { id: idParam, orgId, deletedAt: null },
+        select: { id: true, adminId: true },
+      });
+      if (!existing) {
+        return responseError(res, 404, {
+          code: 'NOT_FOUND',
+          message: 'Team member not found.',
+        });
+      }
+
+      const hashedPassword = await hashPassword(value.password as string);
+      await this.prisma.admin.update({
+        where: { id: existing.adminId },
+        data: { password: hashedPassword, updatedBy: actorAdminId },
+      });
+
+      responseSuccess(res, { message: 'Password updated' });
     }),
   ];
 }

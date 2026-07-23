@@ -8,6 +8,7 @@ import { useState } from "react";
 import { clearClientCookies } from "@/utils/clientUtils";
 import { clearPersistedClientState } from "@/lib/cacheKeys";
 import { applySessionMenus, clearSessionCaches } from "@/lib/sessionCache";
+import { CONSOLE_LOGIN_PATH } from "@/lib/auth/console-paths";
 
 const extraRolesAndMenus = async (authData: LoggedUser) => {
   if (!authData?.mapRoleSettings) return {};
@@ -87,7 +88,7 @@ export const useLoginUser = () => {
       clearSessionCaches();
       clearPersistedClientState();
       clearClientCookies();
-      window.location.href = "/signin";
+      window.location.href = CONSOLE_LOGIN_PATH;
   };
 
   /** --- Sign Out --- */

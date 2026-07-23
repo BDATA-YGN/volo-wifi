@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import { Button, Empty, Space, Table, Tag, Typography } from "antd";
+import { Button, Empty, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { PriceBookRecord } from "../types";
 import { SCOPE_COLOR } from "../constant";
-import { formatBookScopeTarget, formatScopeLabel } from "../utils";
+import { formatBookScopeTarget, formatBookScopeTargetShort, formatScopeLabel } from "../utils";
 import { buildWifiTablePagination } from "@/features/wifi/shared/pagination";
 
 const { Text } = Typography;
@@ -60,11 +60,17 @@ const PriceBooksTable: React.FC<Props> = ({
       title: "Applies to",
       key: "target",
       ellipsis: true,
-      render: (_, row) => (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {formatBookScopeTarget(row)}
-        </Text>
-      ),
+      render: (_, row) => {
+        const full = formatBookScopeTarget(row);
+        const short = formatBookScopeTargetShort(row);
+        const needsTip = full !== short;
+        const label = (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {short}
+          </Text>
+        );
+        return needsTip ? <Tooltip title={full}>{label}</Tooltip> : label;
+      },
     },
     {
       title: "Plan prices",

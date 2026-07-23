@@ -116,9 +116,25 @@ export class WebSocketService {
   private async connectRedisClient(client: Redis, label: string): Promise<boolean> {
     try {
       if (client.status === 'wait') {
-        await client.connect();
+        await Promise.race([
+          client.connect(),
+          new Promise((_, reject) => {
+            setTimeout(
+              () => reject(new Error(`Redis connect timed out after ${REDIS_CONNECT_TIMEOUT_MS}ms`)),
+              REDIS_CONNECT_TIMEOUT_MS,
+            );
+          }),
+        ]);
       }
-      await client.ping();
+      await Promise.race([
+        client.ping(),
+        new Promise((_, reject) => {
+          setTimeout(
+            () => reject(new Error(`Redis ping timed out after ${REDIS_CONNECT_TIMEOUT_MS}ms`)),
+            REDIS_CONNECT_TIMEOUT_MS,
+          );
+        }),
+      ]);
       logger.info(`Redis connected (${label})`);
       return true;
     } catch (err) {

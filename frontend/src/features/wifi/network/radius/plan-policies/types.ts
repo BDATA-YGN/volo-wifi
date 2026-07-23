@@ -13,6 +13,12 @@ export type PolicyPlan = {
   code: string;
   name: string;
   isActive: boolean;
+  quotaType?: string;
+  timeAmount?: number | null;
+  timeUnit?: string | null;
+  dataMb?: number | null;
+  maxDevices?: number | null;
+  validityDays?: number | null;
 };
 
 export type PolicyStation = {
@@ -38,25 +44,43 @@ export type CatalogAttributeOption = {
   defaultValue: string | null;
 };
 
-export type PlanPolicyRecord = {
-  id: string;
-  orgId: string;
-  planId: string;
-  wifiStationId: string | null;
-  vendorProfileId: string;
+/** One attribute row inside a policy group. */
+export type PlanPolicyAttributeRow = {
+  id?: string;
   phase: RadiusAttrPhase;
   attributeName: string;
   op: string;
   valueType: RadiusAttrValueType;
   value: string;
   priority: number;
-  note: string | null;
-  createdAt: string;
-  updatedAt: string;
+  note?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/**
+ * One list row = Plan + Vendor profile + 0..N sites (empty = global),
+ * with many attribute rows underneath.
+ */
+export type PlanPolicyGroupRecord = {
+  groupKey: string;
+  policyBundleId: string;
+  orgId: string;
+  planId: string;
+  vendorProfileId: string;
+  /** @deprecated Prefer stationIds / wifiStations */
+  wifiStationId: string | null;
+  stationIds: string[];
+  isGlobal: boolean;
   org: PolicyOrg;
   plan: PolicyPlan;
-  wifiStation: PolicyStation | null;
   vendorProfile: PolicyVendorProfile;
+  /** @deprecated Prefer wifiStations */
+  wifiStation: PolicyStation | null;
+  wifiStations: PolicyStation[];
+  attributeCount: number;
+  attributes: PlanPolicyAttributeRow[];
+  updatedAt: string;
 };
 
 export type PlanPoliciesMeta = {
@@ -64,15 +88,13 @@ export type PlanPoliciesMeta = {
   limit?: number;
   total?: number;
   totalPages?: number;
+  policyGroups?: number;
+  attributeRows?: number;
   phaseCounts?: Partial<Record<RadiusAttrPhase, number>>;
   plansWithPolicies?: number;
 };
 
-export type PlanPolicyFormValues = {
-  orgId: string;
-  planId: string;
-  vendorProfileId: string;
-  wifiStationId?: string | null;
+export type PlanPolicyAttributeInput = {
   phase: RadiusAttrPhase;
   attributeName: string;
   op: string;
@@ -80,6 +102,16 @@ export type PlanPolicyFormValues = {
   value: string;
   priority: number;
   note?: string;
+};
+
+export type PlanPolicyFormValues = {
+  orgId: string;
+  planId: string;
+  vendorProfileId: string;
+  /** Empty = global (all sites). */
+  stationIds: string[];
+  attributes: PlanPolicyAttributeInput[];
+  policyBundleId?: string;
 };
 
 export type PlanPoliciesFormOptions = {

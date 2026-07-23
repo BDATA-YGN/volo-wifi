@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button, Empty, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { SiteRecord } from "../types";
-import { STATUS_COLOR, TIER_CODE_COLORS } from "../constant";
+import { STATUS_COLOR, resolveTierColor } from "../constant";
 import { formatStatusLabel } from "../utils";
 import { buildWifiTablePagination } from "@/features/wifi/shared/pagination";
 
@@ -53,11 +53,23 @@ const SitesTable: React.FC<Props> = ({
       ),
     },
     {
+      title: "Township",
+      dataIndex: "township",
+      width: 140,
+      ellipsis: true,
+      render: (township: string | null) =>
+        township ? (
+          <Text type="secondary">{township}</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
       title: "Capacity tier",
       key: "tier",
       width: 140,
       render: (_, row) => (
-        <Tag color={TIER_CODE_COLORS[row.stationSize.code] ?? "default"}>
+        <Tag color={resolveTierColor(row.stationSize.code, row.stationSize.name)}>
           {row.stationSize.code}
         </Tag>
       ),
@@ -152,7 +164,7 @@ const SitesTable: React.FC<Props> = ({
       loading={loading}
       columns={columns}
       dataSource={data}
-      scroll={{ x: 1000 }}
+      scroll={{ x: 1120 }}
       locale={{
         emptyText: (
           <Empty

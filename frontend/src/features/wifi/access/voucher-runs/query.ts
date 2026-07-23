@@ -20,6 +20,11 @@ export const list = async (params?: VoucherRunsListParams): Promise<CommonListRe
         orgId: params?.orgId || undefined,
         planId: params?.planId || undefined,
         stationId: params?.stationId || undefined,
+        township: params?.township || undefined,
+        stationSizeId: params?.stationSizeId || undefined,
+        dateFrom: params?.dateFrom || undefined,
+        dateTo: params?.dateTo || undefined,
+        hasBalance: params?.hasBalance ? "true" : undefined,
       },
     });
     return res.data;
@@ -62,7 +67,6 @@ export const create = async (
       {
         ...payload,
         batchNo: payload.batchNo?.trim().toUpperCase() || undefined,
-        prefix: payload.prefix?.trim().toUpperCase() || undefined,
         note: payload.note?.trim() || null,
       },
       { params: { orgId: orgId || undefined } }

@@ -20,6 +20,7 @@ export type PlanOption = {
 export type PartnerPortalAccount = {
   username: string;
   fullName: string | null;
+  lastLogin: string | null;
 };
 
 export type PartnerStation = {

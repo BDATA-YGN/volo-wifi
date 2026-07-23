@@ -39,7 +39,7 @@ export const loadFormOptions = async (
   }
 };
 
-export const create = async (
+export const saveGroup = async (
   payload: PlanPolicyFormValues,
   orgId?: string
 ): Promise<CommonResponse> => {
@@ -47,39 +47,41 @@ export const create = async (
     const res = await apiClient.post(
       NETWORK_RADIUS_PLAN_POLICIES_API.createOrUpdate(),
       {
-        ...payload,
-        wifiStationId: payload.wifiStationId || null,
-        note: payload.note?.trim() || null,
+        orgId: payload.orgId,
+        planId: payload.planId,
+        vendorProfileId: payload.vendorProfileId,
+        stationIds: payload.stationIds ?? [],
+        policyBundleId: payload.policyBundleId,
+        attributes: payload.attributes.map((row) => ({
+          phase: row.phase,
+          attributeName: row.attributeName.trim(),
+          op: row.op,
+          valueType: row.valueType,
+          value: row.value.trim(),
+          priority: row.priority,
+          note: row.note?.trim() || null,
+        })),
       },
       { params: { orgId: orgId || payload.orgId || undefined } }
     );
-    return res.data;
+    return { message: res.data?.message ?? "Saved", data: null };
   } catch (error) {
     throw handleApiError(error);
   }
 };
 
-export const update = async (
-  id: string,
-  payload: Partial<PlanPolicyFormValues>,
+export const removeGroup = async (
+  group: { policyBundleId: string },
   orgId?: string
 ): Promise<CommonResponse> => {
   try {
-    const res = await apiClient.post(NETWORK_RADIUS_PLAN_POLICIES_API.createOrUpdate(id), payload, {
-      params: { orgId: orgId || undefined },
+    const res = await apiClient.delete(`${NETWORK_RADIUS_PLAN_POLICIES_API.listOrDetails()}/group`, {
+      params: {
+        orgId: orgId || undefined,
+        policyBundleId: group.policyBundleId,
+      },
     });
-    return res.data;
-  } catch (error) {
-    throw handleApiError(error);
-  }
-};
-
-export const remove = async (id: string, orgId?: string): Promise<CommonResponse> => {
-  try {
-    const res = await apiClient.delete(NETWORK_RADIUS_PLAN_POLICIES_API.delete(id), {
-      params: { orgId: orgId || undefined },
-    });
-    return res.data;
+    return { message: res.data?.message ?? "Removed", data: null };
   } catch (error) {
     throw handleApiError(error);
   }

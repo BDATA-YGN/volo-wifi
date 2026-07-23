@@ -29,6 +29,7 @@ export const TIME_UNIT_OPTIONS: { value: UnitTime; label: string }[] = [
   { value: "MINUTE", label: "Minutes" },
   { value: "HOUR", label: "Hours" },
   { value: "DAY", label: "Days" },
+  { value: "MONTH", label: "Months" },
 ];
 
 export const TIME_USAGE_MODE_OPTIONS: { value: PlanTimeUsageMode; label: string }[] = [

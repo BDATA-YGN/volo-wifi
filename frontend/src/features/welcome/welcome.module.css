@@ -1,0 +1,125 @@
+.page {
+  --welcome-accent: #0f766e;
+  --welcome-accent-soft: rgba(15, 118, 110, 0.18);
+  --welcome-bg: #f1f5f9;
+  --welcome-bg-top: #e2e8f0;
+  --welcome-text: #0f172a;
+  --welcome-muted: #64748b;
+
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2rem 1.25rem 1.5rem;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--welcome-accent-soft), transparent),
+    linear-gradient(180deg, var(--welcome-bg-top) 0%, var(--welcome-bg) 45%, var(--welcome-bg) 100%);
+  color: var(--welcome-text);
+  font-family: "NotoSansMyanmar", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.glow {
+  position: absolute;
+  inset: auto 10% 18% 10%;
+  height: 40%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(15, 118, 110, 0.12), transparent 70%);
+  filter: blur(24px);
+  pointer-events: none;
+  animation: welcomePulse 8s ease-in-out infinite;
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 28rem;
+  animation: welcomeRise 0.7s ease-out both;
+}
+
+.brand {
+  margin-bottom: 1.75rem;
+  animation: welcomeFade 1s ease-out 0.15s both;
+}
+
+.logo {
+  display: block;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  animation: welcomeFade 0.9s ease-out 0.28s both;
+}
+
+.subtitle {
+  margin: 0.875rem 0 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--welcome-muted);
+  max-width: 22rem;
+  animation: welcomeFade 0.9s ease-out 0.4s both;
+}
+
+.footer {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--welcome-muted);
+  opacity: 0.85;
+}
+
+@keyframes welcomeRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes welcomeFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes welcomePulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main,
+  .brand,
+  .title,
+  .subtitle,
+  .glow {
+    animation: none;
+  }
+}

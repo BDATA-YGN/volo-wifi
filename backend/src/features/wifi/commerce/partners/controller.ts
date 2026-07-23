@@ -19,8 +19,10 @@ import { USER_STATUSES, type UserStatus } from './constants';
 import {
   CommercePartnersCreateSchema,
   CommercePartnersUpdateSchema,
+  CommercePartnersResetPasswordSchema,
 } from './schema';
 import { provisionPartnerPortalAccount } from './provision-portal-account';
+import { hashPassword } from '@/utils/password';
 
 const resellerSelect = {
   id: true,
@@ -62,7 +64,7 @@ const planBriefSelect = {
 const listPartnerSelect = {
   ...resellerSelect,
   admin: {
-    select: { id: true, username: true, fullName: true },
+    select: { id: true, username: true, fullName: true, lastLogin: true },
   },
   resellerStations: {
     where: { deletedAt: null },
@@ -114,15 +116,26 @@ async function resolveOrgFromRequest(
 
 type ResellerRow = Prisma.ResellerGetPayload<{ select: typeof resellerSelect }>;
 
-function serializePortalAccount(admin: { username: string; fullName: string | null } | null | undefined) {
+function serializePortalAccount(
+  admin:
+    | { username: string; fullName: string | null; lastLogin?: Date | null }
+    | null
+    | undefined
+) {
   if (!admin) return null;
   return {
     username: admin.username,
     fullName: admin.fullName,
+    lastLogin: admin.lastLogin ? admin.lastLogin.toISOString() : null,
   };
 }
 
-function serializePartner(row: ResellerRow, admin?: { username: string; fullName: string | null } | null) {
+function serializePartner(
+  row: ResellerRow,
+  admin?:
+    | { username: string; fullName: string | null; lastLogin?: Date | null }
+    | null
+) {
   return {
     id: row.id,
     orgId: row.orgId,
@@ -722,6 +735,62 @@ export class CommercePartnersController {
       });
 
       responseSuccess(res, { message: 'Partner removed', data: { id } });
+    }),
+  ];
+
+  public resetPassword = [
+    asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+      const id = req.params?.id as string;
+      const actorAdminId = req.userId!;
+
+      let orgId: string;
+      try {
+        orgId = await resolveOrgFromRequest(this.prisma, req);
+      } catch (err: unknown) {
+        const e = err as { status?: number; code?: string; message?: string };
+        return responseError(res, e.status ?? 400, {
+          code: e.code ?? 'ORG_REQUIRED',
+          message: e.message ?? 'Select an organization to manage partners.',
+        });
+      }
+
+      const { error, value } = CommercePartnersResetPasswordSchema.validate(req.body, {
+        abortEarly: false,
+        allowUnknown: false,
+      });
+      if (error) {
+        return responseError(res, 400, {
+          code: 'VALIDATION_ERROR',
+          message: error.details.map((d) => d.message).join(', '),
+        });
+      }
+
+      const existing = await this.prisma.reseller.findFirst({
+        where: { id, orgId, deletedAt: null },
+        select: { id: true, adminId: true, admin: { select: { id: true, username: true } } },
+      });
+
+      if (!existing) {
+        return responseError(res, 404, { code: 'NOT_FOUND', message: 'Partner not found.' });
+      }
+
+      if (!existing.adminId || !existing.admin) {
+        return responseError(res, 400, {
+          code: 'NO_PORTAL_ACCOUNT',
+          message: 'This partner has no login account to reset.',
+        });
+      }
+
+      const hashedPassword = await hashPassword(value.password as string);
+      await this.prisma.admin.update({
+        where: { id: existing.adminId },
+        data: { password: hashedPassword, updatedBy: actorAdminId },
+      });
+
+      responseSuccess(res, {
+        message: 'Password updated',
+        data: { id: existing.id, username: existing.admin.username },
+      });
     }),
   ];
 }

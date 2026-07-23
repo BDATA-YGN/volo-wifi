@@ -5,6 +5,7 @@ import { Alert, Button, Drawer, Form, Input, InputNumber, Select, Space, Typogra
 import type { IssueTokenFormValues, PaymentMethod, SellableCatalog } from "../types";
 import { MAX_ISSUE_QUANTITY, PAYMENT_METHOD_OPTIONS } from "../constant";
 import { calcLineTotal, formatMoney } from "../utils";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { TextArea } = Input;
 const { Text, Title, Paragraph } = Typography;
@@ -34,6 +35,16 @@ const IssueTokenDrawer: React.FC<Props> = ({ open, saving, catalog, onClose, onI
   const lineTotal = calcLineTotal(unitPrice, quantity, discount);
   const currency = catalog?.currency ?? "MMK";
 
+  const pricedPlans = (catalog?.plans ?? []).filter((p) => p.hasPricing);
+  const formValues: IssueTokenFormValues = {
+    quantity: 1,
+    paymentMethod: "CASH" as PaymentMethod,
+    discount: 0,
+    stationId: catalog?.stations[0]?.id ?? "",
+    planId: pricedPlans[0]?.id ?? "",
+  };
+  useDrawerFormSync(form, open, formValues, catalog ? `issue-${catalog.stations[0]?.id ?? "x"}` : "issue");
+
   const handleFinish = async (values: IssueTokenFormValues) => {
     await onIssue({
       ...values,
@@ -42,15 +53,13 @@ const IssueTokenDrawer: React.FC<Props> = ({ open, saving, catalog, onClose, onI
     });
   };
 
-  const pricedPlans = (catalog?.plans ?? []).filter((p) => p.hasPricing);
-
   return (
     <Drawer
       title="Issue access tokens"
       size={480}
       open={open}
       onClose={onClose}
-      destroyOnClose
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -75,13 +84,6 @@ const IssueTokenDrawer: React.FC<Props> = ({ open, saving, catalog, onClose, onI
       <Form
         form={form}
         layout="vertical"
-        initialValues={{
-          quantity: 1,
-          paymentMethod: "CASH" as PaymentMethod,
-          discount: 0,
-          stationId: catalog?.stations[0]?.id,
-          planId: pricedPlans[0]?.id,
-        }}
         onFinish={handleFinish}
       >
         <Form.Item

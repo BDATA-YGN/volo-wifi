@@ -1,40 +1,77 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as admin from 'firebase-admin';
-import { Message, MulticastMessage } from 'firebase-admin/messaging';
-import staging from './staging.json';
-import production from './production.json';
-import development from './development.json'
-import { NODE_ENV } from '@/config';
+import { Message, Messaging, MulticastMessage } from 'firebase-admin/messaging';
+import { NODE_ENV, env } from '@/config';
 import { logger } from '@/logging/logger';
 
-if (!admin.apps.length) {
-  // 2. Decide which OBJECT to use, not which path string
-  let serviceAccount = {};
-  switch (NODE_ENV) {
-    case 'development':
-      serviceAccount = development;
-      break;
-    case 'staging':
-      serviceAccount = staging;
-      break;
-    case 'production':
-      serviceAccount = production;
-      break;
-    default:
-      serviceAccount = development;
-      break;
+let messaging: Messaging | null = null;
+
+function resolveServiceAccount(): admin.ServiceAccount | null {
+  const fromEnv = env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+  if (fromEnv) {
+    try {
+      return JSON.parse(fromEnv) as admin.ServiceAccount;
+    } catch (error) {
+      logger.error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON', { error });
+      return null;
+    }
+  }
+
+  const configuredPath = env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim();
+  // Never use require('./{env}.json') — those files are gitignored/dockerignored and crash Node with MODULE_NOT_FOUND.
+  const candidates = [
+    configuredPath,
+    path.join(__dirname, `${NODE_ENV}.json`),
+    path.join(__dirname, 'production.json'),
+    path.join(process.cwd(), 'src/third-party/bdataFirebaseFCM', `${NODE_ENV}.json`),
+    path.join(process.cwd(), 'src/third-party/bdataFirebaseFCM', 'production.json'),
+  ].filter((p): p is string => Boolean(p));
+
+  for (const candidate of candidates) {
+    try {
+      if (!fs.existsSync(candidate)) continue;
+      const raw = fs.readFileSync(candidate, 'utf8');
+      return JSON.parse(raw) as admin.ServiceAccount;
+    } catch (error) {
+      logger.warn('Failed reading Firebase service account file', {
+        path: candidate,
+        error: error instanceof Error ? error.message : error,
+      });
+    }
+  }
+
+  return null;
+}
+
+function ensureFirebaseInitialized(): boolean {
+  if (messaging) return true;
+  if (admin.apps.length) {
+    messaging = admin.messaging();
+    return true;
+  }
+
+  const serviceAccount = resolveServiceAccount();
+  if (!serviceAccount) {
+    logger.warn(
+      'Firebase Admin skipped — set FIREBASE_SERVICE_ACCOUNT_JSON (or PATH / local *.json). Push notifications disabled.',
+      { env: NODE_ENV },
+    );
+    return false;
   }
 
   admin.initializeApp({
-    // 3. Cast to any if TS complains about the JSON structure not matching ServiceAccount type
-    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+    credential: admin.credential.cert(serviceAccount),
   });
-
+  messaging = admin.messaging();
   logger.info('Firebase Admin initialized', { env: NODE_ENV });
+  return true;
 }
 
-export class FCMService {
-  private static messaging = admin.messaging();
+// Best-effort init at import (socket may call FCM when users are offline).
+ensureFirebaseInitialized();
 
+export class FCMService {
   private static sanitizeData(data?: Record<string, any>): Record<string, string> {
     if (!data) return {};
     const sanitized: Record<string, string> = {};
@@ -45,10 +82,18 @@ export class FCMService {
     return sanitized;
   }
 
+  private static getMessaging(): Messaging | null {
+    if (!ensureFirebaseInitialized()) return null;
+    return messaging;
+  }
+
   /**
-   * NEW: Sends a notification to a single specific device token
+   * Sends a notification to a single specific device token
    */
   static async sendToDevice(token: string, title: string, body: string, data?: Record<string, any>, notify = false) {
+    const client = this.getMessaging();
+    if (!client) return null;
+
     const message: Message = {
       token: token,
       data: this.sanitizeData(data),
@@ -56,7 +101,7 @@ export class FCMService {
         priority: 'high',
         notification: {
           sound: 'default',
-          clickAction: 'FLUTTER_NOTIFICATION_CLICK', // Common for mobile deep-linking
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
         },
       },
       apns: {
@@ -70,11 +115,11 @@ export class FCMService {
     };
 
     if (notify) {
-      message.notification = { title, body }
+      message.notification = { title, body };
     }
 
     try {
-      const response = await this.messaging.send(message);
+      const response = await client.send(message);
       logger.debug('FCM sent to device', { messageId: response });
       return response;
     } catch (error: any) {
@@ -94,6 +139,9 @@ export class FCMService {
    * Sends a notification to a specific Topic
    */
   static async sendToTopic(topic: string, title: string, body: string, data?: Record<string, any>, notify = true) {
+    const client = this.getMessaging();
+    if (!client) return null;
+
     logger.debug('FCM sendToTopic', { topic, notify });
 
     const sanitizedData = this.sanitizeData(data);
@@ -124,13 +172,14 @@ export class FCMService {
     };
 
     if (notify) {
-      message.notification = { title, body }
+      message.notification = { title, body };
     }
 
     try {
-      return await this.messaging.send(message);
+      return await client.send(message);
     } catch (error) {
       logger.error('Error sending FCM to topic', { error });
+      return null;
     }
   }
 
@@ -140,23 +189,24 @@ export class FCMService {
   static async sendToDevices(tokens: string[], title: string, body: string, data?: Record<string, any>, notify = false) {
     if (tokens.length === 0) return;
 
-    // FCM Multicast allows up to 500 tokens at a time
+    const client = this.getMessaging();
+    if (!client) return null;
+
     const message: MulticastMessage = {
       tokens: tokens,
       data: this.sanitizeData(data),
     };
 
     if (notify) {
-      message.notification = { title, body }
+      message.notification = { title, body };
     }
 
     try {
-      const response = await this.messaging.sendEachForMulticast(message);
+      const response = await client.sendEachForMulticast(message);
 
       if (response.failureCount > 0) {
-        response.responses.forEach((resp, idx) => {
+        response.responses.forEach((resp) => {
           if (!resp.success) {
-            // resp.error?.code will tell you why (e.g., 'messaging/registration-token-not-registered')
             logger.warn('FCM multicast token failed', { code: resp.error?.code });
           }
         });
@@ -164,6 +214,7 @@ export class FCMService {
       return response;
     } catch (error) {
       logger.error('Error sending FCM multicast', { error });
+      return null;
     }
   }
 }

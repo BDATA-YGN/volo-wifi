@@ -52,6 +52,7 @@ enum UnitTime {
   MINUTE
   HOUR
   DAY
+  MONTH
 }
 
 enum SaleStatus {

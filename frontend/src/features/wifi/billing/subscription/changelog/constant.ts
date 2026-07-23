@@ -5,12 +5,7 @@ export const BILLING_SUBSCRIPTION_CHANGELOG_API = buildWifiApiRoutes(
   "/wifi/billing/subscription/changelog"
 );
 
-export const TIER_CODE_COLORS: Record<string, string> = {
-  SMALL: "blue",
-  MEDIUM: "cyan",
-  LARGE: "purple",
-  XL: "geekblue",
-};
+export { TIER_CODE_COLORS, resolveTierColor } from "@/features/wifi/shared/tier-colors";
 
 export const CHANGE_TYPE_OPTIONS: {
   value: LicenseChangeType | "";

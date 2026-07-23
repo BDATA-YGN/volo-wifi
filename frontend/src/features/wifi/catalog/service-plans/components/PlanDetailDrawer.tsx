@@ -6,7 +6,12 @@ import { Alert, Button, Descriptions, Drawer, Spin, Tag, Typography } from "antd
 import dayjs from "dayjs";
 import type { ServicePlanRecord } from "../types";
 import { QUOTA_TYPE_COLOR, TIME_USAGE_MODE_OPTIONS } from "../constant";
-import { formatQuotaLabel, formatQuotaTypeLabel, formatValidity } from "../utils";
+import {
+  formatQuotaLabel,
+  formatQuotaTypeLabel,
+  formatValidity,
+  planHasTimeLimit,
+} from "../utils";
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -111,10 +116,10 @@ const PlanDetailDrawer: React.FC<Props> = ({
             ) : null}
 
             <Descriptions column={1} size="small" bordered>
-              <Descriptions.Item label="Quota">{formatQuotaLabel(row)}</Descriptions.Item>
+              <Descriptions.Item label="Allowances">{formatQuotaLabel(row)}</Descriptions.Item>
               <Descriptions.Item label="Validity">{formatValidity(row.validityDays)}</Descriptions.Item>
               <Descriptions.Item label="Max devices">{row.maxDevices ?? "—"}</Descriptions.Item>
-              {(row.quotaType === "TIME_ONLY" || row.quotaType === "TIME_AND_DATA") && (
+              {planHasTimeLimit(row) && (
                 <Descriptions.Item label="Time usage">{timeModeLabel}</Descriptions.Item>
               )}
               <Descriptions.Item label="Retail prices">{row._count?.prices ?? 0}</Descriptions.Item>

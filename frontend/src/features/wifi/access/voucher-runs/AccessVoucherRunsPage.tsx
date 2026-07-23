@@ -23,7 +23,6 @@ const AccessVoucherRunsPage: React.FC = () => {
   const { message, modal } = App.useApp();
   const { token } = theme.useToken();
 
-  const [search, setSearchLocal] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<VoucherBatchRecord | null>(null);
@@ -39,7 +38,6 @@ const AccessVoucherRunsPage: React.FC = () => {
     orgId,
     formOptions,
     setPagination,
-    setSearch,
     patchParams,
     selectOrg,
     refresh,
@@ -58,11 +56,6 @@ const AccessVoucherRunsPage: React.FC = () => {
       selectOrg(meta.memberships[0].id);
     }
   }, [initDone, meta?.memberships, orgId, selectOrg]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setSearch(search), 300);
-    return () => window.clearTimeout(timer);
-  }, [search, setSearch]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
   const showSwitcher = memberships.length > 1;
@@ -194,18 +187,60 @@ const AccessVoucherRunsPage: React.FC = () => {
                 style={{ borderRadius: token.borderRadiusLG }}
               >
                 <VoucherRunsToolbar
-                  search={search}
                   planId={(params.planId as string) ?? null}
                   stationId={(params.stationId as string) ?? null}
+                  township={(params.township as string) ?? null}
+                  stationSizeId={(params.stationSizeId as string) ?? null}
+                  dateFrom={(params.dateFrom as string) ?? null}
+                  dateTo={(params.dateTo as string) ?? null}
+                  hasBalance={Boolean(params.hasBalance)}
                   formOptions={formOptions}
                   loading={loading}
                   createDisabled={noPlans}
-                  onSearchChange={setSearchLocal}
                   onPlanChange={(planId) =>
                     patchParams({ planId: planId ?? undefined, page: 1 })
                   }
                   onStationChange={(stationId) =>
                     patchParams({ stationId: stationId ?? undefined, page: 1 })
+                  }
+                  onTownshipChange={(township) => {
+                    const nextTownship = township ?? undefined;
+                    const currentStation = formOptions.stations.find(
+                      (s) => s.id === params.stationId
+                    );
+                    const keepStation =
+                      !nextTownship ||
+                      !currentStation ||
+                      (currentStation.township ?? "").toLowerCase() ===
+                        nextTownship.toLowerCase();
+                    patchParams({
+                      township: nextTownship,
+                      stationId: keepStation ? params.stationId : undefined,
+                      page: 1,
+                    });
+                  }}
+                  onTierChange={(stationSizeId) => {
+                    const nextTier = stationSizeId ?? undefined;
+                    const currentStation = formOptions.stations.find(
+                      (s) => s.id === params.stationId
+                    );
+                    const keepStation =
+                      !nextTier || !currentStation || currentStation.stationSizeId === nextTier;
+                    patchParams({
+                      stationSizeId: nextTier,
+                      stationId: keepStation ? params.stationId : undefined,
+                      page: 1,
+                    });
+                  }}
+                  onDateRangeChange={(dateFrom, dateTo) =>
+                    patchParams({
+                      dateFrom: dateFrom ?? undefined,
+                      dateTo: dateTo ?? undefined,
+                      page: 1,
+                    })
+                  }
+                  onHasBalanceChange={(hasBalance) =>
+                    patchParams({ hasBalance: hasBalance || undefined, page: 1 })
                   }
                   onRefresh={refresh}
                   onCreate={openCreate}

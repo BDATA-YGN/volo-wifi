@@ -40,7 +40,7 @@ export async function resolveNetworkOrgScope(
 ): Promise<NetworkOrgScope> {
   const globalAccess = hasGlobalOrgAccess(user!);
   const memberships = await loadOrgMembershipOptions(prisma, adminId, globalAccess);
-  const canSwitchOrg = canSwitchOrgContext(user!) && memberships.length > 1;
+  const canSwitchOrg = canSwitchOrgContext(user!);
   const requestedOrgId = queryOrgId(query);
 
   const resolved = await resolveOrgIdForAdmin(

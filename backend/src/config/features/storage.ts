@@ -79,8 +79,13 @@ const localDir = env.STORAGE_LOCAL_DIR
     : path.resolve(process.cwd(), env.STORAGE_LOCAL_DIR)
   : defaultLocalDir;
 
-// STORAGE_PUBLIC_BASE_URL replaces legacy STORAGE_EXTERNAL_URL / MEGA_CLOUD_DOMAIN.
-const publicBaseUrl = (env.STORAGE_PUBLIC_BASE_URL || env.STORAGE_EXTERNAL_URL || '').replace(/\/?$/, '');
+const sharedBucket = env.STORAGE_BUCKET.trim();
+const publicBucket = env.STORAGE_PUBLIC_BUCKET.trim() || sharedBucket || 'public';
+const privateBucket = env.STORAGE_PRIVATE_BUCKET.trim() || sharedBucket || 'private';
+
+// STORAGE_PUBLIC_BASE_URL is the CDN / public URL prefix (legacy: STORAGE_EXTERNAL_URL).
+const legacyExternalUrl = (process.env.STORAGE_EXTERNAL_URL || '').trim();
+const publicBaseUrl = (env.STORAGE_PUBLIC_BASE_URL || legacyExternalUrl).replace(/\/?$/, '');
 
 export const STORAGE_ENABLED = env.STORAGE_ENABLED;
 export const isLocalStorage = () => !STORAGE_ENABLED || provider === 'local';
@@ -95,8 +100,8 @@ export const storageConfig: StorageConfig = {
   accessKey: env.STORAGE_ACCESS_KEY,
   secretKey: env.STORAGE_SECRET_KEY,
   region: env.STORAGE_REGION || (provider === 'do_spaces' ? '' : 'auto'),
-  publicBucket: env.STORAGE_PUBLIC_BUCKET || 'public',
-  privateBucket: env.STORAGE_PRIVATE_BUCKET || 'private',
+  publicBucket,
+  privateBucket,
   publicBaseUrl,
   localDir,
 };

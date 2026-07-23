@@ -30,6 +30,7 @@ import {
   enabledPlanIdsFromEntitlements,
   generateUniquePartnerCode,
 } from "../utils";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { TextArea } = Input;
 const { Text, Paragraph } = Typography;
@@ -88,25 +89,7 @@ const PartnerFormDrawer: React.FC<Props> = ({
     return [];
   }, [editing]);
 
-  const applyGeneratedCode = () => {
-    const code = generateUniquePartnerCode(formOptions.existingCodes ?? []);
-    form.setFieldsValue({
-      code,
-      loginUsername: code.toLowerCase(),
-    });
-    return code;
-  };
-
-  useEffect(() => {
-    if (!open || editing) return;
-    const code = generateUniquePartnerCode(formOptions.existingCodes ?? []);
-    form.setFieldsValue({
-      code,
-      loginUsername: code.toLowerCase(),
-    });
-  }, [open, editing, formOptions.existingCodes, form]);
-
-  const initialValues = editing
+  const formValues: PartnerFormFields = editing
     ? {
         code: editing.code,
         name: editing.name,
@@ -127,6 +110,22 @@ const PartnerFormDrawer: React.FC<Props> = ({
         loginPassword: "",
         confirmPassword: "",
       };
+  useDrawerFormSync(form, open, formValues, editing?.id ?? "create");
+
+  const applyGeneratedCode = () => {
+    const code = generateUniquePartnerCode(formOptions.existingCodes ?? []);
+    form.setFieldsValue({
+      code,
+      loginUsername: code.toLowerCase(),
+    });
+    return code;
+  };
+
+  useEffect(() => {
+    if (!open || editing) return;
+    applyGeneratedCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generate after sync on create open
+  }, [open, editing, formOptions.existingCodes, form]);
 
   const handleFinish = async (values: PartnerFormFields) => {
     const payload: PartnerFormValues = {
@@ -439,7 +438,7 @@ const PartnerFormDrawer: React.FC<Props> = ({
       size={560}
       open={open}
       onClose={onClose}
-      destroyOnClose={false}
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -464,7 +463,6 @@ const PartnerFormDrawer: React.FC<Props> = ({
       <Form
         form={form}
         layout="vertical"
-        initialValues={initialValues}
         onFinish={handleFinish}
         preserve={false}
         key={editing?.id ?? "create"}

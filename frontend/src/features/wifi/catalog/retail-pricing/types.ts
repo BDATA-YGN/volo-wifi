@@ -30,12 +30,12 @@ export type PriceBookRecord = {
   name: string;
   isDefault: boolean;
   scope: PriceBookScope;
-  resellerId: string | null;
-  stationId: string | null;
+  stationIds: string[];
+  resellerIds: string[];
+  stations: StationOption[];
+  resellers: ResellerOption[];
   createdAt: string;
   updatedAt: string;
-  reseller: ResellerOption | null;
-  station: StationOption | null;
   _count: { prices: number };
 };
 
@@ -59,8 +59,8 @@ export type PlanPriceRecord = {
 export type PriceBookFormValues = {
   name: string;
   scope: PriceBookScope;
-  resellerId?: string | null;
-  stationId?: string | null;
+  resellerIds?: string[];
+  stationIds?: string[];
 };
 
 export type PlanPriceFormValues = {

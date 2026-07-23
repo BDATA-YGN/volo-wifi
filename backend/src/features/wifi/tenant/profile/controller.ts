@@ -162,7 +162,7 @@ export class TenantProfileController {
           meta: {
             ...loaded.meta,
             memberships,
-            canSwitchOrg: canSwitchOrgContext(user) && memberships.length > 1,
+            canSwitchOrg: canSwitchOrgContext(user),
           },
         });
       } catch (err: unknown) {

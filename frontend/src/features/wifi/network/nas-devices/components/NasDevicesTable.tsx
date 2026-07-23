@@ -87,14 +87,27 @@ const NasDevicesTable: React.FC<Props> = ({
       ),
     },
     {
-      title: "NAS ID",
+      title: "NAS / FreeRADIUS",
       key: "nas",
-      width: 140,
+      width: 200,
       render: (_, row) =>
-        row.nasShortname ? (
-          <Text code style={{ fontSize: 11 }}>
-            {row.nasShortname}
-          </Text>
+        row.isRadiusClient ? (
+          <div style={{ fontSize: 12 }}>
+            {row.nasShortname ? (
+              <div>
+                <Text code style={{ fontSize: 11 }}>
+                  {row.nasShortname}
+                </Text>
+              </div>
+            ) : (
+              <Text type="secondary">No NAS ID</Text>
+            )}
+            {row.radiusProfile ? (
+              <Text type="secondary">{row.radiusProfile.name}</Text>
+            ) : (
+              <Text type="secondary">No server</Text>
+            )}
+          </div>
         ) : (
           <Text type="secondary">—</Text>
         ),

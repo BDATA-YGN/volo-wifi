@@ -258,7 +258,7 @@ export class Controller {
         return responseError(res, 400, { code: '400', message: 'Category name is required' });
       }
 
-      const bucket = process.env.MINIO_PRIVATE_BUCKET || 'mega-music';
+      const bucket = MINIO_PRIVATE_BUCKET;
       const folderName = `storage/${categoryName}`;
       
       await MinioService.createFolder(bucket, folderName);
@@ -278,7 +278,7 @@ export class Controller {
         return responseError(res, 400, { code: '400', message: 'Category name is required' });
       }
 
-      const bucket = process.env.MINIO_PRIVATE_BUCKET || 'mega-music';
+      const bucket = MINIO_PRIVATE_BUCKET;
       const folderName = `storage/${categoryName}`;
 
       await MinioService.removeFolder(bucket, folderName);

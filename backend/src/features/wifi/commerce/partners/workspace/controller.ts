@@ -53,9 +53,13 @@ async function loadPricingReadiness(
     where: {
       orgId,
       deletedAt: null,
-      OR: [{ resellerId }, { isDefault: true }],
+      OR: [{ resellers: { some: { resellerId } } }, { isDefault: true }],
     },
-    select: { id: true, isDefault: true, resellerId: true },
+    select: {
+      id: true,
+      isDefault: true,
+      resellers: { select: { resellerId: true } },
+    },
   });
 
   const bookIds = books.map((b) => b.id);
@@ -75,7 +79,7 @@ async function loadPricingReadiness(
   });
 
   const resellerBookIds = new Set(
-    books.filter((b) => b.resellerId === resellerId).map((b) => b.id)
+    books.filter((b) => b.resellers.some((r) => r.resellerId === resellerId)).map((b) => b.id)
   );
   const defaultBookIds = new Set(books.filter((b) => b.isDefault).map((b) => b.id));
 

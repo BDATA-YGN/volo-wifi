@@ -7,6 +7,7 @@ import { formatWifiDateTimeWithSeconds } from "@/features/wifi/shared/format";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
+import { needsOrgSelection, shouldShowOrgSwitcher } from "@/features/wifi/shared/hooks/useWifiOrgScope";
 import { useWifiOverview } from "./useWifiOverview";
 import { useDashboardWidgets } from "./hooks/useDashboardWidgets";
 import { formatBytes, formatMoney, formatPersona } from "./utils";
@@ -52,20 +53,22 @@ const WifiOverviewPage: React.FC = () => {
   }, [loadFormOptions]);
 
   useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
+    if (!initDone || orgId || meta?.requiresOrgSelection || meta?.canSwitchOrg) return;
+    if (meta?.memberships?.length === 1) {
       selectOrg(meta.memberships[0].id);
     }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
+  }, [initDone, meta?.memberships, meta?.requiresOrgSelection, meta?.canSwitchOrg, orgId, selectOrg]);
 
   useEffect(() => {
+    if (meta?.requiresOrgSelection || meta?.canSwitchOrg) return;
     if (meta?.orgId && !orgId) {
       selectOrg(meta.orgId);
     }
-  }, [meta?.orgId, orgId, selectOrg]);
+  }, [meta?.orgId, meta?.requiresOrgSelection, meta?.canSwitchOrg, orgId, selectOrg]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
-  const showOrgSwitcher = memberships.length > 1;
-  const needsOrg = Boolean(meta?.requiresOrgSelection) && !orgId;
+  const showOrgSwitcher = shouldShowOrgSwitcher(memberships, meta);
+  const needsOrg = needsOrgSelection(orgId, meta, memberships.length);
   const currency = dashboard?.org.currency ?? "MMK";
 
   const personaLabel = useMemo(() => {

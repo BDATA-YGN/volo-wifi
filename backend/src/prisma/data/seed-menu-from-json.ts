@@ -44,42 +44,48 @@ export async function seedMenuFromJson(
 
   const payload = parseMenuPayload(fs.readFileSync(filePath, 'utf-8'));
 
-  await prisma.$transaction([
-    prisma.menuItem.deleteMany({}),
-    prisma.menuGroup.deleteMany({}),
-  ]);
+  await prisma.$connect();
+  await prisma.$queryRaw`SELECT 1`;
 
-  const groupKeyToId = new Map<string, number>();
-  for (const row of payload.menuGroups) {
-    const created = await prisma.menuGroup.create({
-      data: {
-        key: row.key,
-        title: row.title,
-        icon: row.icon,
-        position: row.position,
-        level: row.level,
-        mode: row.mode,
-      },
-    });
-    groupKeyToId.set(row.key, created.id);
-  }
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.menuItem.deleteMany({});
+      await tx.menuGroup.deleteMany({});
 
-  for (const row of payload.menuItems) {
-    const groupKey = row.groupKey ?? payload.menuGroups.find((g) => g.id === row.groupId)?.key;
-    const newGroupId = groupKey != null ? groupKeyToId.get(groupKey) : undefined;
-    const groupId = newGroupId ?? row.groupId;
-    await prisma.menuItem.create({
-      data: {
-        key: row.key,
-        title: row.title,
-        icon: row.icon,
-        url: row.url,
-        position: row.position,
-        groupId,
-        level: row.level,
-      },
-    });
-  }
+      const groupKeyToId = new Map<string, number>();
+      for (const row of payload.menuGroups) {
+        const created = await tx.menuGroup.create({
+          data: {
+            key: row.key,
+            title: row.title,
+            icon: row.icon,
+            position: row.position,
+            level: row.level,
+            mode: row.mode,
+          },
+        });
+        groupKeyToId.set(row.key, created.id);
+      }
+
+      for (const row of payload.menuItems) {
+        const groupKey = row.groupKey ?? payload.menuGroups.find((g) => g.id === row.groupId)?.key;
+        const newGroupId = groupKey != null ? groupKeyToId.get(groupKey) : undefined;
+        const groupId = newGroupId ?? row.groupId;
+        await tx.menuItem.create({
+          data: {
+            key: row.key,
+            title: row.title,
+            icon: row.icon,
+            url: row.url,
+            position: row.position,
+            groupId,
+            level: row.level,
+          },
+        });
+      }
+    },
+    { maxWait: 60_000, timeout: 180_000 },
+  );
 
   return { groups: payload.menuGroups.length, items: payload.menuItems.length };
 }

@@ -117,7 +117,7 @@ const PlanPoliciesToolbar: React.FC<Props> = ({
           Refresh
         </Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
-          Add rule
+          Add policy
         </Button>
       </Space>
     </div>

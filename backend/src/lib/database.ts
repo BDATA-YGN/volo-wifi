@@ -1,14 +1,10 @@
-import { Pool, QueryConfig, QueryResult } from 'pg';
+import { Pool, QueryConfig } from 'pg';
 import { logger } from '@/logging/logger';
-import { DB_DATABASE, DB_HOST, DB_PASSWORD, DB_PORT, DB_USER } from '@/config';
+import { DATABASE_URL, NODE_ENV } from '@/config';
 import { resolvePgSsl } from '@/lib/pg-ssl';
 
 const poolConfig: ConstructorParameters<typeof Pool>[0] = {
-  host: DB_HOST || 'localhost',
-  port: Number(DB_PORT) || 5432,
-  user: DB_USER || 'postgres',
-  password: DB_PASSWORD || '',
-  database: DB_DATABASE || 'mydb',
+  connectionString: DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -21,18 +17,13 @@ if (ssl) {
 
 const pool = new Pool(poolConfig);
 
-// connection test
 pool
   .connect()
-  .then(c => {
+  .then((c) => {
     logger.info('Connected to PostgreSQL');
     c.release();
   })
-  .catch(err => logger.error('DB connection error:', err));
-
-/* -------------------------------------------------------
-   SAFE LOGGING WRAPPER — keeps all original overloads
-------------------------------------------------------- */
+  .catch((err) => logger.error('DB connection error:', err));
 
 function interpolateQuery(query: string, params: any[] = []) {
   return query.replace(/\$(\d+)/g, (_, num) => {
@@ -43,12 +34,11 @@ function interpolateQuery(query: string, params: any[] = []) {
     if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
     if (value instanceof Date) return `'${value.toISOString()}'`;
 
-    // escape single quotes
     return `'${String(value).replace(/'/g, "''")}'`;
   });
 }
 
-if (process.env.NODE_ENV !== 'production') {
+if (NODE_ENV !== 'production') {
   const originalQuery = pool.query.bind(pool);
 
   (pool.query as any) = async (text: string | QueryConfig, params?: any[]) => {
@@ -58,7 +48,7 @@ if (process.env.NODE_ENV !== 'production') {
     const fullQuery = interpolateQuery(sql, params);
 
     logger.info('📘 SQL QUERY:');
-    logger.info(fullQuery.trim()); // full copy-paste version
+    logger.info(fullQuery.trim());
 
     try {
       const result = await originalQuery(text as any, params);
@@ -70,10 +60,6 @@ if (process.env.NODE_ENV !== 'production') {
     }
   };
 }
-
-/* -------------------------------------------------------
-   Clean query() that returns rows only
-------------------------------------------------------- */
 
 export const query = async <T = any>(text: string, params?: any[]): Promise<T[]> => {
   const result = await pool.query(text, params);

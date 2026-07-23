@@ -11,6 +11,7 @@ export class NetworkRadiusPlanPoliciesRoute implements Route {
   constructor() {
     this.router.get(`${this.path}/:id?`, AuthMiddleware, this.controller.listOrDetails);
     this.router.post(`${this.path}/:id?`, AuthMiddleware, this.controller.createOrUpdate);
+    this.router.delete(`${this.path}/group`, AuthMiddleware, this.controller.removeGroup);
     this.router.delete(`${this.path}/delete/:id`, AuthMiddleware, this.controller.remove);
   }
 }

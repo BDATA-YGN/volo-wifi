@@ -1,23 +1,36 @@
 import PrismaDBConnection from '@/prisma/prisma-client';
 import {
   Plan,
-  PlanQuotaType,
   UnitTime,
 } from '@/generated/prisma/client';
 
 const prisma = PrismaDBConnection.getConnection();
 
-export function planHasTimeQuota(plan: Pick<Plan, 'quotaType'> | null | undefined): boolean {
+export function planHasTimeQuota(
+  plan: Pick<Plan, 'quotaType' | 'timeAmount'> | null | undefined,
+): boolean {
   if (!plan) return false;
-  return plan.quotaType === PlanQuotaType.TIME_ONLY || plan.quotaType === PlanQuotaType.TIME_AND_DATA;
+  if (plan.timeAmount != null) return plan.timeAmount > 0;
+  return plan.quotaType === 'TIME_ONLY' || plan.quotaType === 'TIME_AND_DATA';
 }
 
-export function planTimeQuotaSec(plan: Pick<Plan, 'timeAmount' | 'timeUnit'> | null | undefined): number | null {
-  if (!plan?.timeAmount || !plan.timeUnit) return null;
+export function planHasDataQuota(
+  plan: Pick<Plan, 'quotaType' | 'dataMb'> | null | undefined,
+): boolean {
+  if (!plan) return false;
+  if (plan.dataMb != null) return plan.dataMb > 0;
+  return plan.quotaType === 'DATA_ONLY' || plan.quotaType === 'TIME_AND_DATA';
+}
+
+export function planTimeQuotaSec(
+  plan: Pick<Plan, 'timeAmount' | 'timeUnit'> | null | undefined,
+): number | null {
+  if (!plan?.timeAmount || plan.timeAmount <= 0 || !plan.timeUnit) return null;
   const multipliers: Record<UnitTime, number> = {
     MINUTE: 60,
     HOUR: 3600,
     DAY: 86400,
+    MONTH: 30 * 86400,
   };
   return plan.timeAmount * (multipliers[plan.timeUnit] ?? 0);
 }

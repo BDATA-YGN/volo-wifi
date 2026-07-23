@@ -7,6 +7,8 @@ model WifiStation {
   code     String //TODO format? @map("code")
   name     String @map("name")
   location String? @map("location")
+  /// Township / town name from places lookup (string only — not an FK).
+  township String? @map("township")
   address  String? @map("address")
 
   status StationStatus @map("status") @default(ACTIVE)
@@ -27,7 +29,7 @@ model WifiStation {
   admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
 
   devices        StationDevice[]
-  priceBooks     PlanPriceBook[]
+  priceBooks     PlanPriceBookStation[]
   credentials    Credential[]
   voucherBatches VoucherBatch[]
   sales          SaleOrder[]
@@ -47,9 +49,13 @@ model WifiStation {
   /// Plan-level RADIUS attribute overrides scoped to this station (and plan).
   planRadiusOverrides PlanRadiusAttribute[]
 
+  /// Org RADIUS profiles seeded from this site's legacy settings.
+  seededOrgRadiusProfiles OrgRadiusProfile[] @relation("OrgRadiusProfileSourceStation")
+
   resellerStations    ResellerStation[]
   memberRoles         OrgMemberRole[]
   memberStationScopes OrgMemberStation[]
+  planOffers          StationPlanOffer[]
 
   createdAt DateTime @map("created_at")  @default(now())
   updatedAt DateTime @map("updated_at")  @updatedAt
@@ -60,6 +66,25 @@ model WifiStation {
   @@index([stationSizeId], map: "idx_wf_station__station_size_id")
   @@index([radiusVendorProfileId], map: "idx_wf_station__radius_vendor_profile_id")
   @@map("wf_station")
+}
+
+/// Which service plans a site may sell. Empty for a site = all org plans that have a resolvable price.
+model StationPlanOffer {
+  id        String      @id @default(uuid()) @map("id")
+  orgId     String      @map("org_id")
+  org       Org         @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  stationId String      @map("station_id")
+  station   WifiStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  planId    String      @map("plan_id")
+  plan      Plan        @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @map("updated_at") @updatedAt
+
+  @@unique([stationId, planId], map: "uq_wf_station_plan_offer__station_id__plan_id")
+  @@index([orgId, stationId], map: "idx_wf_station_plan_offer__org_id__station_id")
+  @@index([orgId, planId], map: "idx_wf_station_plan_offer__org_id__plan_id")
+  @@map("wf_station_plan_offer")
 }
 
 model StationDevice {
@@ -80,6 +105,12 @@ model StationDevice {
 
   // RADIUS client fields (if device is a NAS)
   isRadiusClient Boolean @map("is_radius_client") @default(false)
+
+  /// Org-scoped RADIUS profile (shared secret / server). Prefer this over inline secret fields.
+  radiusProfileId String? @map("radius_profile_id")
+  radiusProfile   OrgRadiusProfile? @relation(fields: [radiusProfileId], references: [id], onDelete: SetNull)
+
+  /// Legacy / denormalized FreeRADIUS NAS fields (kept in sync from radiusProfile when set).
   radiusSecret   String? @map("radius_secret")
   nasShortname   String? // Short name for NAS (for FreeRADIUS) @map("nas_shortname")
   nasType        String? @map("nas_type") @default("other") // NAS type: other, cisco, computone, etc.
@@ -93,5 +124,6 @@ model StationDevice {
 
   @@index([orgId, stationId], map: "idx_wf_station_device__org_id__station_id")
   @@index([orgId, isRadiusClient], map: "idx_wf_station_device__org_id__is_radius_client")
+  @@index([radiusProfileId], map: "idx_wf_station_device__radius_profile_id")
   @@map("wf_station_device")
 }

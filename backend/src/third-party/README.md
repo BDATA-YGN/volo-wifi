@@ -22,7 +22,7 @@ In-house adapters (not npm packages). Registered via `ServicesRegistry` / `Conta
 ### Critical — fix next
 
 1. **Socket `REGISTER_CONSOLE_ADMIN`** — Client sends only `{ userId }`. Any connection can join another admin’s rooms and receive events. **Fix:** emit session JWT from the console, verify with `JwtService` / `adminToken` before `socket.join`.
-2. **Firebase service account JSON** in `@bdataFirebaseFCM/*.json` — Secrets in repo. **Fix:** env var / secret manager path; add `*.json` to `.gitignore` if not already.
+2. **Firebase service account** — Prefer `FIREBASE_SERVICE_ACCOUNT_JSON` / `FIREBASE_SERVICE_ACCOUNT_PATH`. Local `*.json` files stay gitignored; FCM is skipped (no crash) when unset.
 
 ### High
 
@@ -46,7 +46,7 @@ In-house adapters (not npm packages). Registered via `ServicesRegistry` / `Conta
 
 - **BaseService.findAll** — Two queries (findMany + count); normal for paginated lists. Avoid huge `include` trees on list endpoints.
 - **Socket** — When `SOCKET_REDIS_ENABLED=true`, Redis adapter + pub/sub for multi-instance. Set `SOCKET_REDIS_ENABLED=false` for single-server dev (in-memory online set; see `.env` remarks).
-- **FCM init** — Firebase Admin loads at import; only needed when `SOCKET_PORT` / FCM path runs.
+- **FCM init** — Firebase Admin loads when credentials exist (`FIREBASE_SERVICE_ACCOUNT_JSON` / path / local `{NODE_ENV}.json`); otherwise skipped with a warning.
 
 ## Error-handling pattern
 

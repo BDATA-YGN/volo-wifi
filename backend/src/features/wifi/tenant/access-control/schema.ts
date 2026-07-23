@@ -2,13 +2,21 @@ import Joi from 'joi';
 import { passwordMeetsStrengthRules, passwordStrengthErrorMessage } from '@/utils/passwordStrength';
 import { MEMBER_STATUSES, PROVISION_MEMBER_ROLE_CODES } from './constants';
 
-const roleCodesField = Joi.array()
-  .items(Joi.string().valid(...PROVISION_MEMBER_ROLE_CODES))
-  .min(1);
+const roleCodesField = Joi.array().items(Joi.string().valid(...PROVISION_MEMBER_ROLE_CODES));
 
 const passwordField = Joi.string()
   .required()
   .custom((value, helpers) => {
+    if (!passwordMeetsStrengthRules(value)) {
+      return helpers.error('any.custom', { message: passwordStrengthErrorMessage() });
+    }
+    return value;
+  }, 'password strength');
+
+const optionalPasswordField = Joi.string()
+  .allow('', null)
+  .custom((value, helpers) => {
+    if (value == null || value === '') return value;
     if (!passwordMeetsStrengthRules(value)) {
       return helpers.error('any.custom', { message: passwordStrengthErrorMessage() });
     }
@@ -26,7 +34,7 @@ export const TenantAccessControlCreateSchema = Joi.object({
     .valid(...MEMBER_STATUSES)
     .default('ACTIVE'),
   isPrimary: Joi.boolean().default(false),
-  roleCodes: roleCodesField.required(),
+  roleCodes: roleCodesField.min(1).required(),
   stationIds: Joi.array().items(Joi.string().uuid()).default([]),
 });
 
@@ -34,6 +42,11 @@ export const TenantAccessControlUpdateSchema = Joi.object({
   title: Joi.string().trim().max(128).allow('', null),
   status: Joi.string().valid(...MEMBER_STATUSES),
   isPrimary: Joi.boolean(),
-  roleCodes: roleCodesField,
+  roleCodes: roleCodesField.min(1),
   stationIds: Joi.array().items(Joi.string().uuid()),
+  password: optionalPasswordField,
 }).min(1);
+
+export const TenantAccessControlResetPasswordSchema = Joi.object({
+  password: passwordField,
+});

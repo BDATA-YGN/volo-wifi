@@ -123,7 +123,7 @@ export class Controller {
 
       await socketService.smartNotify({
         event: SIO_EVENTS.REGISTER_CONSOLE_ADMIN,
-        eventId: process.env.MOBILE_ENV === 'development' ? 'general_development' : 'general_production',
+        eventId: process.env.NODE_ENV === 'development' ? 'general_development' : 'general_production',
         type: 'notification',
         data: {
           title: renderedTitle,

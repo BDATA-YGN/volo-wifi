@@ -21,6 +21,7 @@ import {
 } from "@/features/mobile/shared/subdomain";
 import * as lzString from 'lz-string';
 import { withForwardedClientIpHeaders } from "@/lib/http/client-ip";
+import { CONSOLE_LOGIN_PATH } from "@/lib/auth/console-paths";
 
 function nextWithClientIp(request: NextRequest): NextResponse {
   return NextResponse.next({
@@ -28,13 +29,31 @@ function nextWithClientIp(request: NextRequest): NextResponse {
   });
 }
 
-const publicUrls = ["/signin", "/unauthorized", "/health", "/uploads", "/assets", "/basic", "/fonts", "/images", "/storage", "/file-proxy", "/verify", "/collector/login", "/customer/login", "/partner/login", "/portal", "/portal-api"];
+const publicUrls = [
+  CONSOLE_LOGIN_PATH,
+  "/signin",
+  "/unauthorized",
+  "/health",
+  "/uploads",
+  "/assets",
+  "/basic",
+  "/fonts",
+  "/images",
+  "/storage",
+  "/file-proxy",
+  "/verify",
+  "/collector/login",
+  "/customer/login",
+  "/partner/login",
+  "/portal",
+  "/portal-api",
+];
 const SKIP_PATH_REGEX =
   /^(\/images\/.*|\/uploads\/.*|\/assets\/.*|\/storage\/.*|\/file-proxy\/.*|\/portal-api\/.*|\/basic\/.*|\/fonts\/.*|\/logo\.png|\/_next\/static|\/_next\/image|.*\.png|.*\.svg|.*\.webp|\/collector\/sw\.js|\/customer\/sw\.js|\/partner\/sw\.js|\/collector\/manifest\.webmanifest|\/customer\/manifest\.webmanifest|\/partner\/manifest\.webmanifest)$/;
 
 const REDIRECT_URLS = {
   unauthorized: "/unauthorized",
-  signin: "/signin"
+  signin: CONSOLE_LOGIN_PATH,
 };
 
 /** On partner subdomain, non-prefixed paths must not hit admin routes. */
@@ -136,7 +155,7 @@ export async function proxy(request: NextRequest) {
     return nextWithClientIp(request);
   }
 
-  if (publicUrls.some(url => pathname.startsWith(url))) {
+  if (pathname === "/" || publicUrls.some((url) => pathname.startsWith(url))) {
     return nextWithClientIp(request);
   }
 
@@ -178,7 +197,7 @@ export async function proxy(request: NextRequest) {
 }
 
 /** Routes available to every authenticated user, regardless of role permissions. */
-const ALWAYS_ALLOWED_PREFIXES = ["/", "/profile", "/timeline"];
+const ALWAYS_ALLOWED_PREFIXES = ["/", "/home", "/profile", "/timeline"];
 
 function isRouteAccessible(path: string, userRoles: any): boolean {
   if (ALWAYS_ALLOWED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {

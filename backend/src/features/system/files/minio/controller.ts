@@ -2,9 +2,10 @@ import { responseError, responseSuccess } from '@/utils/api-response';
 import { asyncController } from '@/utils/async-controller';
 import { Request, Response } from 'express';
 import { FolderSchema, UploadSchema, FileOperationSchema } from './schema';
+import { MINIO_PRIVATE_BUCKET } from '@/config';
 import * as MinioService from './service';
 
-const DEFAULT_BUCKET = process.env.MINIO_PRIVATE_BUCKET || 'mega-music';
+const DEFAULT_BUCKET = MINIO_PRIVATE_BUCKET || 'private';
 
 export class Controller {
   public listFolders = [

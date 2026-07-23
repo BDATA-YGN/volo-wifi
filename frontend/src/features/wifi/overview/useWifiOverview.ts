@@ -33,9 +33,6 @@ export function useWifiOverview() {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as OverviewFormOptions;
     setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
-    }
     return opts;
   }, []);
 

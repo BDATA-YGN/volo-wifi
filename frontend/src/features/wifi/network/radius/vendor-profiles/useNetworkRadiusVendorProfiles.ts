@@ -31,15 +31,22 @@ export function useNetworkRadiusVendorProfiles(initialParams: Partial<WifiListPa
     return res.data.attributes as CatalogAttribute[];
   }, [listState.orgId]);
 
-  const loadProfile = useCallback(async (id: string) => {
-    const res = await Query.getById(id);
-    return res.data as VendorProfileRecord;
-  }, []);
+  const loadProfile = useCallback(
+    async (id: string) => {
+      const res = await Query.getById(id, listState.orgId);
+      return res.data as VendorProfileRecord;
+    },
+    [listState.orgId]
+  );
 
   const createProfile = useCallback(
     async (payload: VendorProfileFormValues) => {
       await Query.create(payload, listState.orgId);
-      refresh();
+      try {
+        await refresh();
+      } catch {
+        // Mutation already succeeded; list refresh is best-effort.
+      }
     },
     [listState.orgId, refresh]
   );
@@ -47,7 +54,11 @@ export function useNetworkRadiusVendorProfiles(initialParams: Partial<WifiListPa
   const updateProfile = useCallback(
     async (id: string, payload: Partial<VendorProfileFormValues>) => {
       await Query.update(id, payload, listState.orgId);
-      refresh();
+      try {
+        await refresh();
+      } catch {
+        // Mutation already succeeded; list refresh is best-effort.
+      }
     },
     [listState.orgId, refresh]
   );
@@ -55,7 +66,11 @@ export function useNetworkRadiusVendorProfiles(initialParams: Partial<WifiListPa
   const deleteProfile = useCallback(
     async (id: string) => {
       await Query.remove(id, listState.orgId);
-      refresh();
+      try {
+        await refresh();
+      } catch {
+        // Mutation already succeeded; list refresh is best-effort.
+      }
     },
     [listState.orgId, refresh]
   );

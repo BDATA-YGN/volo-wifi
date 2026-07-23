@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
+import dayjs from "dayjs";
 import type { CommonListResponse } from "@/common/interface/interface";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
 import * as Query from "./query";
@@ -18,13 +19,24 @@ const emptyFormOptions: VoucherRunsFormOptions = {
   memberships: [],
   plans: [],
   stations: [],
+  stationSizes: [],
 };
+
+function defaultDateRange(): Pick<VoucherRunsListParams, "dateFrom" | "dateTo"> {
+  return {
+    dateFrom: dayjs().subtract(90, "day").format("YYYY-MM-DD"),
+    dateTo: dayjs().format("YYYY-MM-DD"),
+  };
+}
 
 export function useAccessVoucherRuns() {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [formOptions, setFormOptions] = useState<VoucherRunsFormOptions>(emptyFormOptions);
 
-  const { params, setParams, setPagination, setSearch } = useWifiListState({ limit: 20 });
+  const { params, setParams, setPagination, setSearch } = useWifiListState({
+    limit: 20,
+    ...defaultDateRange(),
+  } as Parameters<typeof useWifiListState>[0]);
   const patchParams = useCallback((patch: Partial<VoucherRunsListParams>) => {
     setParams((prev) => ({ ...prev, ...patch }));
   }, [setParams]);
@@ -39,6 +51,11 @@ export function useAccessVoucherRuns() {
       extended.orgId,
       extended.planId,
       extended.stationId,
+      extended.township,
+      extended.stationSizeId,
+      extended.dateFrom,
+      extended.dateTo,
+      extended.hasBalance,
     ],
     ready: Boolean(orgId),
   });
@@ -49,7 +66,10 @@ export function useAccessVoucherRuns() {
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as VoucherRunsFormOptions;
-    setFormOptions(opts);
+    setFormOptions({
+      ...opts,
+      stationSizes: opts.stationSizes ?? [],
+    });
     if (!targetOrgId && opts.memberships.length === 1) {
       setOrgId(opts.memberships[0].id);
     }

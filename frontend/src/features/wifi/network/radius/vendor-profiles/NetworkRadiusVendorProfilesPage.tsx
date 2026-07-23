@@ -26,6 +26,7 @@ const NetworkRadiusVendorProfilesPage: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailFallback, setDetailFallback] = useState<VendorProfileRecord | null>(null);
   const [editing, setEditing] = useState<VendorProfileRecord | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -75,6 +76,7 @@ const NetworkRadiusVendorProfilesPage: React.FC = () => {
   };
 
   const openView = (record: VendorProfileRecord) => {
+    setDetailFallback(record);
     setDetailId(record.id);
     setDetailOpen(true);
   };
@@ -146,7 +148,7 @@ const NetworkRadiusVendorProfilesPage: React.FC = () => {
             type="error"
             showIcon
             className="mb-4"
-            message="Failed to load vendor profiles"
+            title="Failed to load vendor profiles"
             description={String(error)}
           />
         ) : null}
@@ -211,9 +213,11 @@ const NetworkRadiusVendorProfilesPage: React.FC = () => {
       <VendorProfileDetailDrawer
         open={detailOpen}
         profileId={detailId}
+        fallback={detailFallback}
         onClose={() => {
           setDetailOpen(false);
           setDetailId(null);
+          setDetailFallback(null);
         }}
         onEdit={(p) => void openEdit(p)}
         loadProfile={loadProfile}

@@ -180,16 +180,44 @@ async function resolveRetailPrice(
   stationId: string,
   planId: string
 ): Promise<{ price: Prisma.Decimal; priceBookId: string } | null> {
+  const station = await prisma.wifiStation.findFirst({
+    where: { id: stationId, orgId, deletedAt: null },
+    select: { id: true, stationSizeId: true },
+  });
+  if (!station) return null;
+
+  // Empty allow-list = all plans; otherwise plan must be offered at this site.
+  const offerCount = await prisma.stationPlanOffer.count({
+    where: { orgId, stationId },
+  });
+  if (offerCount > 0) {
+    const offered = await prisma.stationPlanOffer.findFirst({
+      where: { orgId, stationId, planId },
+      select: { id: true },
+    });
+    if (!offered) return null;
+  }
+
   const books = await prisma.planPriceBook.findMany({
     where: {
       orgId,
       deletedAt: null,
-      OR: [{ resellerId }, { stationId }, { isDefault: true }],
+      OR: [
+        { stations: { some: { stationId } } },
+        { resellers: { some: { resellerId } } },
+        { stationSizeId: station.stationSizeId },
+        { isDefault: true },
+      ],
     },
-    select: { id: true, resellerId: true, stationId: true, isDefault: true },
+    select: {
+      id: true,
+      isDefault: true,
+      stationSizeId: true,
+      stations: { select: { stationId: true } },
+      resellers: { select: { resellerId: true } },
+    },
   });
 
-  const bookById = new Map(books.map((b) => [b.id, b]));
   const bookIds = books.map((b) => b.id);
   if (bookIds.length === 0) return null;
 
@@ -204,16 +232,28 @@ async function resolveRetailPrice(
     select: { retailPrice: true, priceBookId: true },
   });
 
-  const stationBook = books.find((b) => b.stationId === stationId);
+  const stationBook = books.find((b) => b.stations.some((s) => s.stationId === stationId));
   if (stationBook) {
     const match = prices.find((p) => p.priceBookId === stationBook.id);
     if (match) return { price: match.retailPrice, priceBookId: stationBook.id };
   }
 
-  const resellerBook = books.find((b) => b.resellerId === resellerId);
+  const resellerBook = books.find((b) => b.resellers.some((r) => r.resellerId === resellerId));
   if (resellerBook) {
     const match = prices.find((p) => p.priceBookId === resellerBook.id);
     if (match) return { price: match.retailPrice, priceBookId: resellerBook.id };
+  }
+
+  const tierBook = books.find(
+    (b) =>
+      b.stationSizeId === station.stationSizeId &&
+      b.stations.length === 0 &&
+      b.resellers.length === 0 &&
+      !b.isDefault
+  );
+  if (tierBook) {
+    const match = prices.find((p) => p.priceBookId === tierBook.id);
+    if (match) return { price: match.retailPrice, priceBookId: tierBook.id };
   }
 
   const defaultBook = books.find((b) => b.isDefault);

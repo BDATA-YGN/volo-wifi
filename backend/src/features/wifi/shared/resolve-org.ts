@@ -31,8 +31,9 @@ export function hasGlobalOrgAccess(user: AdminLike): boolean {
   return isPlatformOperator(user);
 }
 
+/** Org picker is for developer (and isSuper) only — tenant accounts stay scoped to their membership. */
 export function canSwitchOrgContext(user: AdminLike): boolean {
-  return isPlatformOperator(user);
+  return isDeveloperAdmin(user);
 }
 
 export async function loadOrgMembershipOptions(
@@ -132,6 +133,11 @@ export async function resolveOrgIdForAdmin(
     return { orgId: requestedOrgId };
   }
 
+  // Developers must explicitly pick a working organization (no auto-scope).
+  if (canSwitchOrgContext(user)) {
+    return { memberships, requiresSelection: true };
+  }
+
   if (memberships.length === 1) {
     return { orgId: memberships[0].id };
   }
@@ -142,9 +148,6 @@ export async function resolveOrgIdForAdmin(
   }
 
   if (memberships.length > 1) {
-    if (canSwitchOrgContext(user)) {
-      return { memberships, requiresSelection: true };
-    }
     return { orgId: memberships[0].id };
   }
 

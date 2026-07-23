@@ -219,6 +219,7 @@ const SitesPage: React.FC = () => {
                   search={search}
                   status={(params.status as StationStatus) ?? null}
                   stationSizeId={(params.stationSizeId as string) ?? null}
+                  township={(params.township as string) ?? null}
                   formOptions={formOptions}
                   loading={loading}
                   addDisabled={noTiers}
@@ -228,6 +229,9 @@ const SitesPage: React.FC = () => {
                   }
                   onTierChange={(stationSizeId) =>
                     patchParams({ stationSizeId: stationSizeId ?? undefined, page: 1 })
+                  }
+                  onTownshipChange={(township) =>
+                    patchParams({ township: township ?? undefined, page: 1 })
                   }
                   onRefresh={refresh}
                   onCreate={openCreate}

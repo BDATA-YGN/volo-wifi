@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Button,
   Drawer,
@@ -12,9 +12,11 @@ import {
 } from "antd";
 import type { SiteFormValues, SiteRecord, SitesFormOptions } from "../types";
 import { SITE_CODE_PATTERN, STATUS_OPTIONS } from "../constant";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
+import { usePlaceTowns } from "@/features/system/places/usePlaceTowns";
 
 const { TextArea } = Input;
-const { Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 type Props = {
   open: boolean;
@@ -26,6 +28,37 @@ type Props = {
   onCreate: (values: SiteFormValues) => Promise<void>;
   onUpdate: (id: string, values: SiteFormValues) => Promise<void>;
 };
+
+function buildSiteFormValues(
+  editing: SiteRecord | null,
+  formOptions: SitesFormOptions,
+  licenseAtLimit?: boolean
+): SiteFormValues {
+  if (editing) {
+    return {
+      code: editing.code,
+      name: editing.name,
+      location: editing.location ?? undefined,
+      township: editing.township ?? undefined,
+      address: editing.address ?? undefined,
+      stationSizeId: editing.stationSizeId,
+      status: editing.status,
+      portalBaseUrl: editing.portalBaseUrl ?? undefined,
+      nasIdentifier: editing.nasIdentifier ?? undefined,
+      radiusClientIp: editing.radiusClientIp ?? undefined,
+      vlanId: editing.vlanId ?? undefined,
+      radiusVendorProfileId: editing.radiusVendorProfileId,
+      radiusSecret: undefined,
+    };
+  }
+  return {
+    code: "",
+    name: "",
+    township: undefined,
+    stationSizeId: formOptions.stationSizes[0]?.id ?? "",
+    status: licenseAtLimit ? "MAINTENANCE" : "ACTIVE",
+  };
+}
 
 const SiteFormDrawer: React.FC<Props> = ({
   open,
@@ -39,33 +72,28 @@ const SiteFormDrawer: React.FC<Props> = ({
 }) => {
   const [form] = Form.useForm<SiteFormValues>();
   const status = Form.useWatch("status", form);
+  const formValues = buildSiteFormValues(editing, formOptions, licenseAtLimit);
+  useDrawerFormSync(form, open, formValues, editing?.id ?? "create");
+  const { options: townOptions, loading: townsLoading } = usePlaceTowns();
 
-  const initialValues: SiteFormValues = editing
-    ? {
-        code: editing.code,
-        name: editing.name,
-        location: editing.location ?? undefined,
-        address: editing.address ?? undefined,
-        stationSizeId: editing.stationSizeId,
-        status: editing.status,
-        portalBaseUrl: editing.portalBaseUrl ?? undefined,
-        nasIdentifier: editing.nasIdentifier ?? undefined,
-        radiusClientIp: editing.radiusClientIp ?? undefined,
-        vlanId: editing.vlanId ?? undefined,
-        radiusVendorProfileId: editing.radiusVendorProfileId,
-      }
-    : {
-        code: "",
-        name: "",
-        stationSizeId: formOptions.stationSizes[0]?.id ?? "",
-        status: licenseAtLimit ? "MAINTENANCE" : "ACTIVE",
-      };
+  const townshipOptions = useMemo(() => {
+    const byValue = new Map(townOptions.map((o) => [o.value, o]));
+    const current = editing?.township?.trim();
+    if (current && !byValue.has(current)) {
+      byValue.set(current, { value: current, label: current });
+    }
+    return [...byValue.values()];
+  }, [townOptions, editing?.township]);
 
   const handleFinish = async (values: SiteFormValues) => {
+    const payload: SiteFormValues = {
+      ...values,
+      township: values.township?.trim() || null,
+    };
     if (editing) {
-      await onUpdate(editing.id, values);
+      await onUpdate(editing.id, payload);
     } else {
-      await onCreate(values);
+      await onCreate(payload);
     }
   };
 
@@ -97,6 +125,21 @@ const SiteFormDrawer: React.FC<Props> = ({
         rules={[{ required: true, message: "Name is required" }, { min: 2 }]}
       >
         <Input placeholder="Head office WiFi" />
+      </Form.Item>
+
+      <Form.Item
+        name="township"
+        label="Township"
+        extra="Saved as the town name (not linked by ID)"
+      >
+        <Select
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          loading={townsLoading}
+          placeholder="Select township"
+          options={townshipOptions}
+        />
       </Form.Item>
 
       <Form.Item name="location" label="Location label">
@@ -198,7 +241,7 @@ const SiteFormDrawer: React.FC<Props> = ({
       size={520}
       open={open}
       onClose={onClose}
-      destroyOnClose={false}
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -215,7 +258,6 @@ const SiteFormDrawer: React.FC<Props> = ({
           form={form}
           layout="vertical"
           requiredMark="optional"
-          initialValues={initialValues}
           key={editing?.id ?? "create"}
           onFinish={(v) => void handleFinish(v)}
         >

@@ -6,6 +6,7 @@ import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import {
   canAccessOrg,
+  canSwitchOrgContext,
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
@@ -126,7 +127,8 @@ export class AnalyticsVoucherRunsController {
           data: null,
           meta: {
             memberships,
-            requiresOrgSelection: memberships.length > 1,
+            requiresOrgSelection: canSwitchOrgContext(req.user!) || memberships.length > 1,
+            canSwitchOrg: canSwitchOrgContext(req.user!),
             orgId: memberships.length === 1 ? memberships[0].id : undefined,
           },
         });

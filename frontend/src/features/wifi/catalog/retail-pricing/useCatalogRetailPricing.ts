@@ -53,7 +53,12 @@ export function useCatalogRetailPricing() {
     const opts = res.data as RetailPricingFormOptions;
     setFormOptions(opts);
     if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+      const onlyOrgId = opts.memberships[0].id;
+      setOrgId(onlyOrgId);
+      const withOrg = await Query.loadFormOptions(onlyOrgId);
+      const hydrated = withOrg.data as RetailPricingFormOptions;
+      setFormOptions(hydrated);
+      return hydrated;
     }
     return opts;
   }, []);

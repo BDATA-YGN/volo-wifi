@@ -107,6 +107,43 @@ enum RadiusProfileAttrRequirement {
   MUST
 }
 
+/// Org-scoped FreeRADIUS server (typically 1–2 per tenant).
+/// NAS devices select which server to use; per-device NAS client secret stays on StationDevice.
+model OrgRadiusProfile {
+  id    String @id @default(uuid()) @map("id")
+  orgId String @map("org_id")
+  org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  name String @map("name")
+
+  /// Optional default shared secret when devices do not override.
+  sharedSecret String? @map("shared_secret")
+
+  /// FreeRADIUS host / IP that NAS gear points at.
+  serverHost String? @map("server_host")
+
+  nasType   String  @map("nas_type") @default("other")
+  nasPorts  Int?    @map("nas_ports")
+  community String? @map("community")
+  note      String? @map("note")
+  isActive  Boolean @map("is_active") @default(true)
+
+  /// Optional provenance when a server row was derived from a legacy site.
+  sourceStationId String?      @unique @map("source_station_id")
+  sourceStation   WifiStation? @relation("OrgRadiusProfileSourceStation", fields: [sourceStationId], references: [id], onDelete: SetNull)
+
+  devices StationDevice[]
+
+  createdAt DateTime  @map("created_at") @default(now())
+  updatedAt DateTime  @map("updated_at") @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+
+  @@unique([orgId, name], map: "uq_wf_org_radius_profile__org_id__name")
+  @@index([orgId, deletedAt], map: "idx_wf_org_radius_profile__org_id__deleted_at")
+  @@index([orgId, isActive], map: "idx_wf_org_radius_profile__org_id__is_active")
+  @@map("wf_org_radius_profile")
+}
+
 model RadiusVendorProfile {
   id     String @map("id")  @id @default(uuid())
   orgId  String @map("org_id")
@@ -206,6 +243,9 @@ model PlanRadiusAttribute {
   wifiStationId String? @map("wifi_station_id")
   wifiStation   WifiStation? @relation(fields: [wifiStationId], references: [id], onDelete: Cascade)
 
+  /// Groups attribute rows that belong to one console policy (plan + vendor + 0..N sites).
+  policyBundleId String @map("policy_bundle_id")
+
   vendorProfileId String @map("vendor_profile_id")
   vendorProfile   RadiusVendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Restrict)
 
@@ -231,6 +271,8 @@ model PlanRadiusAttribute {
   @@index([orgId, planId], map: "idx_wf_plan_radius_attribute__org_id__plan_id")
   @@index([orgId, planId, wifiStationId], map: "idx_wf_plan_radius_attribute__org_id__plan_id__wifi_station_id")
   @@index([vendorProfileId, planId], map: "idx_wf_plan_radius_attribute__vendor_profile_id__plan_id")
+  @@index([policyBundleId], map: "idx_wf_plan_radius_attribute__policy_bundle_id")
+  @@index([orgId, policyBundleId, deletedAt], map: "idx_wf_plan_radius_attr__org_bundle_del")
   /// FreeRADIUS views + plan attribute joins (planId, station, phase)
   @@index([planId, phase, deletedAt], map: "idx_wf_plan_radius_attribute__plan_id__phase__deleted_at")
   @@index([planId, wifiStationId, phase, deletedAt], map: "idx_wf_plan_radius_attribute__planid_wifistatid_phas_deleat")

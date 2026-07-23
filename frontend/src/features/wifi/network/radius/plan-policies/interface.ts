@@ -2,8 +2,12 @@ export type {
   PlanPoliciesFormOptions,
   PlanPoliciesMeta,
   PlanPolicyFormValues,
-  PlanPolicyRecord,
+  PlanPolicyGroupRecord,
+  PlanPolicyAttributeRow,
 } from "./types";
 
-/** @deprecated Use PlanPolicyRecord */
-export type NetworkRadiusPlanPoliciesRecord = import("./types").PlanPolicyRecord;
+/** @deprecated Use PlanPolicyGroupRecord */
+export type PlanPolicyRecord = import("./types").PlanPolicyGroupRecord;
+
+/** @deprecated Use PlanPolicyGroupRecord */
+export type NetworkRadiusPlanPoliciesRecord = import("./types").PlanPolicyGroupRecord;

@@ -12,7 +12,7 @@ const { Text, Title } = Typography;
 type Props = {
   open: boolean;
   profileId: string | null;
-  loading?: boolean;
+  fallback?: VendorProfileRecord | null;
   onClose: () => void;
   onEdit: (profile: VendorProfileRecord) => void;
   loadProfile: (id: string) => Promise<VendorProfileRecord>;
@@ -21,7 +21,7 @@ type Props = {
 const VendorProfileDetailDrawer: React.FC<Props> = ({
   open,
   profileId,
-  loading: externalLoading,
+  fallback,
   onClose,
   onEdit,
   loadProfile,
@@ -32,13 +32,33 @@ const VendorProfileDetailDrawer: React.FC<Props> = ({
   useEffect(() => {
     if (!open || !profileId) {
       setProfile(null);
+      setLoading(false);
       return;
     }
+
+    if (fallback?.id === profileId) {
+      setProfile((prev) => (prev?.id === profileId ? prev : fallback));
+    }
+
+    let cancelled = false;
     setLoading(true);
     void loadProfile(profileId)
-      .then(setProfile)
-      .finally(() => setLoading(false));
-  }, [open, profileId, loadProfile]);
+      .then((row) => {
+        if (!cancelled) setProfile(row);
+      })
+      .catch(() => {
+        if (!cancelled && fallback?.id === profileId) {
+          setProfile((prev) => prev ?? fallback);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, profileId, fallback?.id, loadProfile]);
 
   const columns: ColumnsType<SupportedAttributeRow> = [
     {
@@ -78,43 +98,47 @@ const VendorProfileDetailDrawer: React.FC<Props> = ({
     },
   ];
 
+  const row = profile;
+  // Only block the drawer while we have nothing to show.
+  const spinning = loading && !row;
+
   return (
     <Drawer
-      title={profile ? profile.name : "Vendor profile"}
+      title={row ? row.name : "Vendor profile"}
       size={720}
       open={open}
       onClose={onClose}
       destroyOnHidden
       extra={
-        profile ? (
-          <Button type="primary" icon={<EditOutlined />} onClick={() => onEdit(profile)}>
+        row ? (
+          <Button type="primary" icon={<EditOutlined />} onClick={() => onEdit(row)}>
             Edit
           </Button>
         ) : null
       }
     >
-      <Spin spinning={loading || externalLoading}>
-        {profile ? (
+      <Spin spinning={spinning}>
+        {row ? (
           <div className="flex flex-col gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <Title level={5} style={{ margin: 0 }}>
-                  {profile.vendor}
+                  {row.vendor}
                 </Title>
-                {profile.model ? (
+                {row.model ? (
                   <Text type="secondary" code>
-                    {profile.model}
+                    {row.model}
                   </Text>
                 ) : null}
-                {profile.supportsCoA ? (
-                  <Tag color="blue">CoA :{profile.coaPort ?? 3799}</Tag>
+                {row.supportsCoA ? (
+                  <Tag color="blue">CoA :{row.coaPort ?? 3799}</Tag>
                 ) : (
                   <Tag>CoA disabled</Tag>
                 )}
               </div>
-              {profile.description ? (
+              {row.description ? (
                 <Text type="secondary" style={{ fontSize: 13 }}>
-                  {profile.description}
+                  {row.description}
                 </Text>
               ) : null}
             </div>
@@ -126,17 +150,17 @@ const VendorProfileDetailDrawer: React.FC<Props> = ({
                 {
                   key: "attrs",
                   label: "Attributes",
-                  children: profile._count.supportedAttributeRows,
+                  children: row._count.supportedAttributeRows,
                 },
                 {
                   key: "sites",
                   label: "WiFi sites",
-                  children: profile._count.wifiStations,
+                  children: row._count.wifiStations,
                 },
                 {
                   key: "plans",
                   label: "Plan policies",
-                  children: profile._count.planAttributes,
+                  children: row._count.planAttributes,
                 },
               ]}
             />
@@ -148,13 +172,20 @@ const VendorProfileDetailDrawer: React.FC<Props> = ({
             <Table<SupportedAttributeRow>
               rowKey="id"
               size="small"
+              loading={loading}
               columns={columns}
-              dataSource={profile.supportedAttributeRows ?? []}
+              dataSource={row.supportedAttributeRows ?? []}
               pagination={false}
-              locale={{ emptyText: "No attributes linked to this profile." }}
+              locale={{
+                emptyText: loading
+                  ? "Loading attributes…"
+                  : "No attributes linked to this profile.",
+              }}
             />
           </div>
-        ) : null}
+        ) : (
+          !spinning && <Text type="secondary">Profile not found.</Text>
+        )}
       </Spin>
     </Drawer>
   );

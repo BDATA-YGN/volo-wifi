@@ -33,6 +33,7 @@ const RecordPaymentDrawer: React.FC<Props> = ({
 
   useEffect(() => {
     if (!open || !invoice) return;
+    form.resetFields();
     form.setFieldsValue({
       amount: Number(invoice.balanceDue) > 0 ? Number(invoice.balanceDue) : undefined,
       paymentMethod: "BANK_TRANSFER",

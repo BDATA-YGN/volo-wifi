@@ -21,12 +21,20 @@ export type ActivityLogRecord = {
   userAgent: string | null;
   createdAt: string;
   admin: ActivityLogAdmin | null;
+  org?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
 };
 
 export type ActivityLogFormOptions = {
   memberships: OrgMembershipOption[];
   actions: string[];
   entities: string[];
+  /** Developer: can list audit rows across every tenant. */
+  canViewAllOrgs?: boolean;
+  scopedOrgId?: string | null;
 };
 
 export type ActivityLogMeta = {
@@ -39,6 +47,8 @@ export type ActivityLogMeta = {
   recentCount?: number;
   actorsToday?: number;
   memberships?: OrgMembershipOption[];
+  canViewAllOrgs?: boolean;
+  scopedOrgId?: string | null;
 };
 
 export type ActivityLogListParams = {

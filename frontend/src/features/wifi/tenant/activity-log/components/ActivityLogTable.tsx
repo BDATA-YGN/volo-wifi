@@ -17,6 +17,8 @@ type Props = {
   page: number;
   pageSize: number;
   total: number;
+  /** When viewing the cross-tenant developer feed, show which org each row belongs to. */
+  showOrg?: boolean;
   onPaginationChange: (page: number, pageSize: number) => void;
   onView: (record: ActivityLogRecord) => void;
 };
@@ -27,6 +29,7 @@ const ActivityLogTable: React.FC<Props> = ({
   page,
   pageSize,
   total,
+  showOrg,
   onPaginationChange,
   onView,
 }) => {
@@ -41,6 +44,31 @@ const ActivityLogTable: React.FC<Props> = ({
         </Text>
       ),
     },
+    ...(showOrg
+      ? [
+          {
+            title: "Organization",
+            key: "org",
+            width: 160,
+            ellipsis: true,
+            render: (_: unknown, row: ActivityLogRecord) =>
+              row.org ? (
+                <div>
+                  <Text strong style={{ fontSize: 12 }}>
+                    {row.org.name}
+                  </Text>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 11, fontFamily: "monospace" }}>
+                      {row.org.code}
+                    </Text>
+                  </div>
+                </div>
+              ) : (
+                <Text type="secondary">—</Text>
+              ),
+          } as ColumnsType<ActivityLogRecord>[number],
+        ]
+      : []),
     {
       title: "Action",
       dataIndex: "action",

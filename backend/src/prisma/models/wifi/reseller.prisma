@@ -16,7 +16,7 @@ model Reseller {
   status     UserStatus @map("status") @default(ACTIVE)
   stationIds Json       @map("station_ids") @default("[]")
 
-  priceBooks            PlanPriceBook[]
+  priceBooks            PlanPriceBookReseller[]
   credentials           Credential[]
   voucherBatches        VoucherBatch[]
   sales                 SaleOrder[]

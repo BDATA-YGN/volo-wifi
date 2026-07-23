@@ -19,12 +19,12 @@ export const SCOPE_OPTIONS: { value: PriceBookScope; label: string; description:
   {
     value: "RESELLER",
     label: "Reseller",
-    description: "Override prices for a specific partner",
+    description: "Override prices for one or more partners",
   },
   {
     value: "STATION",
     label: "Site",
-    description: "Override prices for a single WiFi site",
+    description: "Override prices for one or more WiFi sites",
   },
 ];
 

@@ -144,6 +144,7 @@ export async function buildNasInventory(
       createdAt: true,
       updatedAt: true,
       station: { select: { code: true, name: true, status: true } },
+      radiusProfile: { select: { sharedSecret: true } },
     },
     orderBy: [{ isRadiusClient: 'desc' }, { type: 'asc' }, { createdAt: 'desc' }],
   });
@@ -163,7 +164,8 @@ export async function buildNasInventory(
     if (device.ipAddr?.trim()) summary.withIpCount += 1;
     if (device.macAddr?.trim()) summary.withMacCount += 1;
     if (device.serialNo?.trim()) summary.withSerialCount += 1;
-    if (device.isRadiusClient && !device.radiusSecret) summary.radiusMissingSecret += 1;
+    const hasRadiusSecret = Boolean(device.radiusProfile?.sharedSecret || device.radiusSecret);
+    if (device.isRadiusClient && !hasRadiusSecret) summary.radiusMissingSecret += 1;
     if (device.isRadiusClient && !device.nasShortname?.trim()) summary.radiusMissingNasId += 1;
 
     const typeRow =
@@ -205,7 +207,6 @@ export async function buildNasInventory(
     if (device.isRadiusClient) siteRow.radiusClientCount += 1;
     siteMap.set(siteKey, siteRow);
 
-    const hasRadiusSecret = Boolean(device.radiusSecret);
     const score = readinessScore({
       stationId: device.stationId,
       ipAddr: device.ipAddr,

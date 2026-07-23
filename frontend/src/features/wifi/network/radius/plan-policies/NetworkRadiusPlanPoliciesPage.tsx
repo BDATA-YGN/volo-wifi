@@ -11,7 +11,7 @@ import { useNetworkRadiusPlanPolicies } from "./useNetworkRadiusPlanPolicies";
 import type {
   PlanPoliciesFormOptions,
   PlanPolicyFormValues,
-  PlanPolicyRecord,
+  PlanPolicyGroupRecord,
   RadiusAttrPhase,
 } from "./types";
 import PlanPoliciesStats from "./components/PlanPoliciesStats";
@@ -37,7 +37,7 @@ const NetworkRadiusPlanPoliciesPage: React.FC = () => {
   const [formOptions, setFormOptions] = useState<PlanPoliciesFormOptions>(emptyFormOptions);
   const [filterPlans, setFilterPlans] = useState<PlanPoliciesFormOptions["plans"]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<PlanPolicyRecord | null>(null);
+  const [editing, setEditing] = useState<PlanPolicyGroupRecord | null>(null);
   const [saving, setSaving] = useState(false);
 
   const {
@@ -51,9 +51,8 @@ const NetworkRadiusPlanPoliciesPage: React.FC = () => {
     setPagination,
     patchParams,
     loadFormOptions,
-    createPolicy,
-    updatePolicy,
-    deletePolicy,
+    savePolicyGroup,
+    deletePolicyGroup,
     orgId,
     selectOrg,
     showOrgSwitcher,
@@ -81,7 +80,7 @@ const NetworkRadiusPlanPoliciesPage: React.FC = () => {
     setDrawerOpen(true);
   };
 
-  const openEdit = (record: PlanPolicyRecord) => {
+  const openEdit = (record: PlanPolicyGroupRecord) => {
     setEditing(record);
     setDrawerOpen(true);
   };
@@ -92,41 +91,45 @@ const NetworkRadiusPlanPoliciesPage: React.FC = () => {
     setEditing(null);
   };
 
-  const handleOrgFilterChange = (orgId: string | null) => {
-    patchParams({ orgId: orgId ?? undefined, planId: undefined, page: 1 });
+  const handleOrgFilterChange = (nextOrgId: string | null) => {
+    patchParams({ orgId: nextOrgId ?? undefined, planId: undefined, page: 1 });
   };
 
   const handleSubmit = async (values: PlanPolicyFormValues) => {
     setSaving(true);
     try {
-      if (editing) {
-        await updatePolicy(editing.id, values);
-        message.success("Plan RADIUS rule updated");
-      } else {
-        await createPolicy(values);
-        message.success("Plan RADIUS rule added");
-      }
+      await savePolicyGroup(values);
+      message.success(editing ? "Plan RADIUS policy updated" : "Plan RADIUS policy created");
       setDrawerOpen(false);
       setEditing(null);
     } catch (err: unknown) {
-      message.error(getApiErrorMessage(err, "Failed to save rule"));
+      message.error(getApiErrorMessage(err, "Failed to save policy"));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = (record: PlanPolicyRecord) => {
+  const handleDelete = (record: PlanPolicyGroupRecord) => {
+    const stations = record.wifiStations?.length
+      ? record.wifiStations
+      : record.wifiStation
+        ? [record.wifiStation]
+        : [];
+    const scopeLabel =
+      stations.length === 0 || record.isGlobal
+        ? "all sites (global)"
+        : stations.map((s) => s.code).join(", ");
     modal.confirm({
-      title: `Remove rule for ${record.attributeName}?`,
-      content: `Plan: ${record.plan.name}`,
+      title: `Remove policy for ${record.plan.code}?`,
+      content: `${record.attributeCount} attribute(s) · ${record.vendorProfile.name} · ${scopeLabel}`,
       okText: "Remove",
       okType: "danger",
       onOk: async () => {
         try {
-          await deletePolicy(record.id);
-          message.success("Rule removed");
+          await deletePolicyGroup(record);
+          message.success("Policy group removed");
         } catch (err: unknown) {
-          message.error(getApiErrorMessage(err, "Failed to remove rule"));
+          message.error(getApiErrorMessage(err, "Failed to remove policy"));
         }
       },
     });
@@ -146,8 +149,8 @@ const NetworkRadiusPlanPoliciesPage: React.FC = () => {
       >
         <div className="mb-5 max-w-3xl">
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Per-plan RADIUS reply rules — map FreeRADIUS attributes to WiFi plans by vendor profile.
-            Optional site scope allows location-specific overrides.
+            Per-plan RADIUS reply policies — one row per plan + vendor profile + site set (global or
+            one-to-many sites). Edit a policy to manage sites and attribute rows together.
           </Paragraph>
         </div>
 
@@ -156,7 +159,7 @@ const NetworkRadiusPlanPoliciesPage: React.FC = () => {
             type="error"
             showIcon
             className="mb-4"
-            message="Failed to load plan policies"
+            title="Failed to load plan policies"
             description={String(error)}
           />
         ) : null}

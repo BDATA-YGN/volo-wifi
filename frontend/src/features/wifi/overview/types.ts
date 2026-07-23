@@ -83,6 +83,7 @@ export type OverviewMeta = {
   memberships?: OrgMembershipOption[];
   orgId?: string;
   requiresOrgSelection?: boolean;
+  canSwitchOrg?: boolean;
 };
 
 export type OverviewParams = {

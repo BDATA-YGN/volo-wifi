@@ -12,6 +12,7 @@ import type { SiteInventorySiteRow } from "../types";
 import { STATION_STATUS_COLOR } from "../constant";
 import { formatStatusLabel, readinessColor } from "../utils";
 import type { StationStatus } from "../types";
+import { resolveTierColor } from "@/features/wifi/shared/tier-colors";
 
 const { Text } = Typography;
 
@@ -70,7 +71,12 @@ const InventorySitesTable: React.FC<Props> = ({
       key: "tier",
       width: 110,
       render: (_, row) => (
-        <Tag style={{ fontFamily: "monospace", fontSize: 11 }}>{row.stationSizeCode}</Tag>
+        <Tag
+          color={resolveTierColor(row.stationSizeCode, row.stationSizeName)}
+          style={{ fontFamily: "monospace", fontSize: 11 }}
+        >
+          {row.stationSizeCode}
+        </Tag>
       ),
     },
     {

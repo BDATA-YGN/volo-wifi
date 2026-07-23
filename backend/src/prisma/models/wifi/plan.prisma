@@ -7,13 +7,15 @@ model Plan {
   code        String @map("code")
   name        String @map("name")
   description String? @map("description")
+  /// Derived from time/data limits for filters & analytics.
+  /// TIME_ONLY = time>0 & data=0; DATA_ONLY = time=0 & data>0; TIME_AND_DATA = both limited or both unlimited.
   quotaType   PlanQuotaType @map("quota_type") @default(TIME_ONLY)
 
-  // time quota (optional depending on quotaType)
+  /// Allow-time amount. 0 = unlimited time. Null is legacy (treat as unlimited when unused).
   timeAmount Int? @map("time_amount")
-  timeUnit   UnitTime?
+  timeUnit   UnitTime? @map("time_unit")
 
-  // data quota (MB)
+  /// Data quota in MB. 0 = unlimited data. Null is legacy (treat as unlimited when unused).
   dataMb Int? @map("data_mb")
 
   // validity (days) from first activation
@@ -22,7 +24,7 @@ model Plan {
   // concurrency / device limit
   maxDevices Int? @map("max_devices") @default(1)
 
-  /// Applies when quota includes time (TIME_ONLY / TIME_AND_DATA). Ignored for data-only plans.
+  /// Applies when allow-time is limited (timeAmount > 0). Ignored when time is unlimited.
   timeUsageMode PlanTimeUsageMode @map("time_usage_mode") @default(CUMULATIVE_SESSIONS)
 
   isActive Boolean @map("is_active") @default(true)
@@ -38,6 +40,7 @@ model Plan {
   yearlyStats     YearlySalesStat[]
   dailyRadiusUsageStats DailyRadiusUsageStat[]
   resellerEntitlements ResellerPlanEntitlement[]
+  stationPlanOffers    StationPlanOffer[]
 
   createdAt DateTime @map("created_at")  @default(now())
   updatedAt DateTime @map("updated_at")  @updatedAt
@@ -57,23 +60,51 @@ model PlanPriceBook {
   name      String @map("name")
   isDefault Boolean @map("is_default") @default(false)
 
-  // Optional: limit to reseller or station
-  resellerId String? @map("reseller_id")
-  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+  /// Optional: shared list prices for a capacity tier (SMALL/MEDIUM/LARGE).
+  stationSizeId String?      @map("station_size_id")
+  stationSize   StationSize? @relation(fields: [stationSizeId], references: [id], onDelete: SetNull)
 
-  stationId String? @map("station_id")
-  station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
-
-  prices PlanPrice[]
+  prices    PlanPrice[]
+  stations  PlanPriceBookStation[]
+  resellers PlanPriceBookReseller[]
 
   createdAt DateTime @map("created_at")  @default(now())
   updatedAt DateTime @map("updated_at")  @updatedAt
   deletedAt DateTime? @map("deleted_at")
 
   @@index([orgId, isDefault], map: "idx_wf_plan_price_book__org_id__is_default")
-  @@index([orgId, resellerId], map: "idx_wf_plan_price_book__org_id__reseller_id")
-  @@index([orgId, stationId], map: "idx_wf_plan_price_book__org_id__station_id")
+  @@index([orgId, stationSizeId], map: "idx_wf_plan_price_book__org_id__station_size_id")
   @@map("wf_plan_price_book")
+}
+
+/// Many sites can share one station-scoped price book.
+model PlanPriceBookStation {
+  id          String        @id @default(uuid()) @map("id")
+  priceBookId String        @map("price_book_id")
+  priceBook   PlanPriceBook @relation(fields: [priceBookId], references: [id], onDelete: Cascade)
+  stationId   String        @map("station_id")
+  station     WifiStation   @relation(fields: [stationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@unique([priceBookId, stationId], map: "uq_wf_plan_price_book_station__book_station")
+  @@index([stationId], map: "idx_wf_plan_price_book_station__station_id")
+  @@map("wf_plan_price_book_station")
+}
+
+/// Many resellers can share one reseller-scoped price book.
+model PlanPriceBookReseller {
+  id          String        @id @default(uuid()) @map("id")
+  priceBookId String        @map("price_book_id")
+  priceBook   PlanPriceBook @relation(fields: [priceBookId], references: [id], onDelete: Cascade)
+  resellerId  String        @map("reseller_id")
+  reseller    Reseller      @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @map("created_at") @default(now())
+
+  @@unique([priceBookId, resellerId], map: "uq_wf_plan_price_book_reseller__book_reseller")
+  @@index([resellerId], map: "idx_wf_plan_price_book_reseller__reseller_id")
+  @@map("wf_plan_price_book_reseller")
 }
 
 model PlanPrice {

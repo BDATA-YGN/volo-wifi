@@ -3,6 +3,7 @@
 import React from "react";
 import { Button, Card, Form, Input, Switch, Typography } from "antd";
 import type { TenantProfile, TenantProfileFormValues } from "../types";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { Text, Paragraph } = Typography;
 
@@ -12,8 +13,25 @@ type Props = {
   onSubmit: (values: TenantProfileFormValues) => Promise<void>;
 };
 
+function buildProfileFormValues(profile: TenantProfile): TenantProfileFormValues {
+  return {
+    name: profile.name,
+    description: profile.description ?? undefined,
+    timezone: profile.timezone,
+    currency: profile.currency,
+    enableAnnouncement: profile.enableAnnouncement,
+    announcement: profile.announcement ?? undefined,
+    stationCodePrefix: profile.stationCodePrefix || undefined,
+    planCodePrefix: profile.planCodePrefix || undefined,
+    resellerCodePrefix: profile.resellerCodePrefix || undefined,
+  };
+}
+
 const ProfileSettingsForm: React.FC<Props> = ({ profile, saving, onSubmit }) => {
   const [form] = Form.useForm<TenantProfileFormValues>();
+  const formValues = buildProfileFormValues(profile);
+  // Reuse drawer sync helper: always "open", keyed by profile id (org switch).
+  useDrawerFormSync(form, true, formValues, profile.id);
 
   return (
     <Form
@@ -21,17 +39,6 @@ const ProfileSettingsForm: React.FC<Props> = ({ profile, saving, onSubmit }) => 
       form={form}
       layout="vertical"
       disabled={saving}
-      initialValues={{
-        name: profile.name,
-        description: profile.description ?? undefined,
-        timezone: profile.timezone,
-        currency: profile.currency,
-        enableAnnouncement: profile.enableAnnouncement,
-        announcement: profile.announcement ?? undefined,
-        stationCodePrefix: profile.stationCodePrefix || undefined,
-        planCodePrefix: profile.planCodePrefix || undefined,
-        resellerCodePrefix: profile.resellerCodePrefix || undefined,
-      }}
       onFinish={onSubmit}
     >
       <div className="flex flex-col gap-4">
@@ -116,7 +123,13 @@ const ProfileSettingsForm: React.FC<Props> = ({ profile, saving, onSubmit }) => 
           <Button type="primary" htmlType="submit" loading={saving}>
             Save changes
           </Button>
-          <Button onClick={() => form.resetFields()} disabled={saving}>
+          <Button
+            onClick={() => {
+              form.resetFields();
+              form.setFieldsValue(buildProfileFormValues(profile));
+            }}
+            disabled={saving}
+          >
             Reset
           </Button>
         </div>

@@ -21,6 +21,9 @@ import { logger } from '@/logging/logger';
 const SEED_JSON_DIR = path.resolve(__dirname, '../src/prisma/json');
 const DEFAULT_FILE = path.join(SEED_JSON_DIR, 'menu.json');
 
+/** Remote DB + PrismaPg often needs a longer wait than Prisma's 2s default. */
+const TX_OPTIONS = { maxWait: 60_000, timeout: 180_000 } as const;
+
 interface MenuBackup {
   version: 1;
   exportedAt: string;
@@ -71,8 +74,8 @@ async function backup(outPath: string): Promise<void> {
     where: { deletedAt: null },
     orderBy: [{ groupId: 'asc' }, { position: 'asc' }],
   });
-  const groupById = new Map(groups.map(g => [g.id, g]));
-  const menuItems = items.map(item => {
+  const groupById = new Map(groups.map((g) => [g.id, g]));
+  const menuItems = items.map((item) => {
     const g = groupById.get(item.groupId);
     return {
       id: item.id,
@@ -90,7 +93,7 @@ async function backup(outPath: string): Promise<void> {
   const payload: MenuBackup = {
     version: 1,
     exportedAt: new Date().toISOString(),
-    menuGroups: groups.map(g => ({
+    menuGroups: groups.map((g) => ({
       id: g.id,
       key: g.key,
       title: g.title,
@@ -124,45 +127,51 @@ async function restore(filePath: string): Promise<void> {
     process.exit(1);
   }
 
-  // Reset existing records first (FK: MenuItem -> MenuGroup)
-  await prisma.$transaction([
-    prisma.menuItem.deleteMany({}),
-    prisma.menuGroup.deleteMany({}),
-  ]);
+  // Warm the pool before opening a long transaction (helps with remote Postgres).
+  await prisma.$connect();
+  await prisma.$queryRaw`SELECT 1`;
 
-  const groupKeyToId = new Map<string, number>();
-  for (const row of payload.menuGroups) {
-    const created = await prisma.menuGroup.create({
-      data: {
-        key: row.key,
-        title: row.title,
-        icon: row.icon,
-        position: row.position,
-        level: row.level,
-        mode: row.mode,
-      },
-    });
-    groupKeyToId.set(row.key, created.id);
-  }
+  await prisma.$transaction(async (tx) => {
+    // FK: MenuItem -> MenuGroup (onDelete Cascade); wipe items first.
+    await tx.menuItem.deleteMany({});
+    await tx.menuGroup.deleteMany({});
 
-  for (const row of payload.menuItems) {
-    const groupKey = row.groupKey ?? payload.menuGroups.find(g => g.id === row.groupId)?.key;
-    const newGroupId = groupKey != null ? groupKeyToId.get(groupKey) : undefined;
-    const groupId = newGroupId ?? row.groupId;
-    await prisma.menuItem.create({
-      data: {
-        key: row.key,
-        title: row.title,
-        icon: row.icon,
-        url: row.url,
-        position: row.position,
-        groupId,
-        level: row.level,
-      },
-    });
-  }
+    const groupKeyToId = new Map<string, number>();
+    for (const row of payload.menuGroups) {
+      const created = await tx.menuGroup.create({
+        data: {
+          key: row.key,
+          title: row.title,
+          icon: row.icon,
+          position: row.position,
+          level: row.level,
+          mode: row.mode,
+        },
+      });
+      groupKeyToId.set(row.key, created.id);
+    }
 
-  logger.info(`Restore completed from ${filePath}.`);
+    for (const row of payload.menuItems) {
+      const groupKey = row.groupKey ?? payload.menuGroups.find((g) => g.id === row.groupId)?.key;
+      const newGroupId = groupKey != null ? groupKeyToId.get(groupKey) : undefined;
+      const groupId = newGroupId ?? row.groupId;
+      await tx.menuItem.create({
+        data: {
+          key: row.key,
+          title: row.title,
+          icon: row.icon,
+          url: row.url,
+          position: row.position,
+          groupId,
+          level: row.level,
+        },
+      });
+    }
+  }, TX_OPTIONS);
+
+  logger.info(
+    `Restore completed from ${filePath} (${payload.menuGroups.length} groups, ${payload.menuItems.length} items).`,
+  );
 }
 
 void (async () => {
@@ -172,13 +181,13 @@ void (async () => {
       .command(
         'backup',
         'Export MenuGroup and MenuItem to JSON',
-        y =>
+        (y) =>
           y.option('output', {
             type: 'string',
             description: 'Output JSON file path',
             default: DEFAULT_FILE,
           }),
-        async argv => {
+        async (argv) => {
           try {
             await backup(argv.output as string);
           } finally {
@@ -189,13 +198,13 @@ void (async () => {
       .command(
         'restore',
         'Import MenuGroup and MenuItem from JSON',
-        y =>
+        (y) =>
           y.option('file', {
             type: 'string',
             description: 'Input JSON (menu.json or a menu-permission export)',
             default: DEFAULT_FILE,
           }),
-        async argv => {
+        async (argv) => {
           try {
             await restore(argv.file as string);
           } finally {

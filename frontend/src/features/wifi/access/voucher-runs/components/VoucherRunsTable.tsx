@@ -81,6 +81,25 @@ const VoucherRunsTable: React.FC<Props> = ({
         ),
     },
     {
+      title: "Created by",
+      key: "createdBy",
+      width: 140,
+      ellipsis: true,
+      render: (_, row) =>
+        row.createdByAdmin ? (
+          <div>
+            <Text style={{ fontSize: 12 }}>{row.createdByAdmin.fullName}</Text>
+            <div>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                @{row.createdByAdmin.username}
+              </Text>
+            </div>
+          </div>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
       title: "Quantity",
       key: "qty",
       width: 100,
@@ -148,7 +167,7 @@ const VoucherRunsTable: React.FC<Props> = ({
       loading={loading}
       columns={columns}
       dataSource={data}
-      scroll={{ x: 960 }}
+      scroll={{ x: 1180 }}
       locale={{
         emptyText: (
           <Empty

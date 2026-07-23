@@ -24,6 +24,10 @@ const NetworkNasDevicesPage: React.FC = () => {
   const [orgs, setOrgs] = useState<{ id: string; code: string; name: string; isActive: boolean }[]>(
     []
   );
+  const [stations, setStations] = useState<
+    { id: string; code: string; name: string; status: string }[]
+  >([]);
+  const [vendors, setVendors] = useState<string[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<NasDeviceRecord | null>(null);
   const [saving, setSaving] = useState(false);
@@ -53,7 +57,11 @@ const NetworkNasDevicesPage: React.FC = () => {
 
   useEffect(() => {
     if (!orgId) return;
-    void loadFormOptions(orgId).then((data) => setOrgs(data.orgs));
+    void loadFormOptions(orgId).then((data) => {
+      setOrgs(data.orgs);
+      setStations(data.stations ?? []);
+      setVendors(data.vendors ?? []);
+    });
   }, [loadFormOptions, orgId]);
 
   useEffect(() => {
@@ -129,7 +137,7 @@ const NetworkNasDevicesPage: React.FC = () => {
         <div className="mb-5 max-w-3xl">
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
             Central inventory for routers, access points, and RADIUS NAS clients across tenant WiFi
-            sites. Link devices to sites and configure FreeRADIUS attributes.
+            sites. Link each site device to a FreeRADIUS server.
           </Paragraph>
         </div>
 
@@ -163,9 +171,13 @@ const NetworkNasDevicesPage: React.FC = () => {
               >
                 <NasDevicesToolbar
                   orgs={orgs}
+                  stations={stations}
+                  vendors={vendors}
                   search={search}
                   orgId={orgId ?? null}
                   showOrgFilter={showOrgSwitcher}
+                  stationId={(params.stationId as string) ?? null}
+                  vendor={(params.vendor as string) ?? null}
                   type={(params.type as DeviceType) ?? null}
                   radiusOnly={params.isRadiusClient === true}
                   unassignedOnly={params.unassigned === true}
@@ -173,6 +185,16 @@ const NetworkNasDevicesPage: React.FC = () => {
                   onSearchChange={setSearchLocal}
                   onOrgChange={(nextOrgId) =>
                     patchParams({ orgId: nextOrgId ?? undefined, page: 1 })
+                  }
+                  onStationChange={(stationId) =>
+                    patchParams({
+                      stationId: stationId ?? undefined,
+                      unassigned: stationId ? undefined : params.unassigned,
+                      page: 1,
+                    })
+                  }
+                  onVendorChange={(vendor) =>
+                    patchParams({ vendor: vendor ?? undefined, page: 1 })
                   }
                   onTypeChange={(type) => patchParams({ type: type ?? undefined, page: 1 })}
                   onRadiusOnlyChange={(value) =>
@@ -182,7 +204,11 @@ const NetworkNasDevicesPage: React.FC = () => {
                     })
                   }
                   onUnassignedOnlyChange={(value) =>
-                    patchParams({ unassigned: value ? true : undefined, page: 1 })
+                    patchParams({
+                      unassigned: value ? true : undefined,
+                      stationId: value ? undefined : params.stationId,
+                      page: 1,
+                    })
                   }
                   onRefresh={refresh}
                   onAdd={openCreate}
@@ -216,6 +242,9 @@ const NetworkNasDevicesPage: React.FC = () => {
         orgs={orgs}
         lockedOrgId={canSwitchOrg ? undefined : orgId}
         loadStations={(targetOrgId) => loadFormOptions(targetOrgId).then((d) => d.stations)}
+        loadRadiusProfiles={(targetOrgId) =>
+          loadFormOptions(targetOrgId).then((d) => d.radiusProfiles ?? [])
+        }
         onClose={closeDrawer}
         onSubmit={handleSubmit}
       />

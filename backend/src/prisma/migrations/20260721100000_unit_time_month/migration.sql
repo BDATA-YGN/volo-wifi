@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "UnitTime" ADD VALUE IF NOT EXISTS 'MONTH';

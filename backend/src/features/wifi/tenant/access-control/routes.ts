@@ -10,6 +10,11 @@ export class TenantAccessControlRoute implements Route {
 
   constructor() {
     this.router.get(`${this.path}/:id?`, AuthMiddleware, this.controller.listOrDetails);
+    this.router.post(
+      `${this.path}/reset-password/:id`,
+      AuthMiddleware,
+      this.controller.resetPassword
+    );
     this.router.post(`${this.path}/:id?`, AuthMiddleware, this.controller.createOrUpdate);
     this.router.delete(`${this.path}/delete/:id`, AuthMiddleware, this.controller.remove);
   }

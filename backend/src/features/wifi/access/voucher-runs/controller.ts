@@ -27,13 +27,25 @@ const batchSelect = {
   note: true,
   stationId: true,
   resellerId: true,
+  createdByAdminId: true,
   createdAt: true,
   updatedAt: true,
   plan: {
     select: { id: true, code: true, name: true, quotaType: true, isActive: true },
   },
   station: {
-    select: { id: true, code: true, name: true, status: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      status: true,
+      township: true,
+      stationSizeId: true,
+      stationSize: { select: { id: true, code: true, name: true } },
+    },
+  },
+  createdByAdmin: {
+    select: { id: true, fullName: true, username: true, email: true },
   },
 } satisfies Prisma.VoucherBatchSelect;
 
@@ -118,6 +130,18 @@ function credentialWhereForBatch(batchId: string): Prisma.CredentialWhereInput {
   };
 }
 
+function parseDateBoundary(value: string, endOfDay: boolean): Date | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Accept YYYY-MM-DD or full ISO.
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? `${trimmed}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`
+    : trimmed;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
 function buildListWhere(
   orgId: string,
   query: AuthenticatedRequest['query']
@@ -126,9 +150,40 @@ function buildListWhere(
   const search = typeof query.search === 'string' ? query.search.trim() : '';
   const planId = typeof query.planId === 'string' ? query.planId.trim() : '';
   const stationId = typeof query.stationId === 'string' ? query.stationId.trim() : '';
+  const township = typeof query.township === 'string' ? query.township.trim() : '';
+  const stationSizeId =
+    typeof query.stationSizeId === 'string' ? query.stationSizeId.trim() : '';
+  const dateFromRaw = typeof query.dateFrom === 'string' ? query.dateFrom : '';
+  const dateToRaw = typeof query.dateTo === 'string' ? query.dateTo : '';
+  const hasBalanceRaw =
+    typeof query.hasBalance === 'string' ? query.hasBalance.trim().toLowerCase() : '';
 
   if (planId) where.planId = planId;
   if (stationId) where.stationId = stationId;
+
+  const stationFilter: Prisma.WifiStationWhereInput = {};
+  if (township) {
+    stationFilter.township = { equals: township, mode: 'insensitive' };
+  }
+  if (stationSizeId) {
+    stationFilter.stationSizeId = stationSizeId;
+  }
+  if (Object.keys(stationFilter).length > 0) {
+    where.station = stationFilter;
+  }
+
+  const dateFrom = parseDateBoundary(dateFromRaw, false);
+  const dateTo = parseDateBoundary(dateToRaw, true);
+  if (dateFrom || dateTo) {
+    where.createdAt = {
+      ...(dateFrom ? { gte: dateFrom } : {}),
+      ...(dateTo ? { lte: dateTo } : {}),
+    };
+  }
+
+  if (hasBalanceRaw === 'true' || hasBalanceRaw === '1' || hasBalanceRaw === 'yes') {
+    where.remainingQuantity = { gt: 0 };
+  }
 
   if (search) {
     where.OR = [
@@ -138,6 +193,10 @@ function buildListWhere(
       { plan: { name: { contains: search, mode: 'insensitive' } } },
       { plan: { code: { contains: search, mode: 'insensitive' } } },
       { station: { name: { contains: search, mode: 'insensitive' } } },
+      { station: { code: { contains: search, mode: 'insensitive' } } },
+      { station: { township: { contains: search, mode: 'insensitive' } } },
+      { createdByAdmin: { fullName: { contains: search, mode: 'insensitive' } } },
+      { createdByAdmin: { username: { contains: search, mode: 'insensitive' } } },
     ];
   }
 
@@ -168,7 +227,7 @@ export class AccessVoucherRunsController {
           }
         }
 
-        const [memberships, plans, stations] = await Promise.all([
+        const [memberships, plans, stations, stationSizes] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgId
             ? this.prisma.plan.findMany({
@@ -180,15 +239,27 @@ export class AccessVoucherRunsController {
           orgId
             ? this.prisma.wifiStation.findMany({
                 where: { orgId, deletedAt: null, status: 'ACTIVE' },
-                select: { id: true, code: true, name: true },
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  township: true,
+                  stationSizeId: true,
+                  stationSize: { select: { id: true, code: true, name: true } },
+                },
                 orderBy: { name: 'asc' },
               })
             : Promise.resolve([]),
+          this.prisma.stationSize.findMany({
+            where: { isActive: true },
+            select: { id: true, code: true, name: true, sortOrder: true },
+            orderBy: { sortOrder: 'asc' },
+          }),
         ]);
 
         return responseSuccess(res, {
           message: 'Success',
-          data: { memberships, plans, stations },
+          data: { memberships, plans, stations, stationSizes },
         });
       }
 
@@ -267,7 +338,7 @@ export class AccessVoucherRunsController {
       const where = buildListWhere(orgId, req.query);
       const { page, limit, skip, take } = parsePagination(req.query);
 
-      const [rows, total, totalVouchers, remainingVouchers, runCount] = await Promise.all([
+      const [rows, total, totals] = await Promise.all([
         this.prisma.voucherBatch.findMany({
           where,
           select: batchListSelect,
@@ -278,14 +349,8 @@ export class AccessVoucherRunsController {
         this.prisma.voucherBatch.count({ where }),
         this.prisma.voucherBatch.aggregate({
           where,
-          _sum: { quantity: true },
-        }),
-        this.prisma.voucherBatch.aggregate({
-          where,
-          _sum: { remainingQuantity: true },
-        }),
-        this.prisma.voucherBatch.count({
-          where: { orgId, deletedAt: null, resellerId: null },
+          _sum: { quantity: true, remainingQuantity: true },
+          _count: { _all: true },
         }),
       ]);
 
@@ -297,9 +362,9 @@ export class AccessVoucherRunsController {
           limit,
           total,
           totalPages: Math.max(1, Math.ceil(total / limit)),
-          runCount,
-          totalVouchers: totalVouchers._sum.quantity ?? 0,
-          remainingVouchers: remainingVouchers._sum.remainingQuantity ?? 0,
+          runCount: totals._count._all,
+          totalVouchers: totals._sum.quantity ?? 0,
+          remainingVouchers: totals._sum.remainingQuantity ?? 0,
           memberships: await loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
         },
       });
@@ -310,6 +375,7 @@ export class AccessVoucherRunsController {
     asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const recordId = (req.params?.id as string) ?? null;
       const isUpdate = Boolean(recordId && recordId !== 'all');
+      const adminId = req.userId!;
 
       let orgId: string;
       try {
@@ -420,6 +486,7 @@ export class AccessVoucherRunsController {
           note: value.note || null,
           stationId: value.stationId ?? null,
           resellerId: null,
+          createdByAdminId: adminId,
         },
         select: batchSelect,
       });

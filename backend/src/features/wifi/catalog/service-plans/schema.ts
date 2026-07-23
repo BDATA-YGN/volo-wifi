@@ -1,9 +1,6 @@
 import Joi from 'joi';
-import {
-  PLAN_QUOTA_TYPES,
-  PLAN_TIME_USAGE_MODES,
-  UNIT_TIME_VALUES,
-} from './constants';
+import { PLAN_TIME_USAGE_MODES, UNIT_TIME_VALUES } from './constants';
+import { assertPlanLimitFields } from './plan-limits';
 
 const codePattern = /^[A-Z][A-Z0-9_-]{0,47}$/;
 
@@ -15,48 +12,43 @@ const planFields = {
     .message('Code must start with a letter and use A-Z, 0-9, underscore, or hyphen'),
   name: Joi.string().trim().min(2).max(128),
   description: Joi.string().trim().max(500).allow('', null),
-  quotaType: Joi.string().valid(...PLAN_QUOTA_TYPES),
-  timeAmount: Joi.number().integer().min(1).max(999_999).allow(null),
+  /** Client may omit; server derives from timeAmount/dataMb. */
+  quotaType: Joi.any().strip(),
+  timeAmount: Joi.number().integer().min(0).max(999_999),
   timeUnit: Joi.string()
     .valid(...UNIT_TIME_VALUES)
     .allow(null),
-  dataMb: Joi.number().integer().min(1).max(9_999_999).allow(null),
+  dataMb: Joi.number().integer().min(0).max(9_999_999),
   validityDays: Joi.number().integer().min(1).max(3650).allow(null),
   maxDevices: Joi.number().integer().min(1).max(99).allow(null),
   timeUsageMode: Joi.string().valid(...PLAN_TIME_USAGE_MODES),
   isActive: Joi.boolean(),
 };
 
-function assertQuotaFields(
+function assertLimitFields(
   value: Record<string, unknown>,
   helpers: Joi.CustomHelpers
 ): Record<string, unknown> | Joi.ErrorReport {
-  const quotaType = value.quotaType as string | undefined;
-  if (!quotaType) return value;
-
-  const needsTime = quotaType === 'TIME_ONLY' || quotaType === 'TIME_AND_DATA';
-  const needsData = quotaType === 'DATA_ONLY' || quotaType === 'TIME_AND_DATA';
-
-  if (needsTime) {
-    if (value.timeAmount == null || value.timeUnit == null) {
-      return helpers.error('any.custom', {
-        message: 'Time amount and unit are required for time-based plans.',
-      });
-    }
+  if (value.timeAmount === undefined && value.dataMb === undefined) {
+    return value;
   }
 
-  if (needsData) {
-    if (value.dataMb == null) {
-      return helpers.error('any.custom', {
-        message: 'Data quota (MB) is required for data-based plans.',
-      });
-    }
+  const timeAmount = value.timeAmount as number | undefined;
+  const dataMb = value.dataMb as number | undefined;
+
+  // Create always sends both; update may send one — skip full assert until controller merge.
+  if (timeAmount === undefined || dataMb === undefined) {
+    return value;
   }
 
-  if (quotaType === 'DATA_ONLY' && value.timeUsageMode != null) {
-    // ignored server-side; allow but strip on write
+  const err = assertPlanLimitFields({
+    timeAmount,
+    timeUnit: value.timeUnit as string | null | undefined,
+    dataMb,
+  });
+  if (err) {
+    return helpers.error('any.custom', { message: err });
   }
-
   return value;
 }
 
@@ -65,16 +57,15 @@ export const CatalogServicePlansCreateSchema = Joi.object({
   code: planFields.code.required(),
   name: planFields.name.required(),
   description: planFields.description.optional(),
-  quotaType: planFields.quotaType.required(),
-  timeAmount: planFields.timeAmount.optional(),
+  timeAmount: planFields.timeAmount.required(),
   timeUnit: planFields.timeUnit.optional(),
-  dataMb: planFields.dataMb.optional(),
+  dataMb: planFields.dataMb.required(),
   validityDays: planFields.validityDays.default(1),
   maxDevices: planFields.maxDevices.default(1),
   timeUsageMode: planFields.timeUsageMode.default('CUMULATIVE_SESSIONS'),
   isActive: planFields.isActive.default(true),
 })
-  .custom(assertQuotaFields)
+  .custom(assertLimitFields)
   .unknown(false);
 
 export const CatalogServicePlansUpdateSchema = Joi.object({
@@ -82,7 +73,6 @@ export const CatalogServicePlansUpdateSchema = Joi.object({
   code: planFields.code.optional(),
   name: planFields.name.optional(),
   description: planFields.description.optional(),
-  quotaType: planFields.quotaType.optional(),
   timeAmount: planFields.timeAmount.optional(),
   timeUnit: planFields.timeUnit.optional(),
   dataMb: planFields.dataMb.optional(),

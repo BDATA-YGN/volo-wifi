@@ -19,6 +19,7 @@ import {
 import type { Dayjs } from "dayjs";
 import type { PayoutFormValues, PayoutPreview, PayoutsFormOptions } from "../types";
 import { formatMoney } from "../utils";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { RangePicker } = DatePicker;
 const { Paragraph } = Typography;
@@ -48,6 +49,13 @@ const PayoutFormDrawer: React.FC<Props> = ({
 
   const [preview, setPreview] = useState<PayoutPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  useDrawerFormSync(
+    form,
+    open,
+    { generate: true, amount: 0, note: "" } as PayoutFormValues & { periodDays: [Dayjs, Dayjs] },
+    "create-payout"
+  );
 
   useEffect(() => {
     if (!open) {
@@ -94,7 +102,7 @@ const PayoutFormDrawer: React.FC<Props> = ({
       size={520}
       open={open}
       onClose={onClose}
-      destroyOnClose
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -117,11 +125,6 @@ const PayoutFormDrawer: React.FC<Props> = ({
       <Form
         form={form}
         layout="vertical"
-        initialValues={{
-          generate: true,
-          amount: 0,
-          note: "",
-        }}
         onFinish={handleFinish}
       >
         <Form.Item

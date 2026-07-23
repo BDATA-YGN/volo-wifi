@@ -6,6 +6,8 @@ import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import {
   canAccessOrg,
+  canSwitchOrgContext,
+  hasGlobalOrgAccess,
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
@@ -25,6 +27,7 @@ export class WifiOverviewController {
     asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const adminId = req.userId!;
       const isDeveloper = isDeveloperAdmin(req.user!);
+      const globalAccess = hasGlobalOrgAccess(req.user!);
       const consoleRole = req.user?.role?.roleName ?? 'USER';
 
       const { error } = WifiOverviewQuerySchema.validate(req.query, { abortEarly: false });
@@ -36,8 +39,7 @@ export class WifiOverviewController {
       }
 
       if (req.query.formOptions === 'true') {
-        const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
-        const memberships = await loadOrgMembershipOptions(this.prisma, adminId, isDeveloper);
+        const memberships = await loadOrgMembershipOptions(this.prisma, adminId, globalAccess);
 
         return responseSuccess(res, {
           message: 'Success',
@@ -45,29 +47,58 @@ export class WifiOverviewController {
         });
       }
 
-      const memberships = await loadOrgMembershipOptions(this.prisma, adminId, isDeveloper);
+      const memberships = await loadOrgMembershipOptions(this.prisma, adminId, globalAccess);
+      const canSwitchOrg = canSwitchOrgContext(req.user!);
+
       if (memberships.length === 0) {
         return responseSuccess(res, {
           message: 'No tenant access',
           data: null,
-          meta: { memberships: [], requiresOrgSelection: true },
+          meta: { memberships: [], requiresOrgSelection: canSwitchOrg, canSwitchOrg },
         });
       }
 
       const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
       if (!orgIdParam) {
+        // Developers always pick; tenant users with one membership auto-scope.
+        if (canSwitchOrg || memberships.length > 1) {
+          return responseSuccess(res, {
+            message: 'Organization required',
+            data: null,
+            meta: {
+              memberships,
+              requiresOrgSelection: true,
+              canSwitchOrg,
+            },
+          });
+        }
+
+        const onlyOrgId = memberships[0].id;
+        const dashboard = await buildOverviewDashboard(
+          this.prisma,
+          onlyOrgId,
+          adminId,
+          isDeveloper,
+          consoleRole
+        );
+        const org = await this.prisma.org.findUnique({
+          where: { id: onlyOrgId },
+          select: { id: true, name: true, code: true, currency: true },
+        });
+
         return responseSuccess(res, {
-          message: 'Organization required',
-          data: null,
+          message: 'Success',
+          data: { ...dashboard, org: org! },
           meta: {
             memberships,
-            requiresOrgSelection: memberships.length > 1,
-            orgId: memberships.length === 1 ? memberships[0].id : undefined,
+            orgId: onlyOrgId,
+            requiresOrgSelection: false,
+            canSwitchOrg: false,
           },
         });
       }
 
-      const allowed = await canAccessOrg(this.prisma, adminId, orgIdParam, isDeveloper);
+      const allowed = await canAccessOrg(this.prisma, adminId, orgIdParam, globalAccess);
       if (!allowed) {
         return responseError(res, 403, {
           code: 'FORBIDDEN_ORG',
@@ -102,6 +133,7 @@ export class WifiOverviewController {
           memberships,
           orgId: orgIdParam,
           requiresOrgSelection: false,
+          canSwitchOrg,
         },
       });
     }),

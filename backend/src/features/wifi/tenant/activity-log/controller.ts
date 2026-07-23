@@ -7,9 +7,9 @@ import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import { isUndefinedOrUndefinedString } from '@/utils/string-utils';
 import {
+  canAccessOrg,
   isDeveloperAdmin,
   loadOrgMembershipOptions,
-  resolveOrgIdForAdmin,
 } from '@/features/wifi/shared/resolve-org';
 
 const logSelect = {
@@ -31,9 +31,22 @@ const logSelect = {
       email: true,
     },
   },
+  org: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+    },
+  },
 } satisfies Prisma.WifiAuditLogSelect;
 
 type LogRow = Prisma.WifiAuditLogGetPayload<{ select: typeof logSelect }>;
+
+type ActivityLogScope = {
+  /** When set, results are limited to this org. Undefined = all orgs (developer only). */
+  orgId: string | undefined;
+  isDeveloper: boolean;
+};
 
 function parsePagination(query: AuthenticatedRequest['query']) {
   const page = Math.max(1, Number(query.page) || 1);
@@ -54,32 +67,69 @@ function parseDate(value: unknown): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-async function resolveOrgFromRequest(
+/**
+ * Tenant users: always scoped to their own membership org(s) — never cross-tenant.
+ * Developers: all orgs by default; optional orgId query filters to one tenant.
+ */
+async function resolveActivityLogScope(
   prisma: PrismaClient,
   req: AuthenticatedRequest
-): Promise<string> {
+): Promise<ActivityLogScope> {
   const adminId = req.userId!;
-  const requestedOrgId = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
-  const resolved = await resolveOrgIdForAdmin(
-    prisma,
-    adminId,
-    req.user!,
-    requestedOrgId || undefined
-  );
-  if ('requiresSelection' in resolved) {
-    throw Object.assign(new Error('Select an organization to view activity.'), {
-      status: 400,
-      code: 'ORG_REQUIRED',
+  const isDeveloper = isDeveloperAdmin(req.user!);
+  const requestedOrgId =
+    typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+
+  if (isDeveloper) {
+    if (requestedOrgId) {
+      const allowed = await canAccessOrg(prisma, adminId, requestedOrgId, true);
+      if (!allowed) {
+        throw Object.assign(new Error('You do not have access to this organization.'), {
+          status: 403,
+          code: 'FORBIDDEN_ORG',
+        });
+      }
+      return { orgId: requestedOrgId, isDeveloper: true };
+    }
+    return { orgId: undefined, isDeveloper: true };
+  }
+
+  // Non-developers: membership-only (no platform-wide peek via orgId).
+  const memberships = await loadOrgMembershipOptions(prisma, adminId, false);
+
+  if (requestedOrgId) {
+    const allowed = await canAccessOrg(prisma, adminId, requestedOrgId, false);
+    if (!allowed) {
+      throw Object.assign(new Error('You do not have access to this organization.'), {
+        status: 403,
+        code: 'FORBIDDEN_ORG',
+      });
+    }
+    return { orgId: requestedOrgId, isDeveloper: false };
+  }
+
+  if (memberships.length === 0) {
+    throw Object.assign(new Error('No organization is linked to your account.'), {
+      status: 404,
+      code: 'NO_ORG',
     });
   }
-  return resolved.orgId;
+
+  if (memberships.length === 1) {
+    return { orgId: memberships[0].id, isDeveloper: false };
+  }
+
+  const primary = memberships.find((m) => m.isPrimary);
+  return { orgId: (primary ?? memberships[0]).id, isDeveloper: false };
 }
 
 function buildListWhere(
-  orgId: string,
+  orgId: string | undefined,
   query: AuthenticatedRequest['query']
 ): Prisma.WifiAuditLogWhereInput {
-  const where: Prisma.WifiAuditLogWhereInput = { orgId };
+  const where: Prisma.WifiAuditLogWhereInput = {};
+  if (orgId) where.orgId = orgId;
+
   const view = typeof query.view === 'string' ? query.view.trim().toLowerCase() : 'recent';
   const search = typeof query.search === 'string' ? query.search.trim() : '';
   const action = typeof query.action === 'string' ? query.action.trim() : '';
@@ -118,6 +168,8 @@ function buildListWhere(
       { admin: { fullName: { contains: search, mode: 'insensitive' } } },
       { admin: { username: { contains: search, mode: 'insensitive' } } },
       { admin: { email: { contains: search, mode: 'insensitive' } } },
+      { org: { code: { contains: search, mode: 'insensitive' } } },
+      { org: { name: { contains: search, mode: 'insensitive' } } },
     ];
   }
 
@@ -132,6 +184,20 @@ function serializeLog(row: LogRow) {
   };
 }
 
+function scopeErrorResponse(res: Response, err: unknown): void {
+  const status =
+    err && typeof err === 'object' && 'status' in err
+      ? Number((err as { status: number }).status)
+      : 400;
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? String((err as { code: string }).code)
+      : 'ORG_REQUIRED';
+  const message =
+    err instanceof Error ? err.message : 'Organization context is required.';
+  responseError(res, status, { code, message });
+}
+
 /** menus.wifi.tenant.activity-log @route /wifi/tenant/activity-log */
 export class TenantActivityLogController {
   private get prisma(): PrismaClient {
@@ -144,36 +210,46 @@ export class TenantActivityLogController {
       const isDeveloper = isDeveloperAdmin(req.user!);
 
       if (req.query.formOptions === 'true') {
-        let orgId: string | undefined;
-        const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
-        if (orgIdParam) {
-          orgId = orgIdParam;
-        } else {
-          try {
-            orgId = await resolveOrgFromRequest(this.prisma, req);
-          } catch {
-            orgId = undefined;
-          }
+        let scope: ActivityLogScope;
+        try {
+          scope = await resolveActivityLogScope(this.prisma, req);
+        } catch (err: unknown) {
+          // Still return memberships so the UI can show an empty/no-access state.
+          const memberships = await loadOrgMembershipOptions(
+            this.prisma,
+            adminId,
+            isDeveloper
+          );
+          return responseSuccess(res, {
+            message: 'Success',
+            data: {
+              memberships,
+              actions: [],
+              entities: [],
+              canViewAllOrgs: isDeveloper,
+              scopedOrgId: null,
+            },
+          });
         }
+
+        const filterWhere: Prisma.WifiAuditLogWhereInput = scope.orgId
+          ? { orgId: scope.orgId }
+          : {};
 
         const [memberships, actionRows, entityRows] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
-          orgId
-            ? this.prisma.wifiAuditLog.findMany({
-                where: { orgId },
-                distinct: ['action'],
-                select: { action: true },
-                orderBy: { action: 'asc' },
-              })
-            : Promise.resolve([]),
-          orgId
-            ? this.prisma.wifiAuditLog.findMany({
-                where: { orgId, entity: { not: null } },
-                distinct: ['entity'],
-                select: { entity: true },
-                orderBy: { entity: 'asc' },
-              })
-            : Promise.resolve([]),
+          this.prisma.wifiAuditLog.findMany({
+            where: filterWhere,
+            distinct: ['action'],
+            select: { action: true },
+            orderBy: { action: 'asc' },
+          }),
+          this.prisma.wifiAuditLog.findMany({
+            where: { ...filterWhere, entity: { not: null } },
+            distinct: ['entity'],
+            select: { entity: true },
+            orderBy: { entity: 'asc' },
+          }),
         ]);
 
         return responseSuccess(res, {
@@ -184,25 +260,17 @@ export class TenantActivityLogController {
             entities: entityRows
               .map((r) => r.entity)
               .filter((e): e is string => Boolean(e)),
+            canViewAllOrgs: isDeveloper,
+            scopedOrgId: scope.orgId ?? null,
           },
         });
       }
 
-      let orgId: string;
+      let scope: ActivityLogScope;
       try {
-        orgId = await resolveOrgFromRequest(this.prisma, req);
+        scope = await resolveActivityLogScope(this.prisma, req);
       } catch (err: unknown) {
-        const status =
-          err && typeof err === 'object' && 'status' in err
-            ? Number((err as { status: number }).status)
-            : 400;
-        const code =
-          err && typeof err === 'object' && 'code' in err
-            ? String((err as { code: string }).code)
-            : 'ORG_REQUIRED';
-        const message =
-          err instanceof Error ? err.message : 'Organization context is required.';
-        return responseError(res, status, { code, message });
+        return scopeErrorResponse(res, err);
       }
 
       if (!isUndefinedOrUndefinedString(req.params?.id)) {
@@ -210,7 +278,10 @@ export class TenantActivityLogController {
         const id = Array.isArray(idParam) ? idParam[0] : idParam;
 
         const row = await this.prisma.wifiAuditLog.findFirst({
-          where: { id, orgId },
+          where: {
+            id,
+            ...(scope.orgId ? { orgId: scope.orgId } : {}),
+          },
           select: logSelect,
         });
 
@@ -224,37 +295,42 @@ export class TenantActivityLogController {
         return responseSuccess(res, { message: 'Success', data: serializeLog(row) });
       }
 
-      const view = typeof req.query.view === 'string' ? req.query.view.trim().toLowerCase() : 'recent';
-      const where = buildListWhere(orgId, req.query);
+      const view =
+        typeof req.query.view === 'string' ? req.query.view.trim().toLowerCase() : 'recent';
+      const where = buildListWhere(scope.orgId, req.query);
       const { page, limit, skip, take } = parsePagination(req.query);
       const todayStart = startOfToday();
       const recentSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      const orgWhere: Prisma.WifiAuditLogWhereInput = { orgId };
+      const scopeWhere: Prisma.WifiAuditLogWhereInput = scope.orgId
+        ? { orgId: scope.orgId }
+        : {};
       const todayWhere: Prisma.WifiAuditLogWhereInput = {
-        orgId,
+        ...scopeWhere,
         createdAt: { gte: todayStart },
       };
 
-      const [rows, total, todayCount, recentCount, actorsToday] = await Promise.all([
-        this.prisma.wifiAuditLog.findMany({
-          where,
-          select: logSelect,
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take,
-        }),
-        this.prisma.wifiAuditLog.count({ where }),
-        this.prisma.wifiAuditLog.count({ where: todayWhere }),
-        this.prisma.wifiAuditLog.count({
-          where: { ...orgWhere, createdAt: { gte: recentSince } },
-        }),
-        this.prisma.wifiAuditLog.findMany({
-          where: todayWhere,
-          distinct: ['adminId'],
-          select: { adminId: true },
-        }),
-      ]);
+      const [rows, total, todayCount, recentCount, actorsToday, memberships] =
+        await Promise.all([
+          this.prisma.wifiAuditLog.findMany({
+            where,
+            select: logSelect,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take,
+          }),
+          this.prisma.wifiAuditLog.count({ where }),
+          this.prisma.wifiAuditLog.count({ where: todayWhere }),
+          this.prisma.wifiAuditLog.count({
+            where: { ...scopeWhere, createdAt: { gte: recentSince } },
+          }),
+          this.prisma.wifiAuditLog.findMany({
+            where: todayWhere,
+            distinct: ['adminId'],
+            select: { adminId: true },
+          }),
+          loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
+        ]);
 
       responseSuccess(res, {
         message: 'Success',
@@ -268,7 +344,9 @@ export class TenantActivityLogController {
           todayCount,
           recentCount,
           actorsToday: actorsToday.filter((r) => r.adminId).length,
-          memberships: await loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
+          memberships,
+          canViewAllOrgs: isDeveloper,
+          scopedOrgId: scope.orgId ?? null,
         },
       });
     }),

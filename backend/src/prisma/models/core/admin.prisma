@@ -41,6 +41,7 @@ model Admin {
   wifiOrgMembersCreated          OrgMember[]         @relation("WifiOrgMemberCreatedBy")
   wifiOrgMemberRolesAssigned     OrgMemberRole[]     @relation("WifiOrgMemberRoleAssignedBy")
   wifiResellerStationsAssigned   ResellerStation[]   @relation("WifiResellerStationAssignedBy")
+  wifiVoucherBatchesCreated      VoucherBatch[]      @relation("WifiVoucherBatchCreatedBy")
   // -- end WiFi module back-relations --
 
   @@index([emailAccountId])

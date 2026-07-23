@@ -1,0 +1,35 @@
+$(if logged-in == 'yes')
+$(if http-status == 302)Hotspot redirect$(endif)
+$(if http-header == "Location")$(link-redirect)$(endif)
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Volo WiFi</title>
+    <meta http-equiv="refresh" content="0; url=$(link-redirect)">
+    <script>location.replace('$(link-redirect)');</script>
+</head>
+<body>
+    <p><a href="$(link-redirect)">Continue</a></p>
+</body>
+</html>
+$(else)
+$(if http-status == 302)Hotspot login required$(endif)
+$(if http-header == "Location")https://portal.volowifi.com/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(hostname)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)$(endif)
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Volo WiFi</title>
+    <meta http-equiv="refresh" content="0; url=https://portal.volowifi.com/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(hostname)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)">
+    <script>
+        location.replace('https://portal.volowifi.com/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(hostname)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)');
+    </script>
+</head>
+<body>
+    <p><a href="https://portal.volowifi.com/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(hostname)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)">Continue to Volo WiFi</a></p>
+</body>
+</html>
+$(endif)

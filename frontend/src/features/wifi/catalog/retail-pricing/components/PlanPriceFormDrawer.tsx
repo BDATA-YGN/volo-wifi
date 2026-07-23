@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Button, Drawer, Form, InputNumber, Select, Space, Switch, Typography } from "antd";
 import type {
   PlanBrief,
@@ -8,8 +8,9 @@ import type {
   PlanPriceRecord,
   PlanPriceUpdateValues,
 } from "../types";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
-const { Paragraph } = Typography;
+const { Paragraph, Text } = Typography;
 
 type Props = {
   open: boolean;
@@ -36,11 +37,16 @@ const PlanPriceFormDrawer: React.FC<Props> = ({
 }) => {
   const [form] = Form.useForm<PlanPriceFormValues>();
 
-  const availablePlans = editing
-    ? plans
-    : plans.filter((p) => !pricedPlanIds.includes(p.id));
+  const planOptions = useMemo(() => {
+    const byId = new Map<string, PlanBrief>();
+    for (const plan of plans) byId.set(plan.id, plan);
+    if (editing?.plan) byId.set(editing.plan.id, editing.plan);
+    const list = [...byId.values()];
+    if (!editing) return list.filter((p) => !pricedPlanIds.includes(p.id));
+    return list;
+  }, [plans, pricedPlanIds, editing]);
 
-  const initialValues: PlanPriceFormValues = editing
+  const formValues: PlanPriceFormValues = editing
     ? {
         priceBookId,
         planId: editing.planId,
@@ -55,6 +61,7 @@ const PlanPriceFormDrawer: React.FC<Props> = ({
         costPrice: undefined,
         isActive: true,
       };
+  useDrawerFormSync(form, open, formValues, editing?.id ?? `create-${priceBookId}`);
 
   const handleFinish = async (values: PlanPriceFormValues) => {
     if (editing) {
@@ -68,13 +75,17 @@ const PlanPriceFormDrawer: React.FC<Props> = ({
     }
   };
 
+  const editingLabel = editing?.plan
+    ? `${editing.plan.name} (${editing.plan.code})`
+    : null;
+
   return (
     <Drawer
       title={editing ? `Edit price — ${editing.plan.code}` : "Add plan price"}
       size={420}
       open={open}
       onClose={onClose}
-      destroyOnClose={false}
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -91,7 +102,6 @@ const PlanPriceFormDrawer: React.FC<Props> = ({
           form={form}
           layout="vertical"
           requiredMark="optional"
-          initialValues={initialValues}
           key={editing?.id ?? "create-price"}
           onFinish={(v) => void handleFinish(v)}
         >
@@ -99,22 +109,30 @@ const PlanPriceFormDrawer: React.FC<Props> = ({
             Set customer retail price and optional internal cost for a service plan in this book.
           </Paragraph>
 
-          <Form.Item
-            name="planId"
-            label="Service plan"
-            rules={[{ required: true, message: "Select a plan" }]}
-          >
-            <Select
-              showSearch
-              disabled={Boolean(editing)}
-              optionFilterProp="label"
-              placeholder="Choose plan"
-              options={availablePlans.map((p) => ({
-                value: p.id,
-                label: `${p.name} (${p.code})`,
-              }))}
-            />
-          </Form.Item>
+          {editing && editingLabel ? (
+            <Form.Item label="Service plan">
+              <Text>{editingLabel}</Text>
+              <Form.Item name="planId" hidden>
+                <input type="hidden" />
+              </Form.Item>
+            </Form.Item>
+          ) : (
+            <Form.Item
+              name="planId"
+              label="Service plan"
+              rules={[{ required: true, message: "Select a plan" }]}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="Choose plan"
+                options={planOptions.map((p) => ({
+                  value: p.id,
+                  label: `${p.name} (${p.code})`,
+                }))}
+              />
+            </Form.Item>
+          )}
 
           <Form.Item name="priceBookId" hidden>
             <input type="hidden" />

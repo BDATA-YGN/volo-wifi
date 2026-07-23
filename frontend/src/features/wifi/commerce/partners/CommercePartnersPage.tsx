@@ -15,6 +15,7 @@ import PartnersToolbar from "./components/PartnersToolbar";
 import PartnersTable from "./components/PartnersTable";
 import PartnerFormDrawer from "./components/PartnerFormDrawer";
 import PartnerDetailDrawer from "./components/PartnerDetailDrawer";
+import PartnerResetPasswordModal from "./components/PartnerResetPasswordModal";
 
 const { Paragraph } = Typography;
 
@@ -27,7 +28,9 @@ const CommercePartnersPage: React.FC = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [editing, setEditing] = useState<PartnerDetail | null>(null);
   const [selected, setSelected] = useState<PartnerRecord | null>(null);
+  const [resetTarget, setResetTarget] = useState<PartnerRecord | null>(null);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [initDone, setInitDone] = useState(false);
 
   const {
@@ -48,6 +51,7 @@ const CommercePartnersPage: React.FC = () => {
     createPartner,
     updatePartner,
     removePartner,
+    resetPartnerPassword,
   } = useCommercePartners();
 
   useEffect(() => {
@@ -145,6 +149,21 @@ const CommercePartnersPage: React.FC = () => {
         }
       },
     });
+  };
+
+  const handleResetPassword = async (password: string) => {
+    if (!resetTarget) return;
+    setResetting(true);
+    try {
+      await resetPartnerPassword(resetTarget.id, password);
+      message.success("Password updated");
+      setResetTarget(null);
+    } catch (err: unknown) {
+      message.error(getApiErrorMessage(err, "Failed to reset password"));
+      throw err;
+    } finally {
+      setResetting(false);
+    }
   };
 
   return (
@@ -265,6 +284,7 @@ const CommercePartnersPage: React.FC = () => {
                   onPaginationChange={setPagination}
                   onView={openDetail}
                   onEdit={(record) => void openEdit(record)}
+                  onResetPassword={setResetTarget}
                   onDelete={handleDelete}
                 />
               </Card>
@@ -300,6 +320,17 @@ const CommercePartnersPage: React.FC = () => {
         }}
         onEdit={(record) => void openEdit(record)}
         loadPartner={loadPartner}
+      />
+
+      <PartnerResetPasswordModal
+        open={Boolean(resetTarget)}
+        saving={resetting}
+        partner={resetTarget}
+        onClose={() => {
+          if (resetting) return;
+          setResetTarget(null);
+        }}
+        onSubmit={handleResetPassword}
       />
     </div>
   );

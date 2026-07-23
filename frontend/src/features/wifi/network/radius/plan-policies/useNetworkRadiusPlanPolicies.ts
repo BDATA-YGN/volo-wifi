@@ -9,7 +9,7 @@ import type {
   PlanPoliciesListParams,
   PlanPoliciesMeta,
   PlanPolicyFormValues,
-  PlanPolicyRecord,
+  PlanPolicyGroupRecord,
 } from "./types";
 
 export function useNetworkRadiusPlanPolicies(initialParams: Partial<PlanPoliciesListParams> = {}) {
@@ -22,7 +22,7 @@ export function useNetworkRadiusPlanPolicies(initialParams: Partial<PlanPolicies
 
   const listState = useNetworkOrgListState<
     PlanPoliciesListParams,
-    PlanPolicyRecord,
+    PlanPolicyGroupRecord,
     PlanPoliciesMeta
   >(
     extended,
@@ -41,31 +41,34 @@ export function useNetworkRadiusPlanPolicies(initialParams: Partial<PlanPolicies
 
   const { orgId, refresh } = listState;
 
-  const loadFormOptions = useCallback(async (targetOrgId?: string) => {
-    const res = await Query.loadFormOptions(targetOrgId ?? orgId);
-    return res.data as PlanPoliciesFormOptions;
-  }, [orgId]);
+  const loadFormOptions = useCallback(
+    async (targetOrgId?: string) => {
+      const res = await Query.loadFormOptions(targetOrgId ?? orgId);
+      return res.data as PlanPoliciesFormOptions;
+    },
+    [orgId]
+  );
 
-  const createPolicy = useCallback(
+  const savePolicyGroup = useCallback(
     async (payload: PlanPolicyFormValues) => {
-      await Query.create({ ...payload, orgId: payload.orgId || orgId! }, orgId);
-      refresh();
+      await Query.saveGroup({ ...payload, orgId: payload.orgId || orgId! }, orgId);
+      try {
+        await refresh();
+      } catch {
+        // Mutation succeeded; refresh is best-effort.
+      }
     },
     [orgId, refresh]
   );
 
-  const updatePolicy = useCallback(
-    async (id: string, payload: Partial<PlanPolicyFormValues>) => {
-      await Query.update(id, payload, orgId);
-      refresh();
-    },
-    [orgId, refresh]
-  );
-
-  const deletePolicy = useCallback(
-    async (id: string) => {
-      await Query.remove(id, orgId);
-      refresh();
+  const deletePolicyGroup = useCallback(
+    async (group: PlanPolicyGroupRecord) => {
+      await Query.removeGroup({ policyBundleId: group.policyBundleId || group.groupKey }, orgId);
+      try {
+        await refresh();
+      } catch {
+        // Mutation succeeded; refresh is best-effort.
+      }
     },
     [orgId, refresh]
   );
@@ -77,8 +80,7 @@ export function useNetworkRadiusPlanPolicies(initialParams: Partial<PlanPolicies
     setSearch,
     patchParams,
     loadFormOptions,
-    createPolicy,
-    updatePolicy,
-    deletePolicy,
+    savePolicyGroup,
+    deletePolicyGroup,
   };
 }

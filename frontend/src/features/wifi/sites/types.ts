@@ -45,6 +45,7 @@ export type SiteRecord = {
   code: string;
   name: string;
   location: string | null;
+  township: string | null;
   address: string | null;
   status: StationStatus;
   stationSizeId: string;
@@ -66,6 +67,7 @@ export type SiteFormValues = {
   code: string;
   name: string;
   location?: string;
+  township?: string | null;
   address?: string;
   stationSizeId: string;
   status: StationStatus;
@@ -115,4 +117,5 @@ export type SitesListParams = {
   orgId?: string;
   status?: StationStatus;
   stationSizeId?: string;
+  township?: string;
 };

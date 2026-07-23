@@ -38,6 +38,7 @@ export function useSites() {
       extended.orgId,
       extended.status,
       extended.stationSizeId,
+      extended.township,
     ],
     ready: Boolean(orgId),
   });

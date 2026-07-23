@@ -1,7 +1,7 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
 
 export type PlanQuotaType = "TIME_ONLY" | "DATA_ONLY" | "TIME_AND_DATA";
-export type UnitTime = "MINUTE" | "HOUR" | "DAY";
+export type UnitTime = "MINUTE" | "HOUR" | "DAY" | "MONTH";
 export type PlanTimeUsageMode = "CUMULATIVE_SESSIONS" | "SINGLE_SESSION";
 
 export type PlanCounts = {
@@ -18,6 +18,7 @@ export type ServicePlanRecord = {
   code: string;
   name: string;
   description: string | null;
+  /** Derived server-side from time/data limits (kept for filters & analytics). */
   quotaType: PlanQuotaType;
   timeAmount: number | null;
   timeUnit: UnitTime | null;
@@ -35,10 +36,11 @@ export type ServicePlanFormValues = {
   code: string;
   name: string;
   description?: string;
-  quotaType: PlanQuotaType;
-  timeAmount?: number | null;
+  /** Allow-time amount; 0 = unlimited. */
+  timeAmount: number;
   timeUnit?: UnitTime | null;
-  dataMb?: number | null;
+  /** Data limit in MB; 0 = unlimited. */
+  dataMb: number;
   validityDays: number;
   maxDevices: number;
   timeUsageMode: PlanTimeUsageMode;

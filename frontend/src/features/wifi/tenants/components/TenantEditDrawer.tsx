@@ -3,6 +3,7 @@
 import React from "react";
 import { Button, Drawer, Form, Input, Switch } from "antd";
 import type { TenantDetailRecord, TenantEditFormValues } from "../types";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 type Props = {
   open: boolean;
@@ -12,6 +13,18 @@ type Props = {
   onSubmit: (values: TenantEditFormValues) => Promise<void>;
 };
 
+function buildTenantFormValues(tenant: TenantDetailRecord): TenantEditFormValues {
+  return {
+    name: tenant.name,
+    description: tenant.description ?? undefined,
+    isActive: tenant.isActive,
+    timezone: tenant.timezone,
+    currency: tenant.currency,
+    enableAnnouncement: tenant.enableAnnouncement ?? false,
+    announcement: tenant.announcement ?? undefined,
+  };
+}
+
 const TenantEditDrawer: React.FC<Props> = ({
   open,
   saving,
@@ -20,6 +33,8 @@ const TenantEditDrawer: React.FC<Props> = ({
   onSubmit,
 }) => {
   const [form] = Form.useForm<TenantEditFormValues>();
+  const formValues = tenant ? buildTenantFormValues(tenant) : ({} as TenantEditFormValues);
+  useDrawerFormSync(form, open && Boolean(tenant), formValues, tenant?.id);
 
   return (
     <Drawer
@@ -27,7 +42,7 @@ const TenantEditDrawer: React.FC<Props> = ({
       size={480}
       open={open}
       onClose={onClose}
-      destroyOnClose={false}
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -51,15 +66,6 @@ const TenantEditDrawer: React.FC<Props> = ({
           layout="vertical"
           onFinish={onSubmit}
           disabled={saving}
-          initialValues={{
-            name: tenant.name,
-            description: tenant.description ?? undefined,
-            isActive: tenant.isActive,
-            timezone: tenant.timezone,
-            currency: tenant.currency,
-            enableAnnouncement: tenant.enableAnnouncement ?? false,
-            announcement: tenant.announcement ?? undefined,
-          }}
         >
           <Form.Item
             name="name"

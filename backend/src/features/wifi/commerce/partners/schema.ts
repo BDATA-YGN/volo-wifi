@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { passwordMeetsStrengthRules, passwordStrengthErrorMessage } from '@/utils/passwordStrength';
 import { USER_STATUSES } from './constants';
 
 const codePattern = /^[A-Z0-9][A-Z0-9_-]{0,47}$/;
@@ -8,6 +9,15 @@ const planEntitlementItem = Joi.object({
   planId: Joi.string().uuid().required(),
   isEnabled: Joi.boolean().default(true),
 });
+
+const passwordField = Joi.string()
+  .required()
+  .custom((value, helpers) => {
+    if (!passwordMeetsStrengthRules(value)) {
+      return helpers.error('any.custom', { message: passwordStrengthErrorMessage() });
+    }
+    return value;
+  }, 'password strength');
 
 const partnerFields = {
   code: Joi.string()
@@ -54,3 +64,7 @@ export const CommercePartnersUpdateSchema = Joi.object({
 })
   .min(1)
   .unknown(false);
+
+export const CommercePartnersResetPasswordSchema = Joi.object({
+  password: passwordField,
+}).unknown(false);

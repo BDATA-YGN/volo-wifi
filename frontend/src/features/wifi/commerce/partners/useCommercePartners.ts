@@ -101,6 +101,13 @@ export function useCommercePartners() {
     [orgId, refresh]
   );
 
+  const resetPartnerPassword = useCallback(
+    async (id: string, password: string) => {
+      await Query.resetPassword(id, password, orgId);
+    },
+    [orgId]
+  );
+
   return {
     list,
     meta,
@@ -119,5 +126,6 @@ export function useCommercePartners() {
     createPartner,
     updatePartner,
     removePartner,
+    resetPartnerPassword,
   };
 }

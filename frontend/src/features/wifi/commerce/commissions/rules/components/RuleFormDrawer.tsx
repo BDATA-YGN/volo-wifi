@@ -16,6 +16,7 @@ import {
 import type { CommissionRuleFormValues, CommissionRuleRecord, RulesFormOptions } from "../types";
 import { TYPE_OPTIONS } from "../constant";
 import { formValuesFromRecord } from "../utils";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { Paragraph, Text } = Typography;
 
@@ -42,7 +43,7 @@ const RuleFormDrawer: React.FC<Props> = ({
   const type = Form.useWatch("type", form);
   const currency = formOptions.currency;
 
-  const initialValues: CommissionRuleFormValues = editing
+  const formValues: CommissionRuleFormValues = editing
     ? formValuesFromRecord(editing)
     : {
         resellerId: null,
@@ -52,6 +53,7 @@ const RuleFormDrawer: React.FC<Props> = ({
         fixedValue: 0,
         isActive: true,
       };
+  useDrawerFormSync(form, open, formValues, editing?.id ?? "create");
 
   const handleFinish = async (values: CommissionRuleFormValues) => {
     if (editing) {
@@ -67,7 +69,7 @@ const RuleFormDrawer: React.FC<Props> = ({
       size={480}
       open={open}
       onClose={onClose}
-      destroyOnClose
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -90,7 +92,6 @@ const RuleFormDrawer: React.FC<Props> = ({
       <Form
         form={form}
         layout="vertical"
-        initialValues={initialValues}
         onFinish={handleFinish}
         key={editing?.id ?? "create"}
       >

@@ -2,6 +2,7 @@ import { COOKIES_CONSTANTS, HTTP_ONLY_COOKIE_NAMES } from "@/utils/constants";
 import { MOBILE_ROUTES } from "@/features/mobile/shared/constants";
 import { PARTNER_ROUTES } from "@/features/mobile/partner/constants";
 import { isCaptivePortalPath } from "@/features/captive-portal/subdomain";
+import { CONSOLE_LOGIN_PATH } from "@/lib/auth/console-paths";
 
 export type AuthApp = "admin" | "collector" | "customer";
 
@@ -42,7 +43,7 @@ export function loginPathForAuthApp(pathname: string): string {
   if (pathname.startsWith("/collector")) return MOBILE_ROUTES.collector.login;
   if (pathname.startsWith("/customer")) return MOBILE_ROUTES.customer.login;
   if (pathname.startsWith("/partner")) return PARTNER_ROUTES.login;
-  return "/signin";
+  return CONSOLE_LOGIN_PATH;
 }
 
 export function isMobileWebPath(pathname: string): boolean {
@@ -60,6 +61,9 @@ export function isMobileWebPath(pathname: string): boolean {
 export function shouldRunAdminConsoleClient(pathname: string): boolean {
   if (!pathname || isMobileWebPath(pathname) || isCaptivePortalPath(pathname)) return false;
   if (
+    pathname === "/" ||
+    pathname === CONSOLE_LOGIN_PATH ||
+    pathname.startsWith(`${CONSOLE_LOGIN_PATH}/`) ||
     pathname === "/signin" ||
     pathname.startsWith("/signin/") ||
     pathname === "/unauthorized" ||

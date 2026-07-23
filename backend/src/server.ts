@@ -91,9 +91,18 @@ const cleanup = async (exitCode: number): Promise<void> => {
 
 const logFatal = (label: string, error: unknown) => {
   if (error instanceof Error) {
-    logger.error({ msg: label, message: error.message, stack: error.stack });
+    logger.error(`${label}: ${error.message}`, { stack: error.stack });
+    // Ensure Dokploy always sees fatal lines even if winston transport misbehaves.
+    // eslint-disable-next-line no-console
+    console.error(`[fatal] ${label}: ${error.message}`);
+    if (error.stack) {
+      // eslint-disable-next-line no-console
+      console.error(error.stack);
+    }
   } else {
-    logger.error({ msg: label, reason: error });
+    logger.error(label, { reason: error });
+    // eslint-disable-next-line no-console
+    console.error(`[fatal] ${label}:`, error);
   }
 };
 
@@ -178,21 +187,39 @@ const startSocketApp = async (): Promise<void> => {
 };
 
 const bootstrap = async (): Promise<void> => {
-  logger.info(`Starting app with PORT=${PORT}, API_PORT=${API_PORT}, SOCKET_PORT=${SOCKET_PORT}`);
+  const startedAt = Date.now();
+  logger.info('========== Bootstrap starting ==========');
+  logger.info(
+    `Starting app with NODE_ENV=${process.env.NODE_ENV}, PORT=${PORT}, API_PORT=${API_PORT}, SOCKET_PORT=${SOCKET_PORT}`,
+  );
 
+  logger.info('[1/5] Initializing database and services…');
   await initializeDatabaseAndServices();
-  logger.info('Database and services initialized');
+  logger.info('[1/5] Database and services initialized');
 
+  logger.info('[2/5] Starting Socket.IO…');
   await startSocketApp();
-  if (enableSocket) logger.info('Socket app started');
+  if (enableSocket) logger.info('[2/5] Socket app started');
+  else logger.info('[2/5] Socket app skipped (SOCKET_PORT unset)');
 
+  logger.info('[3/5] Starting Console API…');
   await startConsoleApp();
-  if (enableConsole) logger.info('Console app started');
+  if (enableConsole) logger.info('[3/5] Console app started');
+  else logger.info('[3/5] Console app skipped (PORT unset)');
 
+  logger.info('[4/5] Starting Captive API…');
   await startApiApp();
-  if (enableApi) logger.info('API app started');
+  if (enableApi) logger.info('[4/5] API app started');
+  else logger.info('[4/5] API app skipped (API_PORT unset)');
 
+  logger.info('[5/5] Starting cron jobs…');
   await initializeCronJobs();
+
+  const ms = Date.now() - startedAt;
+  logger.info('========== System Ready ==========');
+  logger.info(
+    `Listeners ready in ${ms}ms — console=${enableConsole ? PORT : 'off'}, api=${enableApi ? API_PORT : 'off'}, socket=${enableSocket ? SOCKET_PORT : 'off'}`,
+  );
 };
 
 void bootstrap().catch(async (error) => {

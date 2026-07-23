@@ -14,6 +14,15 @@ export type NasDeviceStation = {
   status: string;
 };
 
+export type NasDeviceRadiusProfileOption = {
+  id: string;
+  name: string;
+  serverHost: string | null;
+  nasType: string;
+  isActive: boolean;
+  hasSharedSecret?: boolean;
+};
+
 export type NasDeviceRecord = {
   id: string;
   orgId: string;
@@ -26,7 +35,8 @@ export type NasDeviceRecord = {
   ipAddr: string | null;
   note: string | null;
   isRadiusClient: boolean;
-  radiusSecret?: string | null;
+  radiusProfileId: string | null;
+  radiusProfile: NasDeviceRadiusProfileOption | null;
   hasRadiusSecret: boolean;
   nasShortname: string | null;
   nasType: string | null;
@@ -51,7 +61,7 @@ export type NasDevicesMeta = {
 
 export type NasDeviceFormValues = {
   orgId: string;
-  stationId?: string | null;
+  stationId: string;
   type: DeviceType;
   vendor?: string;
   model?: string;
@@ -60,17 +70,16 @@ export type NasDeviceFormValues = {
   ipAddr?: string;
   note?: string;
   isRadiusClient: boolean;
+  radiusProfileId?: string | null;
   radiusSecret?: string;
   nasShortname?: string;
-  nasType?: string;
-  nasPorts?: number | null;
-  nasServer?: string;
-  nasCommunity?: string;
 };
 
 export type NasDevicesFormOptions = {
   orgs: NasDeviceOrg[];
   stations: NasDeviceStation[];
+  vendors: string[];
+  radiusProfiles: NasDeviceRadiusProfileOption[];
 };
 
 export type NasDevicesListParams = {
@@ -78,6 +87,8 @@ export type NasDevicesListParams = {
   limit?: number;
   search?: string;
   orgId?: string;
+  stationId?: string;
+  vendor?: string;
   type?: DeviceType;
   isRadiusClient?: boolean;
   unassigned?: boolean;

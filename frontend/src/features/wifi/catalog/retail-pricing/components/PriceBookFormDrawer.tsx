@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
-import { Button, Drawer, Form, Input, Radio, Select, Typography } from "antd";
+import React, { useMemo } from "react";
+import { Button, Drawer, Form, Input, Radio, Transfer, Typography } from "antd";
+import type { TransferProps } from "antd";
 import type {
   PriceBookFormValues,
   PriceBookRecord,
@@ -9,8 +10,53 @@ import type {
   RetailPricingFormOptions,
 } from "../types";
 import { SCOPE_OPTIONS } from "../constant";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { Text, Paragraph } = Typography;
+
+type TransferItem = {
+  key: string;
+  title: string;
+  description?: string;
+};
+
+type IdsTransferProps = {
+  value?: string[];
+  onChange?: (next: string[]) => void;
+  dataSource: TransferItem[];
+  titles: [string, string];
+  disabled?: boolean;
+};
+
+const IdsTransfer: React.FC<IdsTransferProps> = ({
+  value,
+  onChange,
+  dataSource,
+  titles,
+  disabled,
+}) => {
+  const handleChange: TransferProps["onChange"] = (nextTargetKeys) => {
+    onChange?.(nextTargetKeys.map(String));
+  };
+
+  return (
+    <Transfer
+      dataSource={dataSource}
+      titles={titles}
+      targetKeys={value ?? []}
+      onChange={handleChange}
+      render={(item) => item.title}
+      showSearch
+      disabled={disabled}
+      filterOption={(input, item) =>
+        (item.title ?? "").toLowerCase().includes(input.toLowerCase()) ||
+        (item.description ?? "").toLowerCase().includes(input.toLowerCase())
+      }
+      listStyle={{ width: 280, height: 320 }}
+      oneWay={false}
+    />
+  );
+};
 
 type Props = {
   open: boolean;
@@ -34,26 +80,47 @@ const PriceBookFormDrawer: React.FC<Props> = ({
   const [form] = Form.useForm<PriceBookFormValues>();
   const scope = Form.useWatch("scope", form) as PriceBookScope | undefined;
 
-  const initialValues: PriceBookFormValues = editing
+  const resellerTransferData: TransferItem[] = useMemo(() => {
+    const byId = new Map(formOptions.resellers.map((r) => [r.id, r]));
+    for (const r of editing?.resellers ?? []) byId.set(r.id, r);
+    return [...byId.values()].map((r) => ({
+      key: r.id,
+      title: `${r.name} (${r.code})`,
+      description: r.code,
+    }));
+  }, [formOptions.resellers, editing]);
+
+  const stationTransferData: TransferItem[] = useMemo(() => {
+    const byId = new Map(formOptions.stations.map((s) => [s.id, s]));
+    for (const s of editing?.stations ?? []) byId.set(s.id, s);
+    return [...byId.values()].map((s) => ({
+      key: s.id,
+      title: `${s.name} (${s.code})`,
+      description: s.code,
+    }));
+  }, [formOptions.stations, editing]);
+
+  const formValues: PriceBookFormValues = editing
     ? {
         name: editing.name,
         scope: editing.scope,
-        resellerId: editing.resellerId,
-        stationId: editing.stationId,
+        resellerIds: editing.resellerIds ?? editing.resellers?.map((r) => r.id) ?? [],
+        stationIds: editing.stationIds ?? editing.stations?.map((s) => s.id) ?? [],
       }
     : {
         name: "",
         scope: "DEFAULT",
-        resellerId: null,
-        stationId: null,
+        resellerIds: [],
+        stationIds: [],
       };
+  useDrawerFormSync(form, open, formValues, editing?.id ?? "create");
 
   const handleFinish = async (values: PriceBookFormValues) => {
     const payload: PriceBookFormValues = {
       name: values.name.trim(),
       scope: values.scope,
-      resellerId: values.scope === "RESELLER" ? values.resellerId : null,
-      stationId: values.scope === "STATION" ? values.stationId : null,
+      resellerIds: values.scope === "RESELLER" ? values.resellerIds ?? [] : [],
+      stationIds: values.scope === "STATION" ? values.stationIds ?? [] : [],
     };
     if (editing) {
       await onUpdate(editing.id, payload);
@@ -65,10 +132,10 @@ const PriceBookFormDrawer: React.FC<Props> = ({
   return (
     <Drawer
       title={editing ? `Edit ${editing.name}` : "New price book"}
-      size={480}
+      size={720}
       open={open}
       onClose={onClose}
-      destroyOnClose={false}
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -85,13 +152,12 @@ const PriceBookFormDrawer: React.FC<Props> = ({
           form={form}
           layout="vertical"
           requiredMark="optional"
-          initialValues={initialValues}
           key={editing?.id ?? "create"}
           onFinish={(v) => void handleFinish(v)}
         >
           <Paragraph type="secondary" style={{ marginBottom: 16, fontSize: 13 }}>
             Group retail and cost prices for service plans. Use a default book for the tenant, or
-            override prices per reseller or site.
+            override prices for one or more resellers or sites.
           </Paragraph>
 
           <Form.Item
@@ -119,36 +185,40 @@ const PriceBookFormDrawer: React.FC<Props> = ({
 
           {scope === "RESELLER" ? (
             <Form.Item
-              name="resellerId"
-              label="Reseller"
-              rules={[{ required: true, message: "Select a reseller" }]}
+              name="resellerIds"
+              label="Resellers"
+              extra="Move partners from Available → Selected."
+              rules={[
+                {
+                  validator: async (_, value: string[] | undefined) => {
+                    if (!value?.length) throw new Error("Select one or more resellers");
+                  },
+                },
+              ]}
             >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Choose partner"
-                options={formOptions.resellers.map((r) => ({
-                  value: r.id,
-                  label: `${r.name} (${r.code})`,
-                }))}
+              <IdsTransfer
+                dataSource={resellerTransferData}
+                titles={["Available partners", "Selected partners"]}
               />
             </Form.Item>
           ) : null}
 
           {scope === "STATION" ? (
             <Form.Item
-              name="stationId"
-              label="Site"
-              rules={[{ required: true, message: "Select a site" }]}
+              name="stationIds"
+              label="Sites"
+              extra="Move sites from Available → Selected."
+              rules={[
+                {
+                  validator: async (_, value: string[] | undefined) => {
+                    if (!value?.length) throw new Error("Select one or more sites");
+                  },
+                },
+              ]}
             >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                placeholder="Choose site"
-                options={formOptions.stations.map((s) => ({
-                  value: s.id,
-                  label: `${s.name} (${s.code})`,
-                }))}
+              <IdsTransfer
+                dataSource={stationTransferData}
+                titles={["Available sites", "Selected sites"]}
               />
             </Form.Item>
           ) : null}

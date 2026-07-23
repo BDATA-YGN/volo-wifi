@@ -43,8 +43,8 @@
             "network": {
               "title": "Network",
               "summary": "NAS inventory and RADIUS policy configuration.",
-              "f1": "NAS Devices — routers, APs, and NAS inventory",
-              "f2": "Vendor Profiles & Attribute Catalog — RADIUS dictionary",
+              "f1": "NAS Devices — routers/APs per site, linked to a FreeRADIUS server",
+              "f2": "FreeRADIUS Servers, Vendor Profiles & Attribute Catalog",
               "f3": "Plan RADIUS Policies — per-plan reply attributes",
               "f4": "Live Sessions & Auth Events — operational visibility"
             },
@@ -185,7 +185,8 @@
                   "attribute-catalog": "Attribute Catalog",
                   "plan-policies": "Plan RADIUS Policies",
                   "live-sessions": "Live Sessions",
-                  "auth-events": "Auth Events"
+                  "auth-events": "Auth Events",
+                  "servers": "FreeRADIUS Servers"
                 }
               },
               "commerce": {
@@ -587,7 +588,8 @@
                   "attribute-catalog": "Attribute Catalog",
                   "plan-policies": "Plan RADIUS Policies",
                   "live-sessions": "Live Sessions",
-                  "auth-events": "Auth Events"
+                  "auth-events": "Auth Events",
+                  "servers": "FreeRADIUS Server များ"
                 }
               },
               "commerce": {

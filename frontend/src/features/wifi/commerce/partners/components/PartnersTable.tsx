@@ -3,6 +3,7 @@
 import React from "react";
 import { Button, Empty, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import dayjs from "dayjs";
 import type { PartnerRecord } from "../types";
 import { STATUS_COLOR } from "../constant";
 import { formatStatusLabel } from "../utils";
@@ -19,6 +20,7 @@ type Props = {
   onPaginationChange: (page: number, pageSize: number) => void;
   onView: (record: PartnerRecord) => void;
   onEdit: (record: PartnerRecord) => void;
+  onResetPassword: (record: PartnerRecord) => void;
   onDelete: (record: PartnerRecord) => void;
 };
 
@@ -67,6 +69,7 @@ const PartnersTable: React.FC<Props> = ({
   onPaginationChange,
   onView,
   onEdit,
+  onResetPassword,
   onDelete,
 }) => {
   const columns: ColumnsType<PartnerRecord> = [
@@ -91,7 +94,7 @@ const PartnersTable: React.FC<Props> = ({
     {
       title: "Login account",
       key: "login",
-      width: 160,
+      width: 140,
       render: (_, row) =>
         row.portalAccount ? (
           <Text code style={{ fontSize: 12 }}>
@@ -104,6 +107,26 @@ const PartnersTable: React.FC<Props> = ({
         ),
     },
     {
+      title: "Last login",
+      key: "lastLogin",
+      width: 130,
+      render: (_, row) => {
+        const lastLogin = row.portalAccount?.lastLogin;
+        if (!lastLogin) {
+          return (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Never
+            </Text>
+          );
+        }
+        return (
+          <Tooltip title={dayjs(lastLogin).format("YYYY-MM-DD HH:mm:ss")}>
+            <Text style={{ fontSize: 12 }}>{dayjs(lastLogin).format("MMM D, HH:mm")}</Text>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: "Sites",
       key: "sites",
       width: 180,
@@ -114,7 +137,7 @@ const PartnersTable: React.FC<Props> = ({
     {
       title: "Sellable plans",
       key: "plans",
-      width: 200,
+      width: 180,
       render: (_, row) => (
         <TagList items={row.sellablePlans ?? []} emptyLabel="No plans" max={2} />
       ),
@@ -138,7 +161,7 @@ const PartnersTable: React.FC<Props> = ({
     {
       title: "",
       key: "actions",
-      width: 180,
+      width: 260,
       fixed: "right",
       render: (_, row) => (
         <Space size="small" onClick={(e) => e.stopPropagation()}>
@@ -148,6 +171,11 @@ const PartnersTable: React.FC<Props> = ({
           <Button type="link" size="small" onClick={() => onEdit(row)}>
             Edit
           </Button>
+          {row.hasPortalAccount ? (
+            <Button type="link" size="small" onClick={() => onResetPassword(row)}>
+              Reset password
+            </Button>
+          ) : null}
           <Button type="link" size="small" danger onClick={() => onDelete(row)}>
             Delete
           </Button>
@@ -163,14 +191,14 @@ const PartnersTable: React.FC<Props> = ({
       loading={loading}
       columns={columns}
       dataSource={data}
-      scroll={{ x: 1100 }}
+      scroll={{ x: 1280 }}
       locale={{ emptyText: <Empty description="No partners yet" /> }}
       pagination={buildWifiTablePagination({
         page,
         pageSize,
         total,
         onChange: onPaginationChange,
-        itemLabel: "partner"
+        itemLabel: "partner",
       })}
       onRow={(record) => ({
         onClick: () => onView(record),

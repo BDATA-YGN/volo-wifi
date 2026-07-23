@@ -21,6 +21,7 @@ export const list = async (params?: AccessControlListParams): Promise<CommonList
         search: params?.search || undefined,
         orgId: params?.orgId || undefined,
         status: params?.status || undefined,
+        roleCode: params?.roleCode || undefined,
       },
     });
     return res.data;
@@ -77,6 +78,23 @@ export const update = async (
     const res = await apiClient.post(TENANT_ACCESS_CONTROL_API.createOrUpdate(id), payload, {
       params: { orgId: orgId || undefined },
     });
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const resetPassword = async (
+  id: string,
+  password: string,
+  orgId?: string
+): Promise<CommonResponse> => {
+  try {
+    const res = await apiClient.post(
+      TENANT_ACCESS_CONTROL_API.resetPassword(id),
+      { password },
+      { params: { orgId: orgId || undefined } }
+    );
     return res.data;
   } catch (error) {
     throw handleApiError(error);

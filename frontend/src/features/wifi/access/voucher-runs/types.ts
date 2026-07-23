@@ -8,11 +8,28 @@ export type PlanBrief = {
   isActive?: boolean;
 };
 
+export type StationSizeBrief = {
+  id: string;
+  code: string;
+  name: string;
+  sortOrder?: number;
+};
+
 export type StationBrief = {
   id: string;
   code: string;
   name: string;
   status?: string;
+  township?: string | null;
+  stationSizeId?: string | null;
+  stationSize?: StationSizeBrief | null;
+};
+
+export type AdminBrief = {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string | null;
 };
 
 export type VoucherBatchRecord = {
@@ -30,11 +47,13 @@ export type VoucherBatchRecord = {
   note: string | null;
   stationId: string | null;
   resellerId: string | null;
+  createdByAdminId: string | null;
   tokenKey: string;
   createdAt: string;
   updatedAt: string;
   plan: PlanBrief;
   station: StationBrief | null;
+  createdByAdmin: AdminBrief | null;
 };
 
 export type VoucherCredentialPreview = {
@@ -58,7 +77,6 @@ export type VoucherRunFormValues = {
   planId: string;
   quantity: number;
   batchNo?: string;
-  prefix?: string;
   note?: string;
   stationId?: string | null;
 };
@@ -67,6 +85,7 @@ export type VoucherRunsFormOptions = {
   memberships: OrgMembershipOption[];
   plans: PlanBrief[];
   stations: StationBrief[];
+  stationSizes: StationSizeBrief[];
 };
 
 export type VoucherRunsMeta = {
@@ -87,4 +106,9 @@ export type VoucherRunsListParams = {
   orgId?: string;
   planId?: string;
   stationId?: string;
+  township?: string;
+  stationSizeId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  hasBalance?: boolean;
 };

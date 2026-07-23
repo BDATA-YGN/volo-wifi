@@ -18,6 +18,8 @@ export const list = async (params?: NasDevicesListParams): Promise<CommonListRes
         limit: params?.limit,
         search: params?.search || undefined,
         orgId: params?.orgId || undefined,
+        stationId: params?.stationId || undefined,
+        vendor: params?.vendor || undefined,
         type: params?.type || undefined,
         isRadiusClient:
           params?.isRadiusClient === true
@@ -63,18 +65,16 @@ export const create = async (
   try {
     const res = await apiClient.post(NETWORK_NAS_DEVICES_API.createOrUpdate(), {
       ...payload,
-      stationId: payload.stationId || null,
+      stationId: payload.stationId,
       vendor: payload.vendor?.trim() || null,
       model: payload.model?.trim() || null,
       serialNo: payload.serialNo?.trim() || null,
       macAddr: payload.macAddr?.trim() || null,
       ipAddr: payload.ipAddr?.trim() || null,
       note: payload.note?.trim() || null,
+      radiusProfileId: payload.isRadiusClient ? payload.radiusProfileId || null : null,
       radiusSecret: payload.radiusSecret?.trim() || null,
       nasShortname: payload.nasShortname?.trim() || null,
-      nasType: payload.nasType?.trim() || null,
-      nasServer: payload.nasServer?.trim() || null,
-      nasCommunity: payload.nasCommunity?.trim() || null,
     }, {
       params: { orgId: orgId || payload.orgId || undefined },
     });
@@ -90,8 +90,20 @@ export const update = async (
   orgId?: string
 ): Promise<CommonResponse> => {
   try {
-    const body = { ...payload };
+    const body: Record<string, unknown> = { ...payload };
     if (body.stationId === "") body.stationId = null;
+
+    // Never send empty RADIUS clears on edit — omit so the API keeps existing values.
+    if (body.radiusSecret === "" || body.radiusSecret == null) {
+      delete body.radiusSecret;
+    }
+    if (body.nasShortname === "") {
+      delete body.nasShortname;
+    }
+    if (body.radiusProfileId === "" || body.radiusProfileId == null) {
+      delete body.radiusProfileId;
+    }
+
     const res = await apiClient.post(NETWORK_NAS_DEVICES_API.createOrUpdate(id), body, {
       params: { orgId: orgId || undefined },
     });

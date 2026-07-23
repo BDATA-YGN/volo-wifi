@@ -15,6 +15,7 @@ export function useTenantProfile() {
   const profile = (data?.data ?? null) as TenantProfile | null;
   const meta = data?.meta as TenantProfileMeta | undefined;
   const requiresSelection = Boolean(meta?.requiresOrgSelection);
+  const memberships = (meta?.memberships ?? []) as OrgMembershipOption[];
 
   const selectOrg = useCallback((id: string) => {
     setOrgId(id);
@@ -37,10 +38,13 @@ export function useTenantProfile() {
   return {
     profile,
     meta,
+    memberships,
     loading,
     error,
     requiresSelection,
-    orgId: orgId ?? profile?.id,
+    canSwitchOrg: Boolean(meta?.canSwitchOrg),
+    /** Selected working org — do not fall back to profile.id while selection is still required. */
+    orgId: requiresSelection && !orgId ? undefined : (orgId ?? profile?.id),
     selectOrg,
     refresh,
     updateProfile,

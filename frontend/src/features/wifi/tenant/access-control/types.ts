@@ -7,7 +7,13 @@ export type MemberRoleCode =
   | "ORG_ADMIN"
   | "PARTNER";
 
-export type ProvisionMemberRoleCode = Exclude<MemberRoleCode, "PARTNER">;
+/** Assignable in Access Control — excludes Partner and platform Developer/Admin. */
+export type ProvisionMemberRoleCode =
+  | "ORG_VIEWER"
+  | "ORG_FINANCE"
+  | "STATION_OPS"
+  | "ORG_ADMIN";
+
 
 export type OrgMembershipOption = {
   id: string;
@@ -71,6 +77,8 @@ export type AccessControlFormOptions = {
   stations: StationOption[];
   resellers: { id: string; code: string; name: string; status: string }[];
   roleCodes: ProvisionMemberRoleCode[];
+  canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
 };
 
 export type AccessControlMeta = {
@@ -83,6 +91,7 @@ export type AccessControlMeta = {
   roleAssignments?: number;
   memberships?: OrgMembershipOption[];
   canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
 };
 
 export type AccessControlListParams = {
@@ -91,6 +100,7 @@ export type AccessControlListParams = {
   search?: string;
   orgId?: string;
   status?: MemberStatus;
+  roleCode?: MemberRoleCode;
 };
 
 export type MemberCreateFormValues = {
@@ -113,4 +123,10 @@ export type MemberUpdateFormValues = {
   isPrimary?: boolean;
   roleCodes?: ProvisionMemberRoleCode[];
   stationIds?: string[];
+  password?: string;
+};
+
+export type MemberResetPasswordValues = {
+  password: string;
+  confirmPassword: string;
 };

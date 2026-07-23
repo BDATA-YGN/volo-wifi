@@ -1,8 +1,14 @@
 export { WifiModulePage } from "./WifiModulePage";
 export type { WifiModulePageProps } from "./WifiModulePage";
 export { buildWifiApiRoutes } from "./utils";
+export { TIER_CODE_COLORS, resolveTierColor } from "./tier-colors";
 export type { WifiListParams } from "./types";
-export { useWifiListState, useRoutePermission, usePermittedRelatedLinks } from "./hooks";
+export {
+  useWifiListState,
+  useDrawerFormSync,
+  useRoutePermission,
+  usePermittedRelatedLinks,
+} from "./hooks";
 export {
   WIFI_TABLE_PAGE_SIZE_OPTIONS,
   buildWifiTablePagination,

@@ -83,6 +83,14 @@ const ActivityLogDetailDrawer: React.FC<Props> = ({
               <Descriptions.Item label="Timestamp">
                 {dayjs(row.createdAt).format("YYYY-MM-DD HH:mm:ss")}
               </Descriptions.Item>
+              {row.org ? (
+                <Descriptions.Item label="Organization">
+                  {row.org.name}{" "}
+                  <Text type="secondary" style={{ fontFamily: "monospace" }}>
+                    ({row.org.code})
+                  </Text>
+                </Descriptions.Item>
+              ) : null}
               <Descriptions.Item label="Actor">
                 {row.admin ? (
                   <>

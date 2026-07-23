@@ -111,3 +111,20 @@ export const remove = async (id: string, orgId?: string): Promise<CommonResponse
     throw handleApiError(error);
   }
 };
+
+export const resetPassword = async (
+  id: string,
+  password: string,
+  orgId?: string
+): Promise<CommonResponse> => {
+  try {
+    const res = await apiClient.post(
+      COMMERCE_PARTNERS_API.resetPassword(id),
+      { password },
+      { params: { orgId: orgId || undefined } }
+    );
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};

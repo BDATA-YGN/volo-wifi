@@ -6,6 +6,32 @@ import type { CommonListResponse, CommonResponse, PaginationParams } from "@/com
 import { NETWORK_RADIUS_VENDOR_PROFILES_API } from "./constant";
 import type { CatalogAttribute, VendorProfileFormValues } from "./types";
 
+function normalizeProfilePayload(payload: Partial<VendorProfileFormValues>) {
+  const supportsCoA = payload.supportsCoA;
+  return {
+    ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
+    ...(payload.vendor !== undefined ? { vendor: payload.vendor.trim() } : {}),
+    ...(payload.model !== undefined ? { model: payload.model?.trim() || null } : {}),
+    ...(payload.description !== undefined
+      ? { description: payload.description?.trim() || null }
+      : {}),
+    ...(supportsCoA !== undefined ? { supportsCoA } : {}),
+    ...(payload.coaPort !== undefined || supportsCoA !== undefined
+      ? {
+          coaPort: supportsCoA === false ? null : payload.coaPort ?? 3799,
+        }
+      : {}),
+    ...(payload.supportedAttributes !== undefined
+      ? {
+          supportedAttributes: payload.supportedAttributes.map((row) => ({
+            attributeId: row.attributeId,
+            requirement: row.requirement,
+          })),
+        }
+      : {}),
+  };
+}
+
 export const list = async (
   params?: PaginationParams & { orgId?: string }
 ): Promise<CommonListResponse> => {
@@ -37,9 +63,11 @@ export const loadCatalog = async (
   }
 };
 
-export const getById = async (id: string): Promise<CommonResponse> => {
+export const getById = async (id: string, orgId?: string): Promise<CommonResponse> => {
   try {
-    const res = await apiClient.get(NETWORK_RADIUS_VENDOR_PROFILES_API.listOrDetails(id));
+    const res = await apiClient.get(NETWORK_RADIUS_VENDOR_PROFILES_API.listOrDetails(id), {
+      params: { orgId: orgId || undefined },
+    });
     return res.data;
   } catch (error) {
     throw handleApiError(error);
@@ -53,15 +81,11 @@ export const create = async (
   try {
     const res = await apiClient.post(
       NETWORK_RADIUS_VENDOR_PROFILES_API.createOrUpdate(),
-      {
-        ...payload,
-        model: payload.model?.trim() || null,
-        description: payload.description?.trim() || null,
-        coaPort: payload.supportsCoA ? payload.coaPort ?? 3799 : null,
-      },
+      normalizeProfilePayload(payload),
       { params: { orgId: orgId || undefined } }
     );
-    return res.data;
+    // Slim return — full detail is reloaded via list/getById (avoids Server Action flight issues).
+    return { message: res.data?.message ?? "Vendor profile created", data: null };
   } catch (error) {
     throw handleApiError(error);
   }
@@ -75,10 +99,10 @@ export const update = async (
   try {
     const res = await apiClient.post(
       NETWORK_RADIUS_VENDOR_PROFILES_API.createOrUpdate(id),
-      payload,
+      normalizeProfilePayload(payload),
       { params: { orgId: orgId || undefined } }
     );
-    return res.data;
+    return { message: res.data?.message ?? "Vendor profile updated", data: null };
   } catch (error) {
     throw handleApiError(error);
   }
@@ -89,7 +113,7 @@ export const remove = async (id: string, orgId?: string): Promise<CommonResponse
     const res = await apiClient.delete(NETWORK_RADIUS_VENDOR_PROFILES_API.delete(id), {
       params: { orgId: orgId || undefined },
     });
-    return res.data;
+    return { message: res.data?.message ?? "Vendor profile removed", data: null };
   } catch (error) {
     throw handleApiError(error);
   }

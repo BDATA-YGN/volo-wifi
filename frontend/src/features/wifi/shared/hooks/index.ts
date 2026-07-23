@@ -1,6 +1,9 @@
 export { useWifiListState } from "./useWifiListState";
+export { useDrawerFormSync } from "./useDrawerFormSync";
 export {
   deriveWifiOrgScope,
+  needsOrgSelection,
+  shouldShowOrgSwitcher,
   useOrgIdState,
   useSyncOrgIdFromMeta,
 } from "./useWifiOrgScope";

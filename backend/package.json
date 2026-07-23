@@ -35,8 +35,17 @@
     "data:i18n:backup": "ts-node -r tsconfig-paths/register ./tools/translation-theme-backup-restore.ts backup",
     "data:i18n:restore": "ts-node -r tsconfig-paths/register ./tools/translation-theme-backup-restore.ts restore",
     "data:backfill:role-kind": "ts-node -r tsconfig-paths/register ./tools/backfill-mng-role-setting-kind.ts",
-    "data:sms:migrate": "ts-node -r tsconfig-paths/register ./tools/sms-migrate-from-csv.ts",
-    "data:sms:migrate:apply": "ts-node -r tsconfig-paths/register ./tools/sms-migrate-from-csv.ts --apply"
+    "data:wifi:migrate:dry": "ts-node -r tsconfig-paths/register ./tools/migrate-from-volo-api-console.ts -- --dry-run",
+    "data:wifi:migrate": "ts-node -r tsconfig-paths/register ./tools/migrate-from-volo-api-console.ts",
+    "data:wifi:migrate:phase1": "ts-node -r tsconfig-paths/register ./tools/migrate-from-volo-api-console.ts -- --phase=1",
+    "data:wifi:migrate:phase2": "ts-node -r tsconfig-paths/register ./tools/migrate-from-volo-api-console.ts -- --phase=2",
+    "data:wifi:migrate:phase3": "ts-node -r tsconfig-paths/register ./tools/migrate-from-volo-api-console.ts -- --phase=3",
+    "data:wifi:migrate:reset": "ts-node -r tsconfig-paths/register ./tools/reset-wifi-migration.ts",
+    "data:retail-pricing:backup": "ts-node -r tsconfig-paths/register ./tools/consolidate-retail-pricing.ts -- --mode=backup",
+    "data:retail-pricing:consolidate": "ts-node -r tsconfig-paths/register ./tools/consolidate-retail-pricing.ts -- --mode=consolidate",
+    "data:radius:seed-vendors": "ts-node -r tsconfig-paths/register ./tools/seed-radius-vendor-profiles.ts",
+    "data:radius:seed-plan-policies": "ts-node -r tsconfig-paths/register ./tools/seed-radius-plan-policies.ts",
+    "data:radius:seed-profiles": "ts-node -r tsconfig-paths/register ./tools/seed-org-radius-profiles.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",

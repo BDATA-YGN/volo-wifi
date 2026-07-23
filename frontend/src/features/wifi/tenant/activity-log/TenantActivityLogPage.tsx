@@ -31,10 +31,12 @@ const TenantActivityLogPage: React.FC = () => {
     params,
     orgId,
     formOptions,
+    canViewAllOrgs,
     setPagination,
     setSearch,
     patchParams,
     selectOrg,
+    clearOrg,
     refresh,
     loadFormOptions,
     loadEntry,
@@ -45,19 +47,15 @@ const TenantActivityLogPage: React.FC = () => {
   }, [loadFormOptions]);
 
   useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
-      selectOrg(meta.memberships[0].id);
-    }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
-
-  useEffect(() => {
     const timer = window.setTimeout(() => setSearch(search), 300);
     return () => window.clearTimeout(timer);
   }, [search, setSearch]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
-  const showSwitcher = memberships.length > 1;
-  const needsOrg = initDone && !orgId && memberships.length > 1;
+  // Developers: optional org filter (clear = all tenants). Multi-membership tenants: required pick.
+  const showSwitcher = canViewAllOrgs || memberships.length > 1;
+  const needsOrg = initDone && !canViewAllOrgs && !orgId && memberships.length > 1;
+  const contextReady = canViewAllOrgs || Boolean(orgId);
 
   const openDetail = (record: ActivityLogRecord) => {
     setSelected(record);
@@ -83,8 +81,9 @@ const TenantActivityLogPage: React.FC = () => {
       >
         <div className="mb-5 max-w-3xl">
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Immutable audit trail for your organization — who did what, on which entity, and when.
-            Filter by time window, action type, or search actors and metadata.
+            {canViewAllOrgs
+              ? "Platform audit trail across all tenants. Clear the organization filter to see every org, or pick one tenant to narrow the feed."
+              : "Immutable audit trail for your organization — who did what, on which entity, and when. Filter by time window, action type, or search actors and metadata."}
           </Paragraph>
         </div>
 
@@ -104,8 +103,10 @@ const TenantActivityLogPage: React.FC = () => {
               memberships={memberships}
               value={orgId}
               required={needsOrg}
+              allowClear={canViewAllOrgs}
               loading={loading}
               onChange={selectOrg}
+              onClear={canViewAllOrgs ? clearOrg : undefined}
             />
           ) : null}
 
@@ -118,7 +119,7 @@ const TenantActivityLogPage: React.FC = () => {
             />
           ) : null}
 
-          {orgId ? (
+          {contextReady ? (
             <>
               <ActivityLogStats meta={meta} loading={loading} />
 
@@ -155,6 +156,7 @@ const TenantActivityLogPage: React.FC = () => {
                   page={params.page ?? 1}
                   pageSize={params.limit ?? 20}
                   total={meta?.total ?? 0}
+                  showOrg={canViewAllOrgs && !orgId}
                   onPaginationChange={setPagination}
                   onView={openDetail}
                 />

@@ -16,6 +16,7 @@ export const list = async (params?: SitesListParams): Promise<CommonListResponse
         orgId: params?.orgId || undefined,
         status: params?.status || undefined,
         stationSizeId: params?.stationSizeId || undefined,
+        township: params?.township || undefined,
       },
     });
     return res.data;
@@ -56,6 +57,7 @@ export const create = async (payload: SiteFormValues, orgId?: string): Promise<C
         ...payload,
         code: payload.code.trim().toUpperCase(),
         location: payload.location?.trim() || null,
+        township: payload.township?.trim() || null,
         address: payload.address?.trim() || null,
         portalBaseUrl: payload.portalBaseUrl?.trim() || null,
         nasIdentifier: payload.nasIdentifier?.trim() || null,

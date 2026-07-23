@@ -28,12 +28,20 @@ const OrgSwitcher: React.FC<Props> = ({
   <Card
     size="small"
     styles={{ body: { padding: 16 } }}
-    title={required ? "Select organization" : "Working organization"}
+    title={
+      required
+        ? "Select organization"
+        : allowClear
+          ? "Organization filter"
+          : "Working organization"
+    }
   >
     <Text type="secondary" className="mb-3 block" style={{ fontSize: 13 }}>
       {required
-        ? "Your account is linked to multiple organizations. Choose one to view and edit its profile."
-        : "Switch context when you manage more than one tenant."}
+        ? "Developer mode — choose which tenant organization to work on."
+        : allowClear
+          ? "Optional filter — leave empty to include activity from every tenant."
+          : "Switch the working organization when managing more than one tenant."}
     </Text>
     <Select
       showSearch

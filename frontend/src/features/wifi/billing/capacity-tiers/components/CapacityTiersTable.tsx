@@ -6,7 +6,7 @@ import { Button, Dropdown, Table, Tag, Tooltip, Typography, theme } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DeleteOutlined, EditOutlined, LinkOutlined, MoreOutlined } from "@ant-design/icons";
 import type { CapacityTierRecord } from "../types";
-import { TIER_CODE_COLORS } from "../constant";
+import { resolveTierColor } from "../constant";
 
 const { Text } = Typography;
 
@@ -45,8 +45,11 @@ const CapacityTiersTable: React.FC<Props> = ({
       title: "Code",
       dataIndex: "code",
       width: 120,
-      render: (code: string) => (
-        <Tag color={TIER_CODE_COLORS[code] ?? "default"} style={{ margin: 0, fontFamily: "monospace" }}>
+      render: (code: string, record) => (
+        <Tag
+          color={resolveTierColor(code, record.name)}
+          style={{ margin: 0, fontFamily: "monospace" }}
+        >
           {code}
         </Tag>
       ),

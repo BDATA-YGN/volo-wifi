@@ -3,14 +3,17 @@
 import React from "react";
 import { Button, Input, Select, Space } from "antd";
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
-import type { MemberStatus } from "../types";
+import type { MemberRoleCode, MemberStatus } from "../types";
+import { ROLE_OPTIONS } from "../constant";
 
 type Props = {
   search: string;
   status: MemberStatus | null;
+  roleCode: MemberRoleCode | null;
   loading?: boolean;
   onSearchChange: (value: string) => void;
   onStatusChange: (status: MemberStatus | null) => void;
+  onRoleCodeChange: (roleCode: MemberRoleCode | null) => void;
   onRefresh: () => void;
   onAdd: () => void;
 };
@@ -18,9 +21,11 @@ type Props = {
 const AccessControlToolbar: React.FC<Props> = ({
   search,
   status,
+  roleCode,
   loading,
   onSearchChange,
   onStatusChange,
+  onRoleCodeChange,
   onRefresh,
   onAdd,
 }) => (
@@ -37,6 +42,17 @@ const AccessControlToolbar: React.FC<Props> = ({
           { value: "SUSPENDED", label: "Suspended" },
           { value: "DISABLED", label: "Disabled" },
         ]}
+      />
+      <Select
+        allowClear
+        placeholder="Role"
+        style={{ width: 180 }}
+        value={roleCode ?? undefined}
+        onChange={(v) => onRoleCodeChange((v as MemberRoleCode) ?? null)}
+        options={ROLE_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+        }))}
       />
       <Input
         allowClear

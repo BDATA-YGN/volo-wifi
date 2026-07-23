@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/features/core/auth/store";
 import dayjs from "dayjs";
 import * as AuthHook from "@/features/core/auth/useAuth";
+import { CONSOLE_LOGIN_PATH } from "@/lib/auth/console-paths";
 
 const { Text } = Typography;
 
@@ -52,7 +53,7 @@ export function SessionIndicator() {
     try {
       await signOut();
     } catch {
-      window.location.href = "/signin";
+      window.location.href = CONSOLE_LOGIN_PATH;
     } finally {
       setIsLoggingOut(false);
     }
@@ -123,7 +124,7 @@ export function SessionIndicator() {
       await signOut();
       message.success("Sign out success");
     } catch {
-      window.location.href = "/signin";
+      window.location.href = CONSOLE_LOGIN_PATH;
     } finally {
       setIsLoggingOut(false);
     }
@@ -203,7 +204,7 @@ export function SessionIndicator() {
 
   if (isExpired && !isLoggingOut) {
     return (
-      <Button type="primary" onClick={() => router.push("/signin")}>
+      <Button type="primary" onClick={() => router.push(CONSOLE_LOGIN_PATH)}>
         Login
       </Button>
     );

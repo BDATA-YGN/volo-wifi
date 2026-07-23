@@ -54,11 +54,21 @@ npx prisma migrate deploy
 
 ### Firebase (push)
 
-Mount at runtime (never commit):
+Do **not** rely on `production.json` / `staging.json` in the image (gitignored).
 
-`backend/src/third-party/bdataFirebaseFCM/production.json`
+Set in Dokploy Environment:
 
-Set `MOBILE_ENV=production`.
+```env
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+```
+
+Or mount a file and set `FIREBASE_SERVICE_ACCOUNT_PATH=/run/secrets/firebase.json`.
+
+If unset, the API still starts; push notifications are skipped with a warning.
+
+### Production logs
+
+Startup prints phase lines and a final `========== System Ready ==========` banner at `LOG_LEVEL=info` (default). Keep `LOG_LEVEL=info` (or omit it) in Dokploy so those lines appear in the Logs tab.
 
 ---
 

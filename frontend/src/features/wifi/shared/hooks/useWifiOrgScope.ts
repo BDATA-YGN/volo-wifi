@@ -16,7 +16,9 @@ export function useSyncOrgIdFromMeta(
   }, [meta?.orgId, orgId, setOrgId]);
 
   useEffect(() => {
-    if (!orgId && meta?.memberships?.length === 1 && !meta?.requiresOrgSelection) {
+    // Developers must pick explicitly — never auto-select for requiresOrgSelection.
+    if (meta?.requiresOrgSelection) return;
+    if (!orgId && meta?.memberships?.length === 1) {
       setOrgId(meta.memberships[0].id);
     }
   }, [meta?.memberships, meta?.requiresOrgSelection, orgId, setOrgId]);
@@ -28,11 +30,31 @@ export function useOrgIdState(meta?: WifiOrgScopeMeta | null) {
   return [orgId, setOrgId] as const;
 }
 
+/** Show org picker for developers (canSwitchOrg / requiresOrgSelection) or multi-membership users. */
+export function shouldShowOrgSwitcher(
+  memberships: OrgMembershipOption[],
+  meta?: Pick<WifiOrgScopeMeta, "canSwitchOrg" | "requiresOrgSelection"> | null
+): boolean {
+  if (memberships.length === 0) return false;
+  if (meta?.canSwitchOrg || meta?.requiresOrgSelection) return true;
+  return memberships.length > 1;
+}
+
+export function needsOrgSelection(
+  orgId: string | undefined,
+  meta?: Pick<WifiOrgScopeMeta, "canSwitchOrg" | "requiresOrgSelection"> | null,
+  membershipsLength = 0
+): boolean {
+  if (orgId) return false;
+  if (meta?.requiresOrgSelection || meta?.canSwitchOrg) return membershipsLength > 0;
+  return membershipsLength > 1;
+}
+
 export function deriveWifiOrgScope(meta?: WifiOrgScopeMeta | null, orgId?: string) {
   const memberships = (meta?.memberships ?? []) as OrgMembershipOption[];
   const canSwitchOrg = Boolean(meta?.canSwitchOrg);
-  const showOrgSwitcher = canSwitchOrg && memberships.length > 1;
-  const needsOrg = Boolean(meta?.requiresOrgSelection) && !orgId;
+  const showOrgSwitcher = shouldShowOrgSwitcher(memberships, meta);
+  const needsOrg = needsOrgSelection(orgId, meta, memberships.length);
   const contextReady = Boolean(orgId) && !needsOrg;
 
   return {

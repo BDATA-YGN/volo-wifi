@@ -95,7 +95,16 @@ export function parseApiError(error: unknown, fallback = "Request failed"): APIE
 }
 
 export function createApiRequestError(error: unknown, fallback = "Request failed"): ApiRequestError {
-  return new ApiRequestError(parseApiError(error, fallback));
+  try {
+    return new ApiRequestError(parseApiError(error, fallback));
+  } catch {
+    // Circular axios / Prisma errors can blow the stack while reading nested fields.
+    const message =
+      error instanceof Error && error.message.trim()
+        ? error.message.trim().slice(0, 500)
+        : fallback;
+    return new ApiRequestError({ code: 500, message });
+  }
 }
 
 /**

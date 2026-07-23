@@ -24,6 +24,7 @@ model StationSize {
   orgLicensePrices    OrgLicenseStationSizePrice[]
   licenseHistory      OrgLicenseHistory[]
   invoiceItems        OrgInvoiceItem[]
+  planPriceBooks      PlanPriceBook[]
 
   @@index([isActive, sortOrder], map: "idx_wf_station_size__is_active__sort_order")
   @@map("wf_station_size")

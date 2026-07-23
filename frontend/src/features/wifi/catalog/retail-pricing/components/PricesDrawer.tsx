@@ -202,7 +202,7 @@ const PricesDrawer: React.FC<Props> = ({
                 </Text>
               </div>
 
-              {formOptions.plans.length === 0 ? (
+              {formOptions.plans.length === 0 && prices.length === 0 ? (
                 <Alert
                   type="warning"
                   showIcon

@@ -1,11 +1,13 @@
 import jwt, { JwtPayload, TokenExpiredError } from 'jsonwebtoken';
+import { SECRET_KEY } from '@/config';
 
 interface TokenPayload extends JwtPayload {
   credentialId: string;
 }
 
-const ACCESS_SECRET = process.env.ACCESS_TOKEN_SECRET || 'ACCESS_SECRET';
-const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET || 'REFRESH_SECRET';
+/** Share SECRET_KEY with console auth; refresh uses a derived secret. */
+const ACCESS_SECRET = process.env.ACCESS_TOKEN_SECRET?.trim() || SECRET_KEY;
+const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET?.trim() || `${SECRET_KEY}:captive-refresh`;
 
 export class CaptiveJwtService {
   static createAccessToken(credentialId: string): string {

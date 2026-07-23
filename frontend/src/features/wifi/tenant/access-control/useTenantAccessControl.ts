@@ -39,6 +39,7 @@ export function useTenantAccessControl() {
       extended.search,
       extended.orgId,
       extended.status,
+      extended.roleCode,
     ],
     ready: Boolean(orgId),
   });
@@ -50,9 +51,6 @@ export function useTenantAccessControl() {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as AccessControlFormOptions;
     setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
-    }
     return opts;
   }, []);
 
@@ -94,6 +92,13 @@ export function useTenantAccessControl() {
     [orgId, refresh]
   );
 
+  const resetMemberPassword = useCallback(
+    async (id: string, password: string) => {
+      await Query.resetPassword(id, password, orgId);
+    },
+    [orgId]
+  );
+
   return {
     list,
     meta,
@@ -112,5 +117,6 @@ export function useTenantAccessControl() {
     createMember,
     updateMember,
     removeMember,
+    resetMemberPassword,
   };
 }

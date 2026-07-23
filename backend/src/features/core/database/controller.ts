@@ -9,7 +9,7 @@ import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import util from 'util';
-import { DB_BACKUP } from '@/config';
+import { DB_BACKUP, DB_DATABASE, DB_PASSWORD, DB_USER } from '@/config';
 import { logger } from '@/logging/logger';
 import { FileUpload } from '@/middlewares/file-upload.middleware';
 import { InvalidPayloadException } from '@/utils/exception';
@@ -46,10 +46,10 @@ export class Controller {
         const backupFileName = `${databaseName.trim().toLowerCase()}-${timestamp}.sql`;
         const backupPath = path.join(DB_BACKUP, backupFileName);
         console.log(`Creating backup for database: ${databaseName} at ${backupPath}`);
-        await execPromise(`pg_dump -U postgres -F p ${process.env.DB_DATABASE} > ${backupPath}`, {
+        await execPromise(`pg_dump -U ${DB_USER} -F p ${DB_DATABASE} > ${backupPath}`, {
           env: {
             ...process.env,
-            PGPASSWORD: process.env.DB_PASSWORD,
+            PGPASSWORD: DB_PASSWORD,
           },
         });
 

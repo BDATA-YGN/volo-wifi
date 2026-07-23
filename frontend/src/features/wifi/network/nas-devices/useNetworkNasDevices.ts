@@ -17,6 +17,8 @@ type ExtendedParams = {
   limit?: number;
   search?: string;
   orgId?: string;
+  stationId?: string;
+  vendor?: string;
   type?: DeviceType;
   isRadiusClient?: boolean;
   unassigned?: boolean;
@@ -37,6 +39,8 @@ export function useNetworkNasDevices(initialParams: Partial<ExtendedParams> = {}
       extendedParams.page,
       extendedParams.limit,
       extendedParams.search,
+      extendedParams.stationId,
+      extendedParams.vendor,
       extendedParams.type,
       extendedParams.isRadiusClient,
       extendedParams.unassigned,

@@ -18,9 +18,4 @@ export const STATUS_COLOR: Record<StationStatus, string> = {
   DISABLED: "default",
 };
 
-export const TIER_CODE_COLORS: Record<string, string> = {
-  SMALL: "blue",
-  MEDIUM: "cyan",
-  LARGE: "purple",
-  XL: "magenta",
-};
+export { TIER_CODE_COLORS, resolveTierColor } from "@/features/wifi/shared/tier-colors";

@@ -26,6 +26,7 @@ import { NetworkRadiusLiveSessionsRoute } from './network/radius/live-sessions/r
 import { NetworkRadiusPlanPoliciesRoute } from './network/radius/plan-policies/routes';
 import { NetworkRadiusAttributeCatalogRoute } from './network/radius/attribute-catalog/routes';
 import { NetworkRadiusVendorProfilesRoute } from './network/radius/vendor-profiles/routes';
+import { NetworkRadiusProfilesRoute } from './network/radius/profiles/routes';
 import { NetworkNasDevicesRoute } from './network/nas-devices/routes';
 import { BillingInvoicesRoute } from './billing/invoices/routes';
 import { BillingSubscriptionChangelogRoute } from './billing/subscription/changelog/routes';
@@ -75,6 +76,7 @@ export function createWifiRoutes(): Route[] {
     new NetworkRadiusPlanPoliciesRoute(),
     new NetworkRadiusAttributeCatalogRoute(),
     new NetworkRadiusVendorProfilesRoute(),
+    new NetworkRadiusProfilesRoute(),
     new NetworkNasDevicesRoute(),
     new BillingInvoicesRoute(),
     new BillingSubscriptionChangelogRoute(),

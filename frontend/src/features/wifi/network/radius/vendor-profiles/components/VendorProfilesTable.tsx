@@ -1,10 +1,8 @@
 "use client";
 
 import React from "react";
-import { Button, Dropdown, Empty, Table, Tag, Typography } from "antd";
+import { Button, Empty, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { MenuProps } from "antd";
-import { MoreOutlined } from "@ant-design/icons";
 import type { VendorProfileRecord } from "../types";
 import { buildWifiTablePagination } from "@/features/wifi/shared/pagination";
 
@@ -102,25 +100,29 @@ const VendorProfilesTable: React.FC<Props> = ({
     {
       title: "",
       key: "actions",
-      width: 56,
-      align: "center",
+      width: 180,
+      align: "right",
+      fixed: "right",
       render: (_, row) => {
-        const items: MenuProps["items"] = [
-          { key: "view", label: "View details", onClick: () => onView(row) },
-          { key: "edit", label: "Edit", onClick: () => onEdit(row) },
-          { type: "divider" },
-          {
-            key: "delete",
-            label: "Remove",
-            danger: true,
-            disabled: row._count.wifiStations > 0 || row._count.planAttributes > 0,
-            onClick: () => onDelete(row),
-          },
-        ];
+        const inUse = row._count.wifiStations > 0 || row._count.planAttributes > 0;
         return (
-          <Dropdown menu={{ items }} trigger={["click"]}>
-            <Button type="text" size="small" icon={<MoreOutlined />} />
-          </Dropdown>
+          <Space size={0} onClick={(e) => e.stopPropagation()}>
+            <Button type="link" size="small" onClick={() => onView(row)}>
+              View
+            </Button>
+            <Button type="link" size="small" onClick={() => onEdit(row)}>
+              Edit
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              danger
+              disabled={inUse}
+              onClick={() => onDelete(row)}
+            >
+              Remove
+            </Button>
+          </Space>
         );
       },
     },
@@ -142,6 +144,7 @@ const VendorProfilesTable: React.FC<Props> = ({
       loading={loading}
       columns={columns}
       dataSource={data}
+      scroll={{ x: 900 }}
       pagination={buildWifiTablePagination({
         page,
         pageSize,

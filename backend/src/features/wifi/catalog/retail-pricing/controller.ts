@@ -24,15 +24,21 @@ const bookSelect = {
   orgId: true,
   name: true,
   isDefault: true,
-  resellerId: true,
-  stationId: true,
   createdAt: true,
   updatedAt: true,
-  reseller: {
-    select: { id: true, code: true, name: true, status: true },
+  stations: {
+    select: {
+      station: {
+        select: { id: true, code: true, name: true, status: true },
+      },
+    },
   },
-  station: {
-    select: { id: true, code: true, name: true, status: true },
+  resellers: {
+    select: {
+      reseller: {
+        select: { id: true, code: true, name: true, status: true },
+      },
+    },
   },
   _count: {
     select: {
@@ -100,18 +106,30 @@ async function resolveOrgFromRequest(
 
 function deriveScope(book: {
   isDefault: boolean;
-  resellerId: string | null;
-  stationId: string | null;
+  stations: unknown[];
+  resellers: unknown[];
 }): PriceBookScope {
-  if (book.resellerId) return 'RESELLER';
-  if (book.stationId) return 'STATION';
+  if (book.resellers.length > 0) return 'RESELLER';
+  if (book.stations.length > 0) return 'STATION';
   return 'DEFAULT';
 }
 
 function serializeBook(row: BookRow) {
+  const stations = row.stations.map((link) => link.station);
+  const resellers = row.resellers.map((link) => link.reseller);
   return {
-    ...row,
-    scope: deriveScope(row),
+    id: row.id,
+    orgId: row.orgId,
+    name: row.name,
+    isDefault: row.isDefault,
+    scope: deriveScope({ isDefault: row.isDefault, stations, resellers }),
+    stationIds: stations.map((s) => s.id),
+    resellerIds: resellers.map((r) => r.id),
+    stations,
+    resellers,
+    reseller: resellers[0] ?? null,
+    station: stations[0] ?? null,
+    _count: row._count,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -127,20 +145,6 @@ function serializePrice(row: PriceRow) {
   };
 }
 
-function scopeToWriteData(
-  scope: PriceBookScope,
-  resellerId?: string | null,
-  stationId?: string | null
-): Pick<Prisma.PlanPriceBookUncheckedCreateInput, 'isDefault' | 'resellerId' | 'stationId'> {
-  if (scope === 'DEFAULT') {
-    return { isDefault: true, resellerId: null, stationId: null };
-  }
-  if (scope === 'RESELLER') {
-    return { isDefault: false, resellerId: resellerId ?? null, stationId: null };
-  }
-  return { isDefault: false, resellerId: null, stationId: stationId ?? null };
-}
-
 function buildBookWhere(
   orgId: string,
   query: AuthenticatedRequest['query']
@@ -151,21 +155,21 @@ function buildBookWhere(
 
   if (scope === 'DEFAULT') {
     where.isDefault = true;
-    where.resellerId = null;
-    where.stationId = null;
+    where.stations = { none: {} };
+    where.resellers = { none: {} };
   } else if (scope === 'RESELLER') {
-    where.resellerId = { not: null };
+    where.resellers = { some: {} };
   } else if (scope === 'STATION') {
-    where.stationId = { not: null };
+    where.stations = { some: {} };
   }
 
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
-      { reseller: { name: { contains: search, mode: 'insensitive' } } },
-      { reseller: { code: { contains: search, mode: 'insensitive' } } },
-      { station: { name: { contains: search, mode: 'insensitive' } } },
-      { station: { code: { contains: search, mode: 'insensitive' } } },
+      { resellers: { some: { reseller: { name: { contains: search, mode: 'insensitive' } } } } },
+      { resellers: { some: { reseller: { code: { contains: search, mode: 'insensitive' } } } } },
+      { stations: { some: { station: { name: { contains: search, mode: 'insensitive' } } } } },
+      { stations: { some: { station: { code: { contains: search, mode: 'insensitive' } } } } },
     ];
   }
 
@@ -176,24 +180,50 @@ async function assertScopeRefs(
   prisma: PrismaClient,
   orgId: string,
   scope: PriceBookScope,
-  resellerId?: string | null,
-  stationId?: string | null
+  resellerIds: string[],
+  stationIds: string[]
 ): Promise<string | null> {
-  if (scope === 'RESELLER' && resellerId) {
-    const reseller = await prisma.reseller.findFirst({
-      where: { id: resellerId, orgId, deletedAt: null },
-      select: { id: true },
+  if (scope === 'RESELLER' && resellerIds.length > 0) {
+    const count = await prisma.reseller.count({
+      where: { id: { in: resellerIds }, orgId, deletedAt: null },
     });
-    if (!reseller) return 'Selected reseller is invalid for this organization.';
+    if (count !== resellerIds.length) {
+      return 'One or more selected resellers are invalid for this organization.';
+    }
   }
-  if (scope === 'STATION' && stationId) {
-    const station = await prisma.wifiStation.findFirst({
-      where: { id: stationId, orgId, deletedAt: null },
-      select: { id: true },
+  if (scope === 'STATION' && stationIds.length > 0) {
+    const count = await prisma.wifiStation.count({
+      where: { id: { in: stationIds }, orgId, deletedAt: null },
     });
-    if (!station) return 'Selected site is invalid for this organization.';
+    if (count !== stationIds.length) {
+      return 'One or more selected sites are invalid for this organization.';
+    }
   }
   return null;
+}
+
+async function syncBookLinks(
+  tx: Prisma.TransactionClient,
+  priceBookId: string,
+  scope: PriceBookScope,
+  resellerIds: string[],
+  stationIds: string[]
+): Promise<void> {
+  await tx.planPriceBookStation.deleteMany({ where: { priceBookId } });
+  await tx.planPriceBookReseller.deleteMany({ where: { priceBookId } });
+
+  if (scope === 'STATION' && stationIds.length > 0) {
+    await tx.planPriceBookStation.createMany({
+      data: stationIds.map((stationId) => ({ priceBookId, stationId })),
+      skipDuplicates: true,
+    });
+  }
+  if (scope === 'RESELLER' && resellerIds.length > 0) {
+    await tx.planPriceBookReseller.createMany({
+      data: resellerIds.map((resellerId) => ({ priceBookId, resellerId })),
+      skipDuplicates: true,
+    });
+  }
 }
 
 /** menus.wifi.catalog.retail-pricing @route /wifi/catalog/retail-pricing */
@@ -316,10 +346,10 @@ export class CatalogRetailPricingController {
             where: { orgId, deletedAt: null, isDefault: true },
           }),
           this.prisma.planPriceBook.count({
-            where: { orgId, deletedAt: null, resellerId: { not: null } },
+            where: { orgId, deletedAt: null, resellers: { some: {} } },
           }),
           this.prisma.planPriceBook.count({
-            where: { orgId, deletedAt: null, stationId: { not: null } },
+            where: { orgId, deletedAt: null, stations: { some: {} } },
           }),
           this.prisma.planPrice.count({
             where: { orgId, deletedAt: null, isActive: true },
@@ -373,7 +403,12 @@ export class CatalogRetailPricingController {
       if (isUpdate) {
         const existing = await this.prisma.planPriceBook.findFirst({
           where: { id: recordId!, orgId, deletedAt: null },
-          select: { id: true, isDefault: true, resellerId: true, stationId: true },
+          select: {
+            id: true,
+            isDefault: true,
+            stations: { select: { stationId: true } },
+            resellers: { select: { resellerId: true } },
+          },
         });
         if (!existing) {
           return responseError(res, 404, {
@@ -382,20 +417,20 @@ export class CatalogRetailPricingController {
           });
         }
 
-        const scope = (value.scope ?? deriveScope(existing)) as PriceBookScope;
-        const scopeData = scopeToWriteData(
-          scope,
-          value.resellerId !== undefined ? value.resellerId : existing.resellerId,
-          value.stationId !== undefined ? value.stationId : existing.stationId
-        );
+        const existingStationIds = existing.stations.map((s) => s.stationId);
+        const existingResellerIds = existing.resellers.map((r) => r.resellerId);
+        const scope = (value.scope ??
+          deriveScope({
+            isDefault: existing.isDefault,
+            stations: existing.stations,
+            resellers: existing.resellers,
+          })) as PriceBookScope;
+        const stationIds =
+          value.stationIds !== undefined ? (value.stationIds as string[]) : existingStationIds;
+        const resellerIds =
+          value.resellerIds !== undefined ? (value.resellerIds as string[]) : existingResellerIds;
 
-        const refError = await assertScopeRefs(
-          this.prisma,
-          orgId,
-          scope,
-          scopeData.resellerId,
-          scopeData.stationId
-        );
+        const refError = await assertScopeRefs(this.prisma, orgId, scope, resellerIds, stationIds);
         if (refError) {
           return responseError(res, 400, { code: 'VALIDATION_ERROR', message: refError });
         }
@@ -408,12 +443,18 @@ export class CatalogRetailPricingController {
             });
           }
 
-          return tx.planPriceBook.update({
+          await tx.planPriceBook.update({
             where: { id: recordId! },
             data: {
               ...(value.name !== undefined ? { name: value.name } : {}),
-              ...scopeData,
+              isDefault: scope === 'DEFAULT',
             },
+          });
+
+          await syncBookLinks(tx, recordId!, scope, resellerIds, stationIds);
+
+          return tx.planPriceBook.findFirstOrThrow({
+            where: { id: recordId! },
             select: bookSelect,
           });
         });
@@ -425,14 +466,9 @@ export class CatalogRetailPricingController {
       }
 
       const scope = value.scope as PriceBookScope;
-      const scopeData = scopeToWriteData(scope, value.resellerId, value.stationId);
-      const refError = await assertScopeRefs(
-        this.prisma,
-        orgId,
-        scope,
-        scopeData.resellerId,
-        scopeData.stationId
-      );
+      const stationIds = (value.stationIds ?? []) as string[];
+      const resellerIds = (value.resellerIds ?? []) as string[];
+      const refError = await assertScopeRefs(this.prisma, orgId, scope, resellerIds, stationIds);
       if (refError) {
         return responseError(res, 400, { code: 'VALIDATION_ERROR', message: refError });
       }
@@ -445,12 +481,19 @@ export class CatalogRetailPricingController {
           });
         }
 
-        return tx.planPriceBook.create({
+        const book = await tx.planPriceBook.create({
           data: {
             orgId,
             name: value.name,
-            ...scopeData,
+            isDefault: scope === 'DEFAULT',
           },
+          select: { id: true },
+        });
+
+        await syncBookLinks(tx, book.id, scope, resellerIds, stationIds);
+
+        return tx.planPriceBook.findFirstOrThrow({
+          where: { id: book.id },
           select: bookSelect,
         });
       });

@@ -141,6 +141,11 @@ const PartnerDetailDrawer: React.FC<Props> = ({
               <Descriptions.Item label="Login username">
                 {row.portalAccount?.username ?? "—"}
               </Descriptions.Item>
+              <Descriptions.Item label="Last login">
+                {row.portalAccount?.lastLogin
+                  ? formatWifiDateTime(row.portalAccount.lastLogin)
+                  : "Never"}
+              </Descriptions.Item>
               <Descriptions.Item label="Phone">{row.phone ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Email">{row.email ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Address">{row.address ?? "—"}</Descriptions.Item>

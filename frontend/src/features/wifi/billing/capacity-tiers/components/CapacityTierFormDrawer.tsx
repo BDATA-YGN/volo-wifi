@@ -29,6 +29,7 @@ const CapacityTierFormDrawer: React.FC<Props> = ({
   useEffect(() => {
     if (!open) return;
     if (editing) {
+      form.resetFields();
       form.setFieldsValue({
         code: editing.code,
         name: editing.name,

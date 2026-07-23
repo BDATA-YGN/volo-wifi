@@ -5,8 +5,7 @@ import Link from "next/link";
 import { Button, Empty, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { ServicePlanRecord } from "../types";
-import { QUOTA_TYPE_COLOR } from "../constant";
-import { formatQuotaLabel, formatQuotaTypeLabel, formatValidity } from "../utils";
+import { formatQuotaLabel, formatValidity } from "../utils";
 import { buildWifiTablePagination } from "@/features/wifi/shared/pagination";
 
 const { Text } = Typography;
@@ -55,18 +54,11 @@ const ServicePlansTable: React.FC<Props> = ({
       ),
     },
     {
-      title: "Quota",
+      title: "Allowances",
       key: "quota",
-      width: 180,
+      width: 200,
       render: (_, row) => (
-        <div>
-          <Tag color={QUOTA_TYPE_COLOR[row.quotaType]} style={{ marginBottom: 4 }}>
-            {formatQuotaTypeLabel(row.quotaType)}
-          </Tag>
-          <div>
-            <Text style={{ fontSize: 12 }}>{formatQuotaLabel(row)}</Text>
-          </div>
-        </div>
+        <Text style={{ fontSize: 12 }}>{formatQuotaLabel(row)}</Text>
       ),
     },
     {

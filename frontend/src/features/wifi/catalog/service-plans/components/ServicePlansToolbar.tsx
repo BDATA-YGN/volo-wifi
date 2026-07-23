@@ -33,7 +33,7 @@ const ServicePlansToolbar: React.FC<Props> = ({
     <Space wrap>
       <Select
         allowClear
-        placeholder="Quota type"
+        placeholder="Plan type"
         style={{ width: 150 }}
         value={quotaType ?? undefined}
         onChange={(v) => onQuotaTypeChange(v ?? null)}

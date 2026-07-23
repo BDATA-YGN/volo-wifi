@@ -32,6 +32,15 @@ const stationSelect = {
   status: true,
 } satisfies Prisma.WifiStationSelect;
 
+const radiusProfileSelect = {
+  id: true,
+  name: true,
+  serverHost: true,
+  nasType: true,
+  isActive: true,
+  sharedSecret: true,
+} satisfies Prisma.OrgRadiusProfileSelect;
+
 const deviceListSelect = {
   id: true,
   orgId: true,
@@ -44,6 +53,7 @@ const deviceListSelect = {
   ipAddr: true,
   note: true,
   isRadiusClient: true,
+  radiusProfileId: true,
   radiusSecret: true,
   nasShortname: true,
   nasType: true,
@@ -54,6 +64,7 @@ const deviceListSelect = {
   updatedAt: true,
   org: { select: orgSelect },
   station: { select: stationSelect },
+  radiusProfile: { select: radiusProfileSelect },
 } satisfies Prisma.StationDeviceSelect;
 
 type DeviceRow = Prisma.StationDeviceGetPayload<{ select: typeof deviceListSelect }>;
@@ -65,19 +76,30 @@ function parsePagination(query: AuthenticatedRequest['query']) {
   return { page, limit, skip, take: limit };
 }
 
+function hasResolvedSecret(row: DeviceRow): boolean {
+  return Boolean(row.radiusProfile?.sharedSecret || row.radiusSecret);
+}
+
 function sanitizeListRow(row: DeviceRow) {
-  const { radiusSecret, ...rest } = row;
+  const { radiusSecret, radiusProfile, ...rest } = row;
   return {
     ...rest,
-    hasRadiusSecret: Boolean(radiusSecret),
+    hasRadiusSecret: hasResolvedSecret(row),
+    radiusProfile: radiusProfile
+      ? {
+          id: radiusProfile.id,
+          name: radiusProfile.name,
+          serverHost: radiusProfile.serverHost,
+          nasType: radiusProfile.nasType,
+          isActive: radiusProfile.isActive,
+          hasSharedSecret: Boolean(radiusProfile.sharedSecret),
+        }
+      : null,
   };
 }
 
 function sanitizeDetailRow(row: DeviceRow) {
-  return {
-    ...row,
-    hasRadiusSecret: Boolean(row.radiusSecret),
-  };
+  return sanitizeListRow(row);
 }
 
 function buildWhere(
@@ -86,11 +108,13 @@ function buildWhere(
 ): Prisma.StationDeviceWhereInput {
   const stationId = typeof query.stationId === 'string' ? query.stationId.trim() : '';
   const type = typeof query.type === 'string' ? query.type.trim().toUpperCase() : '';
+  const vendor = typeof query.vendor === 'string' ? query.vendor.trim() : '';
   const search = typeof query.search === 'string' ? query.search.trim() : '';
 
   const where: Prisma.StationDeviceWhereInput = { deletedAt: null, orgId };
   if (stationId) where.stationId = stationId;
   if (type) where.type = type as Prisma.EnumDeviceTypeFilter['equals'];
+  if (vendor) where.vendor = { equals: vendor, mode: 'insensitive' };
   if (query.isRadiusClient === 'true') where.isRadiusClient = true;
   if (query.isRadiusClient === 'false') where.isRadiusClient = false;
   if (query.unassigned === 'true') where.stationId = null;
@@ -103,6 +127,7 @@ function buildWhere(
       { macAddr: { contains: search, mode: 'insensitive' } },
       { ipAddr: { contains: search, mode: 'insensitive' } },
       { nasShortname: { contains: search, mode: 'insensitive' } },
+      { radiusProfile: { name: { contains: search, mode: 'insensitive' } } },
       { org: { name: { contains: search, mode: 'insensitive' } } },
       { org: { code: { contains: search, mode: 'insensitive' } } },
       { station: { name: { contains: search, mode: 'insensitive' } } },
@@ -118,7 +143,7 @@ async function validateStationBelongsToOrg(
   orgId: string,
   stationId: string | null | undefined
 ): Promise<string | null> {
-  if (!stationId) return null;
+  if (!stationId) return 'WiFi site is required.';
 
   const station = await prisma.wifiStation.findFirst({
     where: { id: stationId, orgId, deletedAt: null },
@@ -130,6 +155,75 @@ async function validateStationBelongsToOrg(
   }
 
   return null;
+}
+
+async function resolveRadiusProfileForOrg(
+  prisma: PrismaClient,
+  orgId: string,
+  radiusProfileId: string | null | undefined,
+  isRadiusClient: boolean,
+  options?: {
+    radiusSecretInput?: string | null;
+    existingRadiusSecret?: string | null;
+  }
+): Promise<
+  | { error: string }
+  | {
+      radiusProfileId: string | null;
+      radiusSecret: string | null;
+      nasServer: string | null;
+    }
+> {
+  const profileId = radiusProfileId?.trim() || null;
+
+  if (!isRadiusClient) {
+    return {
+      radiusProfileId: null,
+      radiusSecret: null,
+      nasServer: null,
+    };
+  }
+
+  if (!profileId) {
+    return { error: 'Select a FreeRADIUS server when this device is a RADIUS client.' };
+  }
+
+  const profile = await prisma.orgRadiusProfile.findFirst({
+    where: { id: profileId, orgId, deletedAt: null, isActive: true },
+    select: {
+      id: true,
+      sharedSecret: true,
+      serverHost: true,
+    },
+  });
+
+  if (!profile) {
+    return {
+      error: 'Selected FreeRADIUS server does not belong to this tenant or is inactive.',
+    };
+  }
+
+  const secretFromInput =
+    options?.radiusSecretInput !== undefined
+      ? options.radiusSecretInput?.trim() || null
+      : undefined;
+  const radiusSecret =
+    secretFromInput !== undefined
+      ? secretFromInput || options?.existingRadiusSecret || profile.sharedSecret || null
+      : options?.existingRadiusSecret || profile.sharedSecret || null;
+
+  if (!radiusSecret) {
+    return {
+      error:
+        'Shared secret is required — set it on the NAS device or on the FreeRADIUS server.',
+    };
+  }
+
+  return {
+    radiusProfileId: profile.id,
+    radiusSecret,
+    nasServer: profile.serverHost,
+  };
 }
 
 /** menus.wifi.network.nas-devices @route /wifi/network/nas-devices */
@@ -147,7 +241,7 @@ export class NetworkNasDevicesController {
         if (req.query.formOptions === 'true') {
           return responseSuccess(res, {
             message: 'Success',
-            data: { orgs: scope.memberships, stations: [] },
+            data: { orgs: scope.memberships, stations: [], vendors: [], radiusProfiles: [] },
             meta: toNetworkOrgMeta(scope),
           });
         }
@@ -168,15 +262,38 @@ export class NetworkNasDevicesController {
       const { orgId } = scope;
 
       if (req.query.formOptions === 'true') {
-        const stations = await this.prisma.wifiStation.findMany({
-          where: { orgId, deletedAt: null },
-          select: stationSelect,
-          orderBy: { name: 'asc' },
-        });
+        const [stations, vendorRows, radiusProfiles] = await Promise.all([
+          this.prisma.wifiStation.findMany({
+            where: { orgId, deletedAt: null },
+            select: stationSelect,
+            orderBy: { name: 'asc' },
+          }),
+          this.prisma.stationDevice.findMany({
+            where: { orgId, deletedAt: null, vendor: { not: null } },
+            select: { vendor: true },
+            distinct: ['vendor'],
+            orderBy: { vendor: 'asc' },
+          }),
+          this.prisma.orgRadiusProfile.findMany({
+            where: { orgId, deletedAt: null, isActive: true },
+            select: {
+              id: true,
+              name: true,
+              serverHost: true,
+              nasType: true,
+              isActive: true,
+            },
+            orderBy: { name: 'asc' },
+          }),
+        ]);
+
+        const vendors = vendorRows
+          .map((r) => r.vendor?.trim())
+          .filter((v): v is string => Boolean(v));
 
         return responseSuccess(res, {
           message: 'Success',
-          data: { orgs: scopedNetworkFormOrgs(scope), stations },
+          data: { orgs: scopedNetworkFormOrgs(scope), stations, vendors, radiusProfiles },
           meta: toNetworkOrgMeta(scope),
         });
       }
@@ -283,13 +400,20 @@ export class NetworkNasDevicesController {
           message: e.message ?? 'Organization scope mismatch.',
         });
       }
-      const stationId =
-        value.stationId === null ? null : (value.stationId as string | undefined);
+      const stationId = (value.stationId as string | null | undefined) || null;
 
       if (isUpdate) {
         const existing = await this.prisma.stationDevice.findFirst({
           where: { id: recordId!, deletedAt: null, orgId: scope.orgId },
-          select: { id: true, orgId: true },
+          select: {
+            id: true,
+            orgId: true,
+            isRadiusClient: true,
+            radiusProfileId: true,
+            radiusSecret: true,
+            nasShortname: true,
+            nasServer: true,
+          },
         });
 
         if (!existing) {
@@ -303,17 +427,64 @@ export class NetworkNasDevicesController {
         const stationError = await validateStationBelongsToOrg(
           this.prisma,
           targetOrgId,
-          stationId !== undefined ? stationId : undefined
+          stationId
         );
         if (stationError) {
           return responseError(res, 400, { code: 'INVALID_STATION', message: stationError });
+        }
+
+        // Partial updates (e.g. General tab only) must not wipe RADIUS / NAS fields.
+        const nextIsRadiusClient =
+          value.isRadiusClient !== undefined
+            ? Boolean(value.isRadiusClient)
+            : existing.isRadiusClient;
+
+        let nextProfileId = existing.radiusProfileId;
+        if (value.radiusProfileId !== undefined) {
+          const incoming =
+            typeof value.radiusProfileId === 'string'
+              ? value.radiusProfileId.trim()
+              : value.radiusProfileId;
+          if (incoming) {
+            nextProfileId = String(incoming);
+          } else if (!nextIsRadiusClient) {
+            nextProfileId = null;
+          }
+        }
+
+        const radiusResolved = await resolveRadiusProfileForOrg(
+          this.prisma,
+          targetOrgId,
+          nextProfileId,
+          nextIsRadiusClient,
+          {
+            radiusSecretInput:
+              value.radiusSecret !== undefined ? (value.radiusSecret as string | null) : undefined,
+            existingRadiusSecret: existing.radiusSecret,
+          }
+        );
+        if ('error' in radiusResolved) {
+          return responseError(res, 400, {
+            code: 'INVALID_RADIUS_PROFILE',
+            message: radiusResolved.error,
+          });
+        }
+
+        let nextNasShortname = existing.nasShortname;
+        if (value.nasShortname !== undefined) {
+          const incoming = String(value.nasShortname ?? '').trim();
+          if (incoming) {
+            nextNasShortname = incoming;
+          } else if (!nextIsRadiusClient) {
+            nextNasShortname = null;
+          }
         }
 
         const updated = await this.prisma.stationDevice.update({
           where: { id: recordId! },
           data: {
             orgId: targetOrgId,
-            ...(stationId !== undefined ? { stationId } : {}),
+            stationId,
             ...(value.type !== undefined ? { type: value.type } : {}),
             ...(value.vendor !== undefined ? { vendor: value.vendor?.trim() || null } : {}),
             ...(value.model !== undefined ? { model: value.model?.trim() || null } : {}),
@@ -321,21 +492,11 @@ export class NetworkNasDevicesController {
             ...(value.macAddr !== undefined ? { macAddr: value.macAddr?.trim() || null } : {}),
             ...(value.ipAddr !== undefined ? { ipAddr: value.ipAddr?.trim() || null } : {}),
             ...(value.note !== undefined ? { note: value.note?.trim() || null } : {}),
-            ...(value.isRadiusClient !== undefined
-              ? { isRadiusClient: value.isRadiusClient }
-              : {}),
-            ...(value.radiusSecret !== undefined
-              ? { radiusSecret: value.radiusSecret?.trim() || null }
-              : {}),
-            ...(value.nasShortname !== undefined
-              ? { nasShortname: value.nasShortname?.trim() || null }
-              : {}),
-            ...(value.nasType !== undefined ? { nasType: value.nasType?.trim() || null } : {}),
-            ...(value.nasPorts !== undefined ? { nasPorts: value.nasPorts } : {}),
-            ...(value.nasServer !== undefined ? { nasServer: value.nasServer?.trim() || null } : {}),
-            ...(value.nasCommunity !== undefined
-              ? { nasCommunity: value.nasCommunity?.trim() || null }
-              : {}),
+            isRadiusClient: nextIsRadiusClient,
+            radiusProfileId: radiusResolved.radiusProfileId,
+            radiusSecret: radiusResolved.radiusSecret,
+            nasServer: radiusResolved.nasServer ?? existing.nasServer,
+            nasShortname: nextNasShortname,
           },
           select: deviceListSelect,
         });
@@ -346,19 +507,32 @@ export class NetworkNasDevicesController {
         });
       }
 
-      const stationError = await validateStationBelongsToOrg(
-        this.prisma,
-        orgId!,
-        stationId
-      );
+      const stationError = await validateStationBelongsToOrg(this.prisma, orgId!, stationId);
       if (stationError) {
         return responseError(res, 400, { code: 'INVALID_STATION', message: stationError });
+      }
+
+      const isRadiusClient = value.isRadiusClient ?? false;
+      const radiusResolved = await resolveRadiusProfileForOrg(
+        this.prisma,
+        orgId!,
+        value.radiusProfileId as string | null | undefined,
+        isRadiusClient,
+        {
+          radiusSecretInput: (value.radiusSecret as string | null | undefined) ?? null,
+        }
+      );
+      if ('error' in radiusResolved) {
+        return responseError(res, 400, {
+          code: 'INVALID_RADIUS_PROFILE',
+          message: radiusResolved.error,
+        });
       }
 
       const created = await this.prisma.stationDevice.create({
         data: {
           orgId: orgId!,
-          stationId: stationId ?? null,
+          stationId: stationId!,
           type: value.type ?? 'ROUTER',
           vendor: value.vendor?.trim() || null,
           model: value.model?.trim() || null,
@@ -366,13 +540,12 @@ export class NetworkNasDevicesController {
           macAddr: value.macAddr?.trim() || null,
           ipAddr: value.ipAddr?.trim() || null,
           note: value.note?.trim() || null,
-          isRadiusClient: value.isRadiusClient ?? false,
-          radiusSecret: value.radiusSecret?.trim() || null,
+          isRadiusClient,
+          radiusProfileId: radiusResolved.radiusProfileId,
+          radiusSecret: radiusResolved.radiusSecret,
           nasShortname: value.nasShortname?.trim() || null,
-          nasType: value.nasType?.trim() || 'other',
-          nasPorts: value.nasPorts ?? null,
-          nasServer: value.nasServer?.trim() || null,
-          nasCommunity: value.nasCommunity?.trim() || null,
+          nasServer: radiusResolved.nasServer,
+          nasType: 'other',
         },
         select: deviceListSelect,
       });

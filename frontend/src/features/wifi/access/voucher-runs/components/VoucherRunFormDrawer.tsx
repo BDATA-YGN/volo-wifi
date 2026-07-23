@@ -14,10 +14,10 @@ import {
 import type { VoucherRunFormValues, VoucherRunsFormOptions } from "../types";
 import {
   BATCH_NO_PATTERN,
-  BATCH_PREFIX_PATTERN,
   MAX_BATCH_QUANTITY,
   MIN_BATCH_QUANTITY,
 } from "../constant";
+import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { TextArea } = Input;
 const { Paragraph } = Typography;
@@ -39,11 +39,12 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
 }) => {
   const [form] = Form.useForm<VoucherRunFormValues>();
 
-  const initialValues: VoucherRunFormValues = {
+  const formValues: VoucherRunFormValues = {
     planId: formOptions.plans[0]?.id ?? "",
     quantity: 10,
     stationId: null,
   };
+  useDrawerFormSync(form, open, formValues, "create-run");
 
   return (
     <Drawer
@@ -51,7 +52,7 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
       size={480}
       open={open}
       onClose={onClose}
-      destroyOnClose={false}
+      destroyOnHidden
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose} disabled={saving}>
@@ -68,7 +69,6 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
           form={form}
           layout="vertical"
           requiredMark="optional"
-          initialValues={initialValues}
           key="create-run"
           onFinish={(v) => void onSubmit(v)}
         >
@@ -137,23 +137,6 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
                 form.setFieldValue(
                   "batchNo",
                   e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")
-                )
-              }
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="prefix"
-            label="Token prefix"
-            extra="Optional — prepended to each generated token for easier identification"
-            rules={[{ pattern: BATCH_PREFIX_PATTERN, message: "2–12 uppercase letters or digits" }]}
-          >
-            <Input
-              placeholder="PROMO"
-              onChange={(e) =>
-                form.setFieldValue(
-                  "prefix",
-                  e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
                 )
               }
             />

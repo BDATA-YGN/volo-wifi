@@ -5,6 +5,7 @@ import { Badge, Card, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { SiteRow } from "../types";
 import { STATION_STATUS_COLOR, formatBytes, formatMoney } from "../utils";
+import { resolveTierColor } from "@/features/wifi/shared/tier-colors";
 
 const { Text } = Typography;
 
@@ -55,7 +56,12 @@ const SitesTable: React.FC<Props> = ({
         <div>
           <Text style={{ fontSize: 13 }}>{row.stationSizeName}</Text>
           <div>
-            <Tag style={{ fontFamily: "monospace", marginTop: 2 }}>{row.stationSizeCode}</Tag>
+            <Tag
+              color={resolveTierColor(row.stationSizeCode, row.stationSizeName)}
+              style={{ fontFamily: "monospace", marginTop: 2 }}
+            >
+              {row.stationSizeCode}
+            </Tag>
           </div>
         </div>
       ),

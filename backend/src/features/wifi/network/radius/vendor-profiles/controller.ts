@@ -109,11 +109,13 @@ function handleOrgScopeError(res: Response, err: unknown): boolean {
   return true;
 }
 
-async function syncSupportedAttributes(
-  prisma: PrismaClient,
+type SupportedAttrInput = { attributeId: string; requirement: 'OPTIONAL' | 'MUST' };
+
+async function replaceSupportedAttributes(
+  tx: Prisma.TransactionClient,
   orgId: string,
   profileId: string,
-  rows: { attributeId: string; requirement: 'OPTIONAL' | 'MUST' }[]
+  rows: SupportedAttrInput[]
 ) {
   const unique = new Map<string, 'OPTIONAL' | 'MUST'>();
   for (const row of rows) {
@@ -122,7 +124,7 @@ async function syncSupportedAttributes(
 
   const attributeIds = [...unique.keys()];
   if (attributeIds.length) {
-    const found = await prisma.routerSupportedAttribute.count({
+    const found = await tx.routerSupportedAttribute.count({
       where: { id: { in: attributeIds }, orgId },
     });
     if (found !== attributeIds.length) {
@@ -130,22 +132,20 @@ async function syncSupportedAttributes(
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.radiusVendorProfileSupportedAttribute.deleteMany({
-      where: { vendorProfileId: profileId, orgId },
-    });
-
-    if (attributeIds.length) {
-      await tx.radiusVendorProfileSupportedAttribute.createMany({
-        data: attributeIds.map((attributeId) => ({
-          orgId,
-          vendorProfileId: profileId,
-          attributeId,
-          requirement: unique.get(attributeId) ?? 'OPTIONAL',
-        })),
-      });
-    }
+  await tx.radiusVendorProfileSupportedAttribute.deleteMany({
+    where: { vendorProfileId: profileId, orgId },
   });
+
+  if (attributeIds.length) {
+    await tx.radiusVendorProfileSupportedAttribute.createMany({
+      data: attributeIds.map((attributeId) => ({
+        orgId,
+        vendorProfileId: profileId,
+        attributeId,
+        requirement: unique.get(attributeId) ?? 'OPTIONAL',
+      })),
+    });
+  }
 }
 
 /** menus.wifi.network.radius.vendor-profiles @route /wifi/network/radius/vendor-profiles */
@@ -285,9 +285,7 @@ export class NetworkRadiusVendorProfilesController {
         });
       }
 
-      const supportedAttributes = value.supportedAttributes as
-        | { attributeId: string; requirement: 'OPTIONAL' | 'MUST' }[]
-        | undefined;
+      const supportedAttributes = value.supportedAttributes as SupportedAttrInput[] | undefined;
 
       if (isUpdate) {
         const existing = await this.prisma.radiusVendorProfile.findFirst({
@@ -302,31 +300,35 @@ export class NetworkRadiusVendorProfilesController {
           });
         }
 
+        let updated: Prisma.RadiusVendorProfileGetPayload<{ select: typeof profileListSelect }>;
         try {
-          if (supportedAttributes !== undefined) {
-            await syncSupportedAttributes(this.prisma, orgId, recordId!, supportedAttributes);
-          }
+          updated = await this.prisma.$transaction(async (tx) => {
+            if (supportedAttributes !== undefined) {
+              await replaceSupportedAttributes(tx, orgId, recordId!, supportedAttributes);
+            }
+
+            return tx.radiusVendorProfile.update({
+              where: { id: recordId! },
+              data: {
+                ...(value.name !== undefined ? { name: value.name } : {}),
+                ...(value.vendor !== undefined ? { vendor: value.vendor } : {}),
+                ...(value.model !== undefined ? { model: value.model?.trim() || null } : {}),
+                ...(value.description !== undefined
+                  ? { description: value.description?.trim() || null }
+                  : {}),
+                ...(value.supportsCoA !== undefined ? { supportsCoA: value.supportsCoA } : {}),
+                ...(value.coaPort !== undefined ? { coaPort: value.coaPort } : {}),
+              },
+              // List shape is enough for mutations — detail attrs are reloaded on demand.
+              select: profileListSelect,
+            });
+          });
         } catch (err) {
           return responseError(res, 400, {
             code: 'INVALID_ATTRIBUTES',
             message: err instanceof Error ? err.message : 'Invalid attribute selection.',
           });
         }
-
-        const updated = await this.prisma.radiusVendorProfile.update({
-          where: { id: recordId! },
-          data: {
-            ...(value.name !== undefined ? { name: value.name } : {}),
-            ...(value.vendor !== undefined ? { vendor: value.vendor } : {}),
-            ...(value.model !== undefined ? { model: value.model?.trim() || null } : {}),
-            ...(value.description !== undefined
-              ? { description: value.description?.trim() || null }
-              : {}),
-            ...(value.supportsCoA !== undefined ? { supportsCoA: value.supportsCoA } : {}),
-            ...(value.coaPort !== undefined ? { coaPort: value.coaPort } : {}),
-          },
-          select: profileDetailSelect,
-        });
 
         return responseSuccess(res, {
           message: 'Vendor profile updated',

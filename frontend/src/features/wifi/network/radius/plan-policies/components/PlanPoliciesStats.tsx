@@ -16,8 +16,8 @@ const PlanPoliciesStats: React.FC<Props> = ({ meta, loading }) => (
       <Card size="small" styles={{ body: { padding: 16 } }}>
         <Statistic
           loading={loading}
-          title="Policy rules"
-          value={meta?.total ?? 0}
+          title="Policy groups"
+          value={meta?.policyGroups ?? meta?.total ?? 0}
           prefix={<UnorderedListOutlined />}
         />
       </Card>
@@ -36,8 +36,8 @@ const PlanPoliciesStats: React.FC<Props> = ({ meta, loading }) => (
       <Card size="small" styles={{ body: { padding: 16 } }}>
         <Statistic
           loading={loading}
-          title="Reply attributes"
-          value={meta?.phaseCounts?.REPLY ?? 0}
+          title="Attribute rows"
+          value={meta?.attributeRows ?? meta?.phaseCounts?.REPLY ?? 0}
           prefix={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
         />
       </Card>

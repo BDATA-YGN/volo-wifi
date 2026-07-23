@@ -392,14 +392,26 @@ export class CaptiveDashboardController {
           timeUnit: p.timeUnit ?? undefined,
           dataMb: p.dataMb ?? undefined,
           validityDays: p.validityDays ?? undefined,
-          summary:
-            p.quotaType === 'TIME_ONLY' || p.quotaType === 'TIME_AND_DATA'
-              ? p.timeAmount != null && p.timeUnit
-                ? `${p.timeAmount} ${p.timeUnit.toLowerCase()}${p.timeAmount !== 1 ? 's' : ''}`
-                : '—'
-              : p.dataMb != null
-                ? `${p.dataMb} MB`
-                : '—',
+          summary: (() => {
+            const parts: string[] = [];
+            if (p.timeAmount != null) {
+              if (p.timeAmount <= 0) {
+                parts.push('Unlimited time');
+              } else if (p.timeUnit) {
+                parts.push(
+                  `${p.timeAmount} ${p.timeUnit.toLowerCase()}${p.timeAmount !== 1 ? 's' : ''}`,
+                );
+              }
+            } else if (p.quotaType === 'TIME_ONLY' || p.quotaType === 'TIME_AND_DATA') {
+              parts.push('Time');
+            }
+            if (p.dataMb != null) {
+              parts.push(p.dataMb <= 0 ? 'Unlimited data' : `${p.dataMb} MB`);
+            } else if (p.quotaType === 'DATA_ONLY' || p.quotaType === 'TIME_AND_DATA') {
+              parts.push('Data');
+            }
+            return parts.length ? parts.join(' · ') : '—';
+          })(),
         }));
 
         responseSuccess(res, { message: captiveSuccess.PLANS, data });

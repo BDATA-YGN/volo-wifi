@@ -16,11 +16,14 @@ const emptyFormOptions: ActivityLogFormOptions = {
   memberships: [],
   actions: [],
   entities: [],
+  canViewAllOrgs: false,
+  scopedOrgId: null,
 };
 
 export function useTenantActivityLog() {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [formOptions, setFormOptions] = useState<ActivityLogFormOptions>(emptyFormOptions);
+  const [optionsReady, setOptionsReady] = useState(false);
 
   const { params, setParams, setPagination, setSearch } = useWifiListState({
     limit: 20,
@@ -31,7 +34,11 @@ export function useTenantActivityLog() {
     setParams((prev) => ({ ...prev, ...patch }));
   }, [setParams]);
 
+  const canViewAllOrgs = Boolean(formOptions.canViewAllOrgs);
   const extended = { ...(params as ActivityLogListParams), orgId };
+
+  // Tenants need an org context; developers may load the cross-tenant feed without one.
+  const listReady = optionsReady && (canViewAllOrgs || Boolean(orgId));
 
   const { data, loading, error, refresh } = useRequest(() => Query.list(extended), {
     refreshDeps: [
@@ -42,8 +49,9 @@ export function useTenantActivityLog() {
       extended.view,
       extended.action,
       extended.entity,
+      canViewAllOrgs,
     ],
-    ready: Boolean(orgId),
+    ready: listReady,
   });
 
   const list = ((data as CommonListResponse | undefined)?.data ?? []) as ActivityLogRecord[];
@@ -53,9 +61,19 @@ export function useTenantActivityLog() {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as ActivityLogFormOptions;
     setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+    setOptionsReady(true);
+
+    // Auto-scope tenants to their only (or primary) membership.
+    if (!opts.canViewAllOrgs && !targetOrgId && opts.memberships.length >= 1) {
+      const primary = opts.memberships.find((m) => m.isPrimary) ?? opts.memberships[0];
+      setOrgId(primary.id);
     }
+
+    // Developers: keep optional filter; if API returned a scoped id from query, sync it.
+    if (opts.canViewAllOrgs && opts.scopedOrgId) {
+      setOrgId(opts.scopedOrgId);
+    }
+
     return opts;
   }, []);
 
@@ -68,6 +86,12 @@ export function useTenantActivityLog() {
     [loadFormOptions, setParams]
   );
 
+  const clearOrg = useCallback(() => {
+    setOrgId(undefined);
+    setParams((prev) => ({ ...prev, page: 1 }));
+    void loadFormOptions(undefined);
+  }, [loadFormOptions, setParams]);
+
   const loadEntry = useCallback(
     async (id: string) => {
       const res = await Query.getById(id, orgId);
@@ -79,15 +103,17 @@ export function useTenantActivityLog() {
   return {
     list,
     meta,
-    loading,
+    loading: !optionsReady || loading,
     error,
     params: extended,
     orgId,
     formOptions,
+    canViewAllOrgs: Boolean(formOptions.canViewAllOrgs || meta?.canViewAllOrgs),
     setPagination,
     setSearch,
     patchParams,
     selectOrg,
+    clearOrg,
     refresh,
     loadFormOptions,
     loadEntry,

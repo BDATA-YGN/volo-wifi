@@ -117,6 +117,11 @@ const VoucherRunDetailDrawer: React.FC<Props> = ({
               <Descriptions.Item label="Site">
                 {row.station ? `${row.station.name} (${row.station.code})` : "Any site"}
               </Descriptions.Item>
+              <Descriptions.Item label="Created by">
+                {row.createdByAdmin
+                  ? `${row.createdByAdmin.fullName} (@${row.createdByAdmin.username})`
+                  : "—"}
+              </Descriptions.Item>
               <Descriptions.Item label="Issued">{row.quantity}</Descriptions.Item>
               <Descriptions.Item label="Remaining">{row.remainingQuantity}</Descriptions.Item>
               <Descriptions.Item label="Created">

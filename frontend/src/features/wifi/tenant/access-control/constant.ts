@@ -1,7 +1,12 @@
 import { buildWifiApiRoutes } from "@/features/wifi/shared/utils";
-import type { MemberRoleCode } from "./types";
+import type { MemberRoleCode, ProvisionMemberRoleCode } from "./types";
 
-export const TENANT_ACCESS_CONTROL_API = buildWifiApiRoutes("/wifi/tenant/access-control");
+const BASE = "/wifi/tenant/access-control";
+
+export const TENANT_ACCESS_CONTROL_API = {
+  ...buildWifiApiRoutes(BASE),
+  resetPassword: (id: string) => `${BASE}/reset-password/${id}`,
+};
 
 export const STATUS_COLOR: Record<string, string> = {
   ACTIVE: "success",
@@ -18,7 +23,10 @@ export const LEGACY_MEMBER_ROLE_ALIASES: Record<string, MemberRoleCode> = {
   FINANCE_CLERK: "ORG_FINANCE",
 };
 
-/** Aligned with console `mngRoles` in role-settings.json (excluding ADMIN and DEVELOPER). */
+/**
+ * Full org-member role catalog (labels for display).
+ * Platform console roles ADMIN / DEVELOPER are not org-member roles.
+ */
 export const ROLE_OPTIONS: { value: MemberRoleCode; label: string; description: string }[] = [
   {
     value: "ORG_VIEWER",
@@ -48,16 +56,33 @@ export const ROLE_OPTIONS: { value: MemberRoleCode; label: string; description: 
   },
 ];
 
-/** Roles assignable from Access Control (partners are provisioned from the Partners menu). */
+/**
+ * Roles assignable from Access Control.
+ * Excluded: Partner (Partners menu) and platform ADMIN/DEVELOPER.
+ */
 export const PROVISION_ROLE_OPTIONS = ROLE_OPTIONS.filter((option) => option.value !== "PARTNER");
 
+export const LOCKED_MEMBER_ROLE_CODES: MemberRoleCode[] = ["PARTNER"];
+
 const MEMBER_ROLE_CODE_SET = new Set<string>(ROLE_OPTIONS.map((option) => option.value));
+const PROVISION_ROLE_CODE_SET = new Set<string>(PROVISION_ROLE_OPTIONS.map((option) => option.value));
+const LOCKED_ROLE_CODE_SET = new Set<string>(LOCKED_MEMBER_ROLE_CODES);
 
 export function normalizeMemberRoleCode(roleCode: string): MemberRoleCode | null {
   if (MEMBER_ROLE_CODE_SET.has(roleCode)) {
     return roleCode as MemberRoleCode;
   }
   return LEGACY_MEMBER_ROLE_ALIASES[roleCode] ?? null;
+}
+
+export function isProvisionMemberRoleCode(roleCode: string): roleCode is ProvisionMemberRoleCode {
+  const normalized = normalizeMemberRoleCode(roleCode);
+  return normalized != null && PROVISION_ROLE_CODE_SET.has(normalized);
+}
+
+export function isLockedMemberRoleCode(roleCode: string): boolean {
+  const normalized = normalizeMemberRoleCode(roleCode);
+  return normalized != null && LOCKED_ROLE_CODE_SET.has(normalized);
 }
 
 export function formatMemberRoleLabel(roleCode: string): string {

@@ -28,11 +28,6 @@ export const PLATFORM_SETUP_STEPS = [
   },
 ] as const;
 
-export const TIER_CODE_COLORS: Record<string, string> = {
-  SMALL: "blue",
-  MEDIUM: "cyan",
-  LARGE: "purple",
-  XL: "geekblue",
-};
+export { TIER_CODE_COLORS, resolveTierColor } from "@/features/wifi/shared/tier-colors";
 
 export const DEFAULT_CURRENCY = "MMK";

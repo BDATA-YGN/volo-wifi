@@ -7,13 +7,15 @@ import { Shield } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "../profile/components/OrgSwitcher";
+import { needsOrgSelection, shouldShowOrgSwitcher } from "@/features/wifi/shared/hooks/useWifiOrgScope";
 import { useTenantAccessControl } from "./useTenantAccessControl";
-import type { MemberCreateFormValues, MemberStatus, OrgMemberRecord } from "./types";
+import type { MemberCreateFormValues, MemberRoleCode, MemberStatus, OrgMemberRecord } from "./types";
 import AccessControlStats from "./components/AccessControlStats";
 import AccessControlToolbar from "./components/AccessControlToolbar";
 import MembersTable from "./components/MembersTable";
 import MemberFormDrawer from "./components/MemberFormDrawer";
 import MemberDetailDrawer from "./components/MemberDetailDrawer";
+import ResetPasswordModal from "./components/ResetPasswordModal";
 
 const { Paragraph } = Typography;
 
@@ -24,9 +26,12 @@ const TenantAccessControlPage: React.FC = () => {
   const [search, setSearchLocal] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const [editing, setEditing] = useState<OrgMemberRecord | null>(null);
   const [selected, setSelected] = useState<OrgMemberRecord | null>(null);
+  const [resetTarget, setResetTarget] = useState<OrgMemberRecord | null>(null);
   const [saving, setSaving] = useState(false);
+  const [resetSaving, setResetSaving] = useState(false);
   const [initDone, setInitDone] = useState(false);
 
   const {
@@ -47,17 +52,33 @@ const TenantAccessControlPage: React.FC = () => {
     createMember,
     updateMember,
     removeMember,
+    resetMemberPassword,
   } = useTenantAccessControl();
 
   useEffect(() => {
     void loadFormOptions().then(() => setInitDone(true));
   }, [loadFormOptions]);
 
+  // Tenant accounts with a single membership auto-scope. Developers must pick.
   useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
-      selectOrg(meta.memberships[0].id);
+    if (!initDone || orgId) return;
+    const canSwitch = meta?.canSwitchOrg ?? formOptions.canSwitchOrg;
+    const requires = meta?.requiresOrgSelection ?? formOptions.requiresOrgSelection;
+    if (canSwitch || requires) return;
+    if ((meta?.memberships ?? formOptions.memberships).length === 1) {
+      selectOrg((meta?.memberships ?? formOptions.memberships)[0].id);
     }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
+  }, [
+    initDone,
+    meta?.memberships,
+    meta?.requiresOrgSelection,
+    meta?.canSwitchOrg,
+    formOptions.memberships,
+    formOptions.canSwitchOrg,
+    formOptions.requiresOrgSelection,
+    orgId,
+    selectOrg,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(search), 300);
@@ -65,8 +86,12 @@ const TenantAccessControlPage: React.FC = () => {
   }, [search, setSearch]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
-  const showSwitcher = memberships.length > 1;
-  const needsOrg = initDone && !orgId && memberships.length > 1;
+  const orgScopeMeta = {
+    canSwitchOrg: meta?.canSwitchOrg ?? formOptions.canSwitchOrg,
+    requiresOrgSelection: meta?.requiresOrgSelection ?? formOptions.requiresOrgSelection,
+  };
+  const showSwitcher = shouldShowOrgSwitcher(memberships, orgScopeMeta);
+  const needsOrg = needsOrgSelection(orgId, orgScopeMeta, memberships.length);
 
   const openCreate = () => {
     setEditing(null);
@@ -112,6 +137,7 @@ const TenantAccessControlPage: React.FC = () => {
         isPrimary: values.isPrimary,
         roleCodes: values.roleCodes,
         stationIds: values.stationIds,
+        ...(values.password ? { password: values.password } : {}),
       });
       message.success("Member updated");
       setDrawerOpen(false);
@@ -120,6 +146,26 @@ const TenantAccessControlPage: React.FC = () => {
       message.error(getApiErrorMessage(err, "Failed to update member"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openResetPassword = (record: OrgMemberRecord) => {
+    setResetTarget(record);
+    setResetOpen(true);
+  };
+
+  const handleResetPassword = async (password: string) => {
+    if (!resetTarget) return;
+    setResetSaving(true);
+    try {
+      await resetMemberPassword(resetTarget.id, password);
+      message.success("Password updated");
+      setResetOpen(false);
+      setResetTarget(null);
+    } catch (err: unknown) {
+      message.error(getApiErrorMessage(err, "Failed to reset password"));
+    } finally {
+      setResetSaving(false);
     }
   };
 
@@ -184,7 +230,7 @@ const TenantAccessControlPage: React.FC = () => {
             <Alert
               type="info"
               showIcon
-              message="Select an organization"
+              title="Select an organization"
               description="Choose a tenant to manage team access."
             />
           ) : null}
@@ -200,10 +246,14 @@ const TenantAccessControlPage: React.FC = () => {
                 <AccessControlToolbar
                   search={search}
                   status={(params.status as MemberStatus) ?? null}
+                  roleCode={(params.roleCode as MemberRoleCode) ?? null}
                   loading={loading}
                   onSearchChange={setSearchLocal}
                   onStatusChange={(status) =>
                     patchParams({ status: status ?? undefined, page: 1 })
+                  }
+                  onRoleCodeChange={(roleCode) =>
+                    patchParams({ roleCode: roleCode ?? undefined, page: 1 })
                   }
                   onRefresh={refresh}
                   onAdd={openCreate}
@@ -223,6 +273,7 @@ const TenantAccessControlPage: React.FC = () => {
                   onPaginationChange={setPagination}
                   onView={openDetail}
                   onEdit={openEdit}
+                  onResetPassword={openResetPassword}
                   onRemove={handleRemove}
                 />
               </Card>
@@ -231,7 +282,7 @@ const TenantAccessControlPage: React.FC = () => {
             <Alert
               type="warning"
               showIcon
-              message="No organization access"
+              title="No organization access"
               description="Your account is not linked to a tenant. Contact a platform administrator."
             />
           ) : null}
@@ -258,6 +309,17 @@ const TenantAccessControlPage: React.FC = () => {
         }}
         onEdit={openEdit}
         loadMember={loadMember}
+      />
+
+      <ResetPasswordModal
+        open={resetOpen}
+        saving={resetSaving}
+        member={resetTarget}
+        onClose={() => {
+          setResetOpen(false);
+          setResetTarget(null);
+        }}
+        onSubmit={handleResetPassword}
       />
     </div>
   );

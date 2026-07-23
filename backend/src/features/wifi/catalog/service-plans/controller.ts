@@ -18,12 +18,17 @@ import {
   UNIT_TIME_VALUES,
   type PlanQuotaType,
   type PlanTimeUsageMode,
-  type UnitTime,
 } from './constants';
 import {
   CatalogServicePlansCreateSchema,
   CatalogServicePlansUpdateSchema,
 } from './schema';
+import {
+  assertPlanLimitFields,
+  normalizePlanLimitAmount,
+  resolveTimeUnitForWrite,
+  derivePlanQuotaType,
+} from './plan-limits';
 
 const planSelect = {
   id: true,
@@ -117,55 +122,42 @@ function serializePlan(row: PlanRow) {
   };
 }
 
-function normalizePlanWrite(
-  quotaType: PlanQuotaType,
-  value: Record<string, unknown>
-): Prisma.PlanUncheckedUpdateInput {
-  const needsTime = quotaType === 'TIME_ONLY' || quotaType === 'TIME_AND_DATA';
-  const needsData = quotaType === 'DATA_ONLY' || quotaType === 'TIME_AND_DATA';
+function normalizePlanWrite(value: {
+  code?: string;
+  name?: string;
+  description?: string | null;
+  timeAmount: number;
+  timeUnit?: string | null;
+  dataMb: number;
+  validityDays?: number | null;
+  maxDevices?: number | null;
+  timeUsageMode?: string;
+  isActive?: boolean;
+}): Prisma.PlanUncheckedUpdateInput {
+  const timeAmount = normalizePlanLimitAmount(value.timeAmount);
+  const dataMb = normalizePlanLimitAmount(value.dataMb);
+  const hasTimeLimit = timeAmount > 0;
 
-  const data: Prisma.PlanUncheckedUpdateInput = {
+  return {
     ...(value.code !== undefined ? { code: String(value.code) } : {}),
     ...(value.name !== undefined ? { name: String(value.name) } : {}),
     ...(value.description !== undefined
       ? { description: value.description ? String(value.description) : null }
       : {}),
-    ...(value.quotaType !== undefined ? { quotaType } : {}),
-    timeAmount: needsTime ? (value.timeAmount as number) : null,
-    timeUnit: needsTime ? (value.timeUnit as UnitTime) : null,
-    dataMb: needsData ? (value.dataMb as number) : null,
+    quotaType: derivePlanQuotaType(timeAmount, dataMb),
+    timeAmount,
+    timeUnit: resolveTimeUnitForWrite(timeAmount, value.timeUnit),
+    dataMb,
     ...(value.validityDays !== undefined
       ? { validityDays: value.validityDays as number }
       : {}),
     ...(value.maxDevices !== undefined ? { maxDevices: value.maxDevices as number } : {}),
     timeUsageMode:
-      needsTime && value.timeUsageMode
+      hasTimeLimit && value.timeUsageMode
         ? (value.timeUsageMode as PlanTimeUsageMode)
         : 'CUMULATIVE_SESSIONS',
     ...(value.isActive !== undefined ? { isActive: value.isActive as boolean } : {}),
   };
-
-  return data;
-}
-
-function validateMergedQuota(
-  quotaType: PlanQuotaType,
-  fields: {
-    timeAmount?: number | null;
-    timeUnit?: string | null;
-    dataMb?: number | null;
-  }
-): string | null {
-  const needsTime = quotaType === 'TIME_ONLY' || quotaType === 'TIME_AND_DATA';
-  const needsData = quotaType === 'DATA_ONLY' || quotaType === 'TIME_AND_DATA';
-
-  if (needsTime && (fields.timeAmount == null || !fields.timeUnit)) {
-    return 'Time amount and unit are required for time-based plans.';
-  }
-  if (needsData && fields.dataMb == null) {
-    return 'Data quota (MB) is required for data-based plans.';
-  }
-  return null;
 }
 
 /** menus.wifi.catalog.service-plans @route /wifi/catalog/service-plans */
@@ -338,23 +330,29 @@ export class CatalogServicePlansController {
           }
         }
 
-        const mergedQuotaType = (value.quotaType ?? existing.quotaType) as PlanQuotaType;
-        const quotaError = validateMergedQuota(mergedQuotaType, {
-          timeAmount: value.timeAmount !== undefined ? value.timeAmount : existing.timeAmount,
-          timeUnit: value.timeUnit !== undefined ? value.timeUnit : existing.timeUnit,
-          dataMb: value.dataMb !== undefined ? value.dataMb : existing.dataMb,
+        const mergedTimeAmount = normalizePlanLimitAmount(
+          value.timeAmount !== undefined ? value.timeAmount : existing.timeAmount
+        );
+        const mergedDataMb = normalizePlanLimitAmount(
+          value.dataMb !== undefined ? value.dataMb : existing.dataMb
+        );
+        const mergedTimeUnit =
+          value.timeUnit !== undefined ? value.timeUnit : existing.timeUnit;
+
+        const quotaError = assertPlanLimitFields({
+          timeAmount: mergedTimeAmount,
+          timeUnit: mergedTimeUnit,
+          dataMb: mergedDataMb,
         });
         if (quotaError) {
           return responseError(res, 400, { code: 'VALIDATION_ERROR', message: quotaError });
         }
 
-        const writeData = normalizePlanWrite(mergedQuotaType, {
+        const writeData = normalizePlanWrite({
           ...value,
-          quotaType: mergedQuotaType,
-          timeAmount:
-            value.timeAmount !== undefined ? value.timeAmount : existing.timeAmount,
-          timeUnit: value.timeUnit !== undefined ? value.timeUnit : existing.timeUnit,
-          dataMb: value.dataMb !== undefined ? value.dataMb : existing.dataMb,
+          timeAmount: mergedTimeAmount,
+          timeUnit: mergedTimeUnit,
+          dataMb: mergedDataMb,
         });
 
         const updated = await this.prisma.plan.update({
@@ -380,8 +378,18 @@ export class CatalogServicePlansController {
         });
       }
 
-      const quotaType = value.quotaType as PlanQuotaType;
-      const writeData = normalizePlanWrite(quotaType, value);
+      const writeData = normalizePlanWrite({
+        code: value.code,
+        name: value.name,
+        description: value.description,
+        timeAmount: value.timeAmount,
+        timeUnit: value.timeUnit,
+        dataMb: value.dataMb,
+        validityDays: value.validityDays,
+        maxDevices: value.maxDevices,
+        timeUsageMode: value.timeUsageMode,
+        isActive: value.isActive,
+      });
 
       const created = await this.prisma.plan.create({
         data: {

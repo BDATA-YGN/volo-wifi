@@ -9,6 +9,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useMenuManagementStore } from "@/features/core/menuManagement/store";
 import TheIcon, { Name } from "../@bdata/IconPicker/icons";
 import { useAppSettings } from "@/common/provider/AppSettingsContentProvider";
+import { CONSOLE_HOME_PATH } from "@/lib/auth/console-paths";
 
 export default function Index() {
   const menuTranslate = useSafeMenuTranslate();
@@ -35,7 +36,7 @@ export default function Index() {
         <Breadcrumb
           items={[
             {
-              href: "/",
+              href: CONSOLE_HOME_PATH,
               title: currentMenu?.icon ? <TheIcon name={currentMenu?.icon as Name} style={{ margin: 0, padding: 0 }} /> : <HomeOutlined />,
             },
             {
