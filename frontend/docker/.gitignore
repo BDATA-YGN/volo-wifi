@@ -14,8 +14,8 @@ out
 .env*
 !.env.example
 
-# Testing
-coverage
+# Testing (istanbul/nyc report dir at package root only)
+/coverage
 *.test.js
 *.spec.js
 

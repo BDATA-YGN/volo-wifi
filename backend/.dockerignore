@@ -6,7 +6,8 @@ storages
 .env.*
 !.env.example
 *.log
-coverage
+# Istanbul/nyc report dir at image root only (not feature folders named coverage)
+/coverage
 .nyc_output
 api-docs
 src/docs

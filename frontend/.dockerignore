@@ -6,7 +6,7 @@ out
 .env.*
 !.env.example
 *.log
-coverage
+/coverage
 .DS_Store
 **/.DS_Store
 docker
