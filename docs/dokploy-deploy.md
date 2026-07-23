@@ -96,23 +96,25 @@ Startup prints phase lines and a final `========== System Ready ==========` bann
 
 Point all hosts to the **same** frontend Dokploy service (port `4488`).
 
-### Build-time env (`NEXT_PUBLIC_*`)
-
-Set in Dokploy **before** build — they are embedded at compile time:
+### Build-time env (set once — `NEXT_PUBLIC_*` are auto-mirrored)
 
 ```env
 API_URL=https://console.volowifi.com/console
-NEXT_PUBLIC_API_URL=https://console.volowifi.com/console
-NEXT_PUBLIC_SOCKET_URL=https://socket.volowifi.com
-NEXT_PUBLIC_SOCKET_PATH=/general/socket.io
-HOST_NAME=console.volowifi.com
-FILE_SERVER_URL=https://cdn.volowifi.com/public
 CAPTIVE_API_URL=https://api.volowifi.com/api
-NEXT_PUBLIC_CAPTIVE_API_URL=/portal-api
+SOCKET_URL=https://socket.volowifi.com
+SOCKET_PATH=/general/socket.io
+CACHE_PREFIX=volo-wifi
+BY_PASS=false
 CAPTIVE_HOST=captive.volowifi.com
 PARTNER_HOST=partner.volowifi.com
-NEXT_PUBLIC_PARTNER_HOST=partner.volowifi.com
+COLLECTOR_HOST=collector.volowifi.com
+CUSTOMER_HOST=customer.volowifi.com
+# Optional legacy CDN rewrites only — skip when using backend MinIO/S3:
+# FILE_SERVER_URL=https://cdn.volowifi.com/public
+# HOST_NAME=console.volowifi.com
 ```
+
+Do **not** duplicate `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_SOCKET_URL` / `NEXT_PUBLIC_PARTNER_HOST` unless you need a different public value. `frontend/env/apply-defaults.mjs` fills them from the keys above at build time.
 
 ### CORS
 
@@ -125,7 +127,7 @@ Backend `ALLOWED_ORIGINS` must include every HTTPS origin the browser uses (cons
 1. **Wrong root directory** — build fails with `ENOENT package.json` if root is repo root.
 2. **yarn on frontend** — use `npm ci` (project has `package-lock.json`).
 3. **Missing `TRUST_PROXY=1`** on backend behind Dokploy/Traefik — wrong client IP and cookies.
-4. **Rebuilding frontend without `NEXT_PUBLIC_*`** — API calls go to localhost.
+4. **Rebuilding frontend without `API_URL` / `SOCKET_URL`** — client bundle gets empty endpoints (NEXT_PUBLIC_* are mirrored from these at build).
 5. **Committing Firebase JSON** — GitHub blocks push; use mounted secrets in Dokploy.
 
 ---

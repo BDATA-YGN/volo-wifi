@@ -25,7 +25,11 @@ function routePathFromHref(href: string): string {
 function usePermissionBypass(): boolean {
   const { authData } = useAuthStore();
   const isDeveloper = authData?.role?.roleName?.toLowerCase() === "developer";
-  return process.env.NEXT_PUBLIC_BY_PASS === "true" || isDeveloper;
+  return (
+    process.env.NEXT_PUBLIC_BY_PASS === "true" ||
+    process.env.BY_PASS === "true" ||
+    isDeveloper
+  );
 }
 
 function canAccessRoute(permissions: PermissionMap, bypass: boolean, route: string): boolean {

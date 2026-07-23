@@ -24,7 +24,7 @@ const createApiClient = (baseURL?: string, customConfig: ApiClientConfig = {}) =
   const authApp = customConfig.authApp ?? 'admin';
 
   const instance = axios.create({
-    baseURL: baseURL || process.env.NEXT_PUBLIC_API_URL,
+    baseURL: baseURL || process.env.NEXT_PUBLIC_API_URL || process.env.API_URL,
     withCredentials: isBrowser,
     timeout: customConfig.timeout || 30000,
     headers: {
@@ -121,7 +121,7 @@ const sharedResponseInterceptor = {
   }),
 };
 
-const apiClient = createApiClient(process.env.API_URL, {
+const apiClient = createApiClient(process.env.API_URL || process.env.NEXT_PUBLIC_API_URL, {
   authApp: 'admin',
   interceptors: sharedResponseInterceptor,
 });

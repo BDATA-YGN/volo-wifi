@@ -2,18 +2,26 @@ import path from "path";
 import { fileURLToPath } from "url";
 import createNextIntlPlugin from "next-intl/plugin";
 import pkg from "@next/env";
+import { applyPublicEnvDefaults } from "./env/apply-defaults.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const { loadEnvConfig } = pkg;
 loadEnvConfig(process.cwd());
 
-const fileServerBaseURL = process.env.FILE_SERVER_URL;
-const hostName = process.env.HOST_NAME;
-const apiUrl = process.env.API_URL;
+const {
+  apiUrl,
+  fileServerUrl: fileServerBaseURL,
+  hostName,
+} = applyPublicEnvDefaults();
+
 const customerHost = process.env.CUSTOMER_HOST ?? "customer.volowifi.com";
 const collectorHost = process.env.COLLECTOR_HOST ?? "collector.volowifi.com";
 const captiveHost = process.env.CAPTIVE_HOST ?? "captive.volowifi.com";
 const partnerHost = process.env.PARTNER_HOST ?? "partner.volowifi.com";
+
+if (!apiUrl) {
+  console.warn("[next.config] API_URL is empty — set API_URL in .env (mirrors to NEXT_PUBLIC_API_URL).");
+}
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -21,6 +29,20 @@ const withNextIntl = createNextIntlPlugin();
 const nextConfig = {
   output: "standalone",
   reactStrictMode: false,
+  // Bake mirrored public env into the client bundle (single-source .env keys).
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_UPLOAD_URL: process.env.NEXT_PUBLIC_UPLOAD_URL,
+    NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
+    NEXT_PUBLIC_SOCKET_PATH: process.env.NEXT_PUBLIC_SOCKET_PATH,
+    NEXT_PUBLIC_CAPTIVE_API_URL: process.env.NEXT_PUBLIC_CAPTIVE_API_URL,
+    NEXT_PUBLIC_CAPTIVE_HOST: process.env.NEXT_PUBLIC_CAPTIVE_HOST,
+    NEXT_PUBLIC_PARTNER_HOST: process.env.NEXT_PUBLIC_PARTNER_HOST,
+    NEXT_PUBLIC_COLLECTOR_HOST: process.env.NEXT_PUBLIC_COLLECTOR_HOST,
+    NEXT_PUBLIC_CUSTOMER_HOST: process.env.NEXT_PUBLIC_CUSTOMER_HOST,
+    NEXT_PUBLIC_CACHE_PREFIX: process.env.NEXT_PUBLIC_CACHE_PREFIX,
+    NEXT_PUBLIC_BY_PASS: process.env.NEXT_PUBLIC_BY_PASS,
+  },
   turbopack: {
     root: __dirname,
   },
@@ -58,6 +80,10 @@ const nextConfig = {
   },
 
   async rewrites() {
+    const consoleBase = (apiUrl || "").replace(/\/console\/?$/, "");
+    const filesBase = (fileServerBaseURL || "").replace(/\/$/, "");
+    const apiBase = (apiUrl || "").replace(/\/$/, "");
+
     return {
       beforeFiles: [
         {
@@ -77,27 +103,37 @@ const nextConfig = {
         },
       ],
       afterFiles: [
-      { source: "/health", destination: `${apiUrl.replace(/\/console\/?$/, '')}/health` },
-      { source: "/images/:path*", destination: `${fileServerBaseURL}/images/:path*` },
-      { source: "/cover/:path*", destination: `${fileServerBaseURL}/cover/:path*` },
-      { source: "/album_covers/:path*", destination: `${fileServerBaseURL}/album_covers/:path*` },
-      { source: "/mv_cover/:path*", destination: `${fileServerBaseURL}/mv_cover/:path*` },
-      { source: "/mega/:path*", destination: `${fileServerBaseURL}/mega/:path*` },
-      { source: "/icons/:path*", destination: `${fileServerBaseURL}/icons/:path*` },
-      { source: "/profiles/:path*", destination: `${fileServerBaseURL}/profiles/:path*` },
-      { source: "/default/:path*", destination: `${fileServerBaseURL}/default/:path*` },
-      { source: "/storage/:path*", destination: `${fileServerBaseURL}/storage/:path*` },
-      { source: "/users/:path*", destination: `${fileServerBaseURL}/users/:path*` },
-      { source: "/audio/:path*", destination: `${fileServerBaseURL}/audio/:path*` },
-      { source: "/mp3/:path*", destination: `${fileServerBaseURL}/mp3/:path*` },
-      { source: "/mega-prod-public/:path*", destination: `${fileServerBaseURL}/:path*` },
-      { source: "/tranlation/:path*", destination: `${apiUrl}/translation/:path*` },
-      { source: "/uploads/:path*", destination: `${apiUrl}/upload/:path*` },
-      { source: "/upload/storage", destination: `${apiUrl}/upload/storage` },
-      { source: "/upload/chunk/init", destination: `${apiUrl}/upload/chunk/init` },
-      { source: "/upload/chunk", destination: `${apiUrl}/upload/chunk` },
-      { source: "/upload/chunk/complete", destination: `${apiUrl}/upload/chunk/complete` },
-      { source: "/file-proxy/:path*", destination: `${apiUrl}/:path*` },
+        ...(consoleBase
+          ? [{ source: "/health", destination: `${consoleBase}/health` }]
+          : []),
+        ...(filesBase
+          ? [
+              { source: "/images/:path*", destination: `${filesBase}/images/:path*` },
+              { source: "/cover/:path*", destination: `${filesBase}/cover/:path*` },
+              { source: "/album_covers/:path*", destination: `${filesBase}/album_covers/:path*` },
+              { source: "/mv_cover/:path*", destination: `${filesBase}/mv_cover/:path*` },
+              { source: "/mega/:path*", destination: `${filesBase}/mega/:path*` },
+              { source: "/icons/:path*", destination: `${filesBase}/icons/:path*` },
+              { source: "/profiles/:path*", destination: `${filesBase}/profiles/:path*` },
+              { source: "/default/:path*", destination: `${filesBase}/default/:path*` },
+              { source: "/storage/:path*", destination: `${filesBase}/storage/:path*` },
+              { source: "/users/:path*", destination: `${filesBase}/users/:path*` },
+              { source: "/audio/:path*", destination: `${filesBase}/audio/:path*` },
+              { source: "/mp3/:path*", destination: `${filesBase}/mp3/:path*` },
+              { source: "/mega-prod-public/:path*", destination: `${filesBase}/:path*` },
+            ]
+          : []),
+        ...(apiBase
+          ? [
+              { source: "/tranlation/:path*", destination: `${apiBase}/translation/:path*` },
+              { source: "/uploads/:path*", destination: `${apiBase}/upload/:path*` },
+              { source: "/upload/storage", destination: `${apiBase}/upload/storage` },
+              { source: "/upload/chunk/init", destination: `${apiBase}/upload/chunk/init` },
+              { source: "/upload/chunk", destination: `${apiBase}/upload/chunk` },
+              { source: "/upload/chunk/complete", destination: `${apiBase}/upload/chunk/complete` },
+              { source: "/file-proxy/:path*", destination: `${apiBase}/:path*` },
+            ]
+          : []),
       ],
     };
   },
@@ -105,11 +141,15 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: hostName, pathname: "**" },
-      {
-        protocol: "https",
-        hostname: new URL(fileServerBaseURL).hostname,
-        pathname: "**",
-      },
+      ...(fileServerBaseURL
+        ? [
+            {
+              protocol: "https",
+              hostname: new URL(fileServerBaseURL).hostname,
+              pathname: "**",
+            },
+          ]
+        : []),
     ],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 512],

@@ -54,7 +54,11 @@ export function resolveStorageFileUrl(
   const objectPath = withBucketPrefix(extractStorageKey(url), bucket);
   if (!objectPath) return "";
 
-  const uploadBase = (process.env.NEXT_PUBLIC_UPLOAD_URL || "").replace(/\/+$/, "");
+  const uploadBase = (
+    process.env.NEXT_PUBLIC_UPLOAD_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    ""
+  ).replace(/\/+$/, "");
   if (uploadBase) {
     return `${uploadBase}/${objectPath}`;
   }

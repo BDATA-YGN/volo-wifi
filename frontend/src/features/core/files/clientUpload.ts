@@ -2,7 +2,8 @@
 import { FILE_API_ROUTES } from "./constant";
 import { CHUNK_SIZE } from "./constant";
 
-const API_BASE = process.env.NEXT_PUBLIC_UPLOAD_URL;
+const API_BASE =
+  process.env.NEXT_PUBLIC_UPLOAD_URL || process.env.NEXT_PUBLIC_API_URL;
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
