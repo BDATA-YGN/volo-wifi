@@ -55,8 +55,10 @@ The DO CA certificate is in the repo and deploys with `raddb`:
 `raddb/mods-available/sql` references it as:
 
 ```
-sslrootcert=${confdir}/certs/do-ca-certificate.crt
+sslrootcert=/etc/raddb/certs/do-ca-certificate.crt
 ```
+
+(`radiusd.conf` sets `raddbdir = /etc/raddb` so `${confdir}/certs/...` matches this path too.)
 
 Because `./raddb` is bind-mounted to `/etc/raddb`, **git push + redeploy is enough** — the cert is copied automatically. See `raddb/certs/DO-MANAGED-DB.md` for rotation and manual install.
 

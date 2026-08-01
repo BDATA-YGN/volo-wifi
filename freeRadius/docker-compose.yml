@@ -4,10 +4,9 @@
 #   docker compose up -d
 #
 # Dokploy → Logs → select container "freeradius"
-#   You should see: Login OK / Login incorrect / ACCEPT / REJECT
 #
-# Debug (full packet dump — do not leave on in production):
-#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up
+# TEMP: full debug (-X) so Dokploy shows every packet/SQL line.
+# Revert to `freeradius -f -d /etc/raddb` when done debugging (see docker-compose.debug.yml).
 #
 # Requires:
 #   - ./raddb mounted at /etc/raddb (includes certs/do-ca-certificate.crt)
@@ -27,25 +26,17 @@ services:
       - ./raddb:/etc/raddb
       - freeradius-logs:/var/log/freeradius
 
-    # One container only (so Dokploy Logs is not confused with a cleanup sidecar).
-    # Auth lines come from radiusd.conf (destination=stdout, auth=yes) + linelog /dev/stdout.
-    # Background: purge old files once per day.
-    entrypoint: ["/bin/sh", "-c"]
+    # Full debug to stdout → visible in Dokploy Logs / docker compose logs -f
+    entrypoint: ["freeradius"]
     command:
-      - |
-        (
-          while true; do
-            sleep 86400
-            KEEP_DAYS=3 MAX_MB=50 /bin/sh /etc/raddb/scripts/cleanup-logs.sh || true
-          done
-        ) &
-        exec freeradius -f -d /etc/raddb
+      - -X
+      - -d
+      - /etc/raddb
 
-    # Same stream Dokploy shows — keep it from filling disk
     logging:
       driver: json-file
       options:
-        max-size: "20m"
+        max-size: "50m"
         max-file: "5"
 
 volumes:

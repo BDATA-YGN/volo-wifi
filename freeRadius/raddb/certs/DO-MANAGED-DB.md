@@ -6,13 +6,13 @@
 |---------|---------------------------|
 | `raddb/certs/do-ca-certificate.crt` | `/etc/raddb/certs/do-ca-certificate.crt` |
 
-This is the **CA certificate** from DigitalOcean → your database → **Connection details** → download CA.
-
-FreeRADIUS uses it in `raddb/mods-available/sql`:
+FreeRADIUS resolves it via absolute path in `raddb/mods-available/sql`:
 
 ```
-sslrootcert=${confdir}/certs/do-ca-certificate.crt
+sslrootcert=/etc/raddb/certs/do-ca-certificate.crt
 ```
+
+(`radiusd.conf` also sets `raddbdir = /etc/raddb` so `${confdir}/certs/...` matches the Docker mount.)
 
 ## Deploy (automatic)
 
@@ -49,4 +49,4 @@ freeradius -X
 # Connected to database 'volo_wifi_db' on '...ondigitalocean.com' ...
 ```
 
-If you see `root certificate file ... does not exist`, check that `${confdir}/certs/do-ca-certificate.crt` exists and is readable by the freerad user.
+If you see `root certificate file ... does not exist`, check that `/etc/raddb/certs/do-ca-certificate.crt` exists inside the container and is readable.
