@@ -1,5 +1,5 @@
 {
    "captive": $(if logged-in == 'yes')false$(else)true$(endif),
-   "user-portal-url": "https://portal.volowifi.com/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(hostname)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)",
+   "user-portal-url": "https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(hostname)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)",
    "can-extend-session": false
 }

@@ -18,16 +18,16 @@
 CREATE OR REPLACE VIEW nas AS
 SELECT
 	ROW_NUMBER() OVER (ORDER BY id)::integer AS id,
-	COALESCE("ipAddr", id) AS nasname,
+	COALESCE(ip_addr, id) AS nasname,
 	COALESCE("nasShortname", LEFT(id, 32)) AS shortname,
-	COALESCE("nasType", 'other') AS type,
+	COALESCE(nas_type, 'other') AS type,
 	"nasPorts" AS ports,
-	COALESCE("radiusSecret", '') AS secret,
+	COALESCE(radius_secret, '') AS secret,
 	"nasServer" AS server,
 	"nasCommunity" AS community,
 	COALESCE(note, vendor || ' ' || model) AS description
 FROM wf_station_device
-WHERE "isRadiusClient" = true;
+WHERE is_radius_client = true;
 
 --
 -- View: radcheck — password + Simultaneous-Use (concurrent / maxDevices)
@@ -45,18 +45,18 @@ FROM (
 		c.id AS cred_id,
 		COALESCE(c.username, c.token) AS username,
 		CASE
-			WHEN c.username IS NOT NULL AND c."passwordHash" IS NOT NULL THEN 'Crypt-Password'
+			WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN 'Crypt-Password'
 			WHEN c.token IS NOT NULL THEN 'Cleartext-Password'
 		END AS attribute,
 		':=' AS op,
 		CASE
-			WHEN c.username IS NOT NULL AND c."passwordHash" IS NOT NULL THEN c."passwordHash"
+			WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN c.password_hash
 			WHEN c.token IS NOT NULL THEN c.token
 		END AS value
 	FROM wf_credential c
 	WHERE (c.username IS NOT NULL OR c.token IS NOT NULL)
 		AND (
-			(c.username IS NOT NULL AND c."passwordHash" IS NOT NULL)
+			(c.username IS NOT NULL AND c.password_hash IS NOT NULL)
 			OR c.token IS NOT NULL
 		)
 
@@ -68,11 +68,11 @@ FROM (
 		COALESCE(c.username, c.token) AS username,
 		'Simultaneous-Use' AS attribute,
 		':=' AS op,
-		COALESCE(p."maxDevices", 1)::text AS value
+		COALESCE(p.max_devices, 1)::text AS value
 	FROM wf_credential c
-	INNER JOIN wf_plan p ON c."planId" = p.id AND p."deletedAt" IS NULL
+	INNER JOIN wf_plan p ON c.plan_id = p.id AND p.deleted_at IS NULL
 	WHERE (c.username IS NOT NULL OR c.token IS NOT NULL)
-		AND COALESCE(p."maxDevices", 1) >= 1
+		AND COALESCE(p.max_devices, 1) >= 1
 ) combined;
 
 --
@@ -99,8 +99,8 @@ FROM (
 					'{timeSeconds}',
 					COALESCE(
 						c."timeRemainingSec"::text,
-						(p."timeAmount" *
-							CASE p."timeUnit"
+						(p.time_amount *
+							CASE p.time_unit
 								WHEN 'MINUTE' THEN 60
 								WHEN 'HOUR' THEN 3600
 								WHEN 'DAY' THEN 86400
@@ -113,25 +113,25 @@ FROM (
 				REPLACE(
 					pra.value,
 					'{dataMb}',
-					COALESCE(c."dataRemainingMb"::text, p."dataMb"::text, '0')
+					COALESCE(c.data_remaining_mb::text, p.data_mb::text, '0')
 				)
 			ELSE pra.value
 		END AS value
 	FROM wf_credential c
-	INNER JOIN wf_plan p ON p.id = c."planId" AND p."deletedAt" IS NULL
-	LEFT JOIN wf_station ws ON ws.id = c."stationId" AND ws."deletedAt" IS NULL
-	INNER JOIN wf_plan_radius_attribute pra ON pra."planId" = p.id
+	INNER JOIN wf_plan p ON p.id = c.plan_id AND p.deleted_at IS NULL
+	LEFT JOIN wf_station ws ON ws.id = c.station_id AND ws.deleted_at IS NULL
+	INNER JOIN wf_plan_radius_attribute pra ON pra.plan_id = p.id
 		AND pra.phase = 'REPLY'
-		AND pra."deletedAt" IS NULL
+		AND pra.deleted_at IS NULL
 		AND (
-			pra."wifiStationId" IS NULL
-			OR (c."stationId" IS NOT NULL AND pra."wifiStationId" = c."stationId")
+			pra.wifi_station_id IS NULL
+			OR (c.station_id IS NOT NULL AND pra.wifi_station_id = c.station_id)
 		)
 		AND (
-			c."stationId" IS NULL
-			OR ws."radiusVendorProfileId" IS NULL
-			OR pra."vendorProfileId" IS NULL
-			OR pra."vendorProfileId" = ws."radiusVendorProfileId"
+			c.station_id IS NULL
+			OR ws.radius_vendor_profile_id IS NULL
+			OR pra.vendor_profile_id IS NULL
+			OR pra.vendor_profile_id = ws.radius_vendor_profile_id
 		)
 	WHERE (c.username IS NOT NULL OR c.token IS NOT NULL)
 	ORDER BY c.id, pra."attributeName", pra.priority ASC, pra.id
@@ -155,20 +155,20 @@ FROM (
 		pra.op,
 		pra.value
 	FROM wf_credential c
-	INNER JOIN wf_plan p ON p.id = c."planId" AND p."deletedAt" IS NULL
-	LEFT JOIN wf_station ws ON ws.id = c."stationId" AND ws."deletedAt" IS NULL
-	INNER JOIN wf_plan_radius_attribute pra ON pra."planId" = p.id
+	INNER JOIN wf_plan p ON p.id = c.plan_id AND p.deleted_at IS NULL
+	LEFT JOIN wf_station ws ON ws.id = c.station_id AND ws.deleted_at IS NULL
+	INNER JOIN wf_plan_radius_attribute pra ON pra.plan_id = p.id
 		AND pra.phase = 'CHECK'
-		AND pra."deletedAt" IS NULL
+		AND pra.deleted_at IS NULL
 		AND (
-			pra."wifiStationId" IS NULL
-			OR (c."stationId" IS NOT NULL AND pra."wifiStationId" = c."stationId")
+			pra.wifi_station_id IS NULL
+			OR (c.station_id IS NOT NULL AND pra.wifi_station_id = c.station_id)
 		)
 		AND (
-			c."stationId" IS NULL
-			OR ws."radiusVendorProfileId" IS NULL
-			OR pra."vendorProfileId" IS NULL
-			OR pra."vendorProfileId" = ws."radiusVendorProfileId"
+			c.station_id IS NULL
+			OR ws.radius_vendor_profile_id IS NULL
+			OR pra.vendor_profile_id IS NULL
+			OR pra.vendor_profile_id = ws.radius_vendor_profile_id
 		)
 	WHERE (c.username IS NOT NULL OR c.token IS NOT NULL)
 	ORDER BY p.code || COALESCE(c.username, c.token), pra."attributeName", pra.priority ASC, pra.id
@@ -203,7 +203,7 @@ SELECT
 	p.code || COALESCE(c.username, c.token) AS groupname,
 	1 AS priority
 FROM wf_credential c
-INNER JOIN wf_plan p ON p.id = c."planId" AND p."deletedAt" IS NULL
+INNER JOIN wf_plan p ON p.id = c.plan_id AND p.deleted_at IS NULL
 WHERE (c.username IS NOT NULL OR c.token IS NOT NULL);
 
 --

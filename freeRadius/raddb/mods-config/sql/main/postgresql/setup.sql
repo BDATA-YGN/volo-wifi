@@ -24,9 +24,12 @@ GRANT SELECT ON radusergroup TO radius;
 GRANT SELECT ON radgroupcheck TO radius;
 GRANT SELECT ON radgroupreply TO radius;
 
--- Also grant access to the underlying volo tables for views
+-- Underlying tables used by authorize queries + views
 GRANT SELECT ON wf_credential TO radius;
+GRANT SELECT ON wf_plan TO radius;
+GRANT SELECT ON wf_plan_radius_attribute TO radius;
 GRANT SELECT ON wf_station TO radius;
+GRANT SELECT ON wf_station_device TO radius;
 
 /*
  *  The server can write accounting data to volo tables
