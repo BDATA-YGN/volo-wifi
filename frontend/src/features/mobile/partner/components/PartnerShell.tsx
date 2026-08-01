@@ -3,7 +3,7 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Home, KeyRound, User, Wallet } from "lucide-react";
+import { ClipboardList, Home, KeyRound, User } from "lucide-react";
 import clsx from "clsx";
 import MobileInstallBanner from "@/features/mobile/shared/components/MobileInstallBanner";
 import VoloLogo from "@/features/mobile/shared/components/VoloLogo";
@@ -16,7 +16,6 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   home: Home,
   key: KeyRound,
   clipboard: ClipboardList,
-  wallet: Wallet,
   user: User,
 };
 

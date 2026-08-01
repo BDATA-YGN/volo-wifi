@@ -69,11 +69,11 @@
 }
 
 .mobileShell[data-actor="partner"] {
-  --mobile-accent: #7c3aed;
-  --mobile-accent-hover: #6d28d9;
-  --mobile-accent-soft: #f5f3ff;
-  --mobile-accent-border: #ddd6fe;
-  --mobile-hero-shadow: 0 12px 32px rgba(124, 58, 237, 0.28);
+  --mobile-accent: #6d7fc9;
+  --mobile-accent-hover: #5c6db8;
+  --mobile-accent-soft: #f2f4fb;
+  --mobile-accent-border: #d0d7ee;
+  --mobile-hero-shadow: 0 12px 28px rgba(109, 127, 201, 0.22);
 }
 
 .mobileShell[data-theme="dark"] {
@@ -125,12 +125,12 @@
   color-scheme: dark;
 }
 
-/* Partner purple accent in dark mode. */
+/* Partner soft periwinkle accent in dark mode. */
 .mobileShell[data-actor="partner"][data-theme="dark"] {
-  --mobile-accent: #a78bfa;
-  --mobile-accent-hover: #c4b5fd;
-  --mobile-accent-soft: #4c1d95;
-  --mobile-accent-border: #6d28d9;
+  --mobile-accent: #a8b4e0;
+  --mobile-accent-hover: #c0c8eb;
+  --mobile-accent-soft: #2a314f;
+  --mobile-accent-border: #4a5578;
   --mobile-hero-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 

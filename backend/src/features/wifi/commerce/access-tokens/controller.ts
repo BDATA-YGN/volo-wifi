@@ -15,6 +15,7 @@ import {
 } from '@/features/wifi/commerce/shared/resolve-reseller';
 import {
   CAPTIVE_SESSION_PREVIEW_LIMIT,
+  RADIUS_SESSION_PREVIEW_LIMIT,
   CREDENTIAL_STATUSES,
   type CredentialStatus,
 } from './constants';
@@ -37,6 +38,14 @@ import {
   InsufficientVoucherInventoryError,
   reserveVoucherBatchSlots,
 } from './voucher-inventory';
+import {
+  radiusSessionMatchWhere,
+  radiusUserNameVariants,
+} from '@/features/shared/credentials/credential-sync.helpers';
+import {
+  loadOpsArchiveSettings,
+  OPS_ARCHIVE_DEFAULTS,
+} from '@/jobs/reporting/lib/ops-archive-settings';
 
 const credentialSelect = {
   id: true,
@@ -44,6 +53,7 @@ const credentialSelect = {
   type: true,
   status: true,
   token: true,
+  username: true,
   planId: true,
   stationId: true,
   resellerId: true,
@@ -160,6 +170,210 @@ function revokeSuccessMessage(result: Awaited<ReturnType<typeof revokeAccessToke
   return 'Access token revoked';
 }
 
+const radiusSessionSelect = {
+  id: true,
+  status: true,
+  userName: true,
+  callingStationId: true,
+  framedIpAddress: true,
+  nasIpAddress: true,
+  nasIdentifier: true,
+  startedAt: true,
+  lastInterimAt: true,
+  stoppedAt: true,
+  sessionTimeSec: true,
+  inputBytes: true,
+  outputBytes: true,
+  totalBytes: true,
+  terminateCause: true,
+} satisfies Prisma.RadiusSessionSelect;
+
+function serializeRadiusSessionRow(
+  row: {
+    id: string;
+    status: string;
+    userName: string | null;
+    callingStationId: string | null;
+    framedIpAddress: string | null;
+    nasIpAddress: string | null;
+    nasIdentifier: string | null;
+    startedAt: Date;
+    lastInterimAt: Date | null;
+    stoppedAt: Date | null;
+    sessionTimeSec: number | null;
+    inputBytes: bigint | null;
+    outputBytes: bigint | null;
+    totalBytes: bigint | null;
+    terminateCause: string | null;
+  },
+  source: 'hot' | 'archive'
+) {
+  return {
+    id: row.id,
+    source,
+    status: row.status,
+    userName: row.userName,
+    callingStationId: row.callingStationId,
+    framedIpAddress: row.framedIpAddress,
+    nasIpAddress: row.nasIpAddress,
+    nasIdentifier: row.nasIdentifier,
+    startedAt: row.startedAt.toISOString(),
+    lastInterimAt: row.lastInterimAt?.toISOString() ?? null,
+    stoppedAt: row.stoppedAt?.toISOString() ?? null,
+    sessionTimeSec: row.sessionTimeSec,
+    inputBytes: row.inputBytes != null ? row.inputBytes.toString() : null,
+    outputBytes: row.outputBytes != null ? row.outputBytes.toString() : null,
+    totalBytes: row.totalBytes != null ? row.totalBytes.toString() : null,
+    terminateCause: row.terminateCause,
+  };
+}
+
+function buildSessionsEmptyMessage(opts: {
+  hasCaptive: boolean;
+  hasRadius: boolean;
+  wasUsed: boolean;
+  captiveRetentionDays: number;
+  radiusHotRetentionDays: number;
+  radiusArchiveRetentionDays: number;
+}): string | null {
+  if (opts.hasCaptive || opts.hasRadius) return null;
+  if (!opts.wasUsed) {
+    return 'No portal or network sessions recorded yet.';
+  }
+  const archiveNote =
+    opts.radiusArchiveRetentionDays > 0
+      ? ` Completed RADIUS sessions are archived after ${opts.radiusHotRetentionDays} days and purged after ${opts.radiusArchiveRetentionDays} days.`
+      : ` Completed RADIUS sessions are archived after ${opts.radiusHotRetentionDays} days.`;
+  return (
+    `No recent sessions remain in the live store. Captive portal logins are removed after ${opts.captiveRetentionDays} days.` +
+    archiveNote
+  );
+}
+
+async function loadTokenSessionHistory(
+  prisma: PrismaClient,
+  orgId: string,
+  credential: {
+    id: string;
+    username: string | null;
+    token: string | null;
+    status: string;
+    activatedAt: Date | null;
+  }
+) {
+  const userNameVariants = radiusUserNameVariants(credential);
+  const radiusWhere = {
+    ...radiusSessionMatchWhere(userNameVariants),
+    OR: [{ orgId }, { orgId: null }],
+  };
+
+  const [
+    captiveSessions,
+    captiveSessionsTotal,
+    hotSessions,
+    hotTotal,
+    archiveSessions,
+    archiveTotal,
+    archiveSettings,
+  ] = await Promise.all([
+    prisma.captivePortalSession.findMany({
+      where: { credentialId: credential.id, orgId },
+      select: {
+        id: true,
+        username: true,
+        ip: true,
+        mac: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: CAPTIVE_SESSION_PREVIEW_LIMIT,
+    }),
+    prisma.captivePortalSession.count({
+      where: { credentialId: credential.id, orgId },
+    }),
+    userNameVariants.length > 0
+      ? prisma.radiusSession.findMany({
+          where: radiusWhere,
+          select: radiusSessionSelect,
+          orderBy: { startedAt: 'desc' },
+          take: RADIUS_SESSION_PREVIEW_LIMIT,
+        })
+      : Promise.resolve([]),
+    userNameVariants.length > 0
+      ? prisma.radiusSession.count({ where: radiusWhere })
+      : Promise.resolve(0),
+    userNameVariants.length > 0
+      ? prisma.radiusSessionArchive.findMany({
+          where: radiusWhere,
+          select: {
+            id: true,
+            status: true,
+            userName: true,
+            callingStationId: true,
+            framedIpAddress: true,
+            nasIpAddress: true,
+            nasIdentifier: true,
+            startedAt: true,
+            lastInterimAt: true,
+            stoppedAt: true,
+            sessionTimeSec: true,
+            inputBytes: true,
+            outputBytes: true,
+            totalBytes: true,
+            terminateCause: true,
+          },
+          orderBy: { startedAt: 'desc' },
+          take: RADIUS_SESSION_PREVIEW_LIMIT,
+        })
+      : Promise.resolve([]),
+    userNameVariants.length > 0
+      ? prisma.radiusSessionArchive.count({ where: radiusWhere })
+      : Promise.resolve(0),
+    loadOpsArchiveSettings(prisma).catch(() => OPS_ARCHIVE_DEFAULTS),
+  ]);
+
+  const mergedRadius = [
+    ...hotSessions.map((s) => serializeRadiusSessionRow(s, 'hot')),
+    ...archiveSessions.map((s) => serializeRadiusSessionRow(s, 'archive')),
+  ]
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+    .slice(0, RADIUS_SESSION_PREVIEW_LIMIT);
+
+  const radiusSessionsTotal = hotTotal + archiveTotal;
+  const wasUsed =
+    Boolean(credential.activatedAt) ||
+    ['ACTIVATED', 'IN_USE', 'ACTIVE', 'CONSUMED', 'EXPIRED', 'PAUSED'].includes(credential.status);
+
+  return {
+    captiveSessions: captiveSessions.map((s) => ({
+      ...s,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
+    })),
+    captiveSessionsTotal,
+    captiveSessionsTruncated: captiveSessionsTotal > CAPTIVE_SESSION_PREVIEW_LIMIT,
+    radiusSessions: mergedRadius,
+    radiusSessionsTotal,
+    radiusSessionsTruncated: radiusSessionsTotal > RADIUS_SESSION_PREVIEW_LIMIT,
+    radiusSessionsHotTotal: hotTotal,
+    radiusSessionsArchiveTotal: archiveTotal,
+    sessionsMeta: {
+      captiveRetentionDays: archiveSettings.captivePortalRetentionDays,
+      radiusHotRetentionDays: archiveSettings.radiusSessionHotRetentionDays,
+      radiusArchiveRetentionDays: archiveSettings.radiusSessionArchiveRetentionDays,
+      emptyStateMessage: buildSessionsEmptyMessage({
+        hasCaptive: captiveSessionsTotal > 0,
+        hasRadius: radiusSessionsTotal > 0,
+        wasUsed,
+        captiveRetentionDays: archiveSettings.captivePortalRetentionDays,
+        radiusHotRetentionDays: archiveSettings.radiusSessionHotRetentionDays,
+        radiusArchiveRetentionDays: archiveSettings.radiusSessionArchiveRetentionDays,
+      }),
+    },
+  };
+}
+
 function generateOrderNo(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const rand = crypto.randomBytes(2).toString('hex').toUpperCase();
@@ -232,16 +446,17 @@ async function resolveRetailPrice(
     select: { retailPrice: true, priceBookId: true },
   });
 
-  const stationBook = books.find((b) => b.stations.some((s) => s.stationId === stationId));
-  if (stationBook) {
-    const match = prices.find((p) => p.priceBookId === stationBook.id);
-    if (match) return { price: match.retailPrice, priceBookId: stationBook.id };
-  }
-
+  // Priority: Reseller override → Site override → Station-size → Organization default
   const resellerBook = books.find((b) => b.resellers.some((r) => r.resellerId === resellerId));
   if (resellerBook) {
     const match = prices.find((p) => p.priceBookId === resellerBook.id);
     if (match) return { price: match.retailPrice, priceBookId: resellerBook.id };
+  }
+
+  const stationBook = books.find((b) => b.stations.some((s) => s.stationId === stationId));
+  if (stationBook) {
+    const match = prices.find((p) => p.priceBookId === stationBook.id);
+    if (match) return { price: match.retailPrice, priceBookId: stationBook.id };
   }
 
   const tierBook = books.find(
@@ -302,22 +517,26 @@ async function loadSellableCatalog(
 
   const plans = await Promise.all(
     entitlements.map(async (ent) => {
-      const firstStation = stationRows[0];
-      let unitPrice: number | null = null;
-      if (firstStation) {
+      const pricesByStation: Record<string, number> = {};
+      for (const station of stationRows) {
         const resolved = await resolveRetailPrice(
           prisma,
           orgId,
           resellerId,
-          firstStation.id,
+          station.id,
           ent.planId
         );
-        unitPrice = resolved ? decimalToNumber(resolved.price) : null;
+        if (resolved) {
+          pricesByStation[station.id] = decimalToNumber(resolved.price);
+        }
       }
+      const pricedValues = Object.values(pricesByStation);
+      const unitPrice = pricedValues.length > 0 ? pricedValues[0]! : null;
       return {
         ...ent.plan,
         unitPrice,
-        hasPricing: unitPrice != null,
+        hasPricing: pricedValues.length > 0,
+        pricesByStation,
       };
     })
   );
@@ -479,35 +698,19 @@ export class CommerceAccessTokensController {
             });
           }
 
-          const sessions = await this.prisma.captivePortalSession.findMany({
-            where: { credentialId: id, orgId },
-            select: {
-              id: true,
-              username: true,
-              ip: true,
-              mac: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-            orderBy: { createdAt: 'desc' },
-            take: CAPTIVE_SESSION_PREVIEW_LIMIT,
-          });
-
-          const sessionTotal = await this.prisma.captivePortalSession.count({
-            where: { credentialId: id, orgId },
+          const sessions = await loadTokenSessionHistory(this.prisma, orgId, {
+            id: row.id,
+            username: row.username,
+            token: row.token,
+            status: row.status,
+            activatedAt: row.activatedAt,
           });
 
           return responseSuccess(res, {
             message: 'Success',
             data: {
               ...serializeCredential(row, permissionCtx, revokeWindowMinutes),
-              captiveSessions: sessions.map((s) => ({
-                ...s,
-                createdAt: s.createdAt.toISOString(),
-                updatedAt: s.updatedAt.toISOString(),
-              })),
-              captiveSessionsTotal: sessionTotal,
-              captiveSessionsTruncated: sessionTotal > CAPTIVE_SESSION_PREVIEW_LIMIT,
+              ...sessions,
             },
           });
         }

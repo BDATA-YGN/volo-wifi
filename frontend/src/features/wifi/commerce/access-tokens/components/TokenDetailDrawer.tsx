@@ -18,10 +18,16 @@ import type {
   AccessTokenRecord,
   CaptiveSessionPreview,
   CredentialLifecycleAction,
+  RadiusSessionPreview,
 } from "../types";
 import { formatWifiDateTime, maskVoucherToken } from "@/features/wifi/shared/format";
 import { STATUS_COLOR } from "../constant";
-import { formatMoney, formatStatusLabel } from "../utils";
+import {
+  formatBytes,
+  formatMoney,
+  formatSessionDuration,
+  formatStatusLabel,
+} from "../utils";
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -34,6 +40,12 @@ type Props = {
   onRevoke: (record: AccessTokenRecord) => void;
   onApplyAction: (record: AccessTokenRecord, action: CredentialLifecycleAction) => void;
   loadToken: (id: string) => Promise<AccessTokenDetail>;
+};
+
+const RADIUS_STATUS_COLOR: Record<string, string> = {
+  START: "processing",
+  INTERIM: "blue",
+  STOP: "default",
 };
 
 const TokenDetailDrawer: React.FC<Props> = ({
@@ -74,8 +86,13 @@ const TokenDetailDrawer: React.FC<Props> = ({
   const captiveSessionsTotal =
     row?.captiveSessionsTotal ?? row?.captiveSessionCount ?? captiveSessions.length;
   const captiveSessionsTruncated = row?.captiveSessionsTruncated ?? false;
+  const radiusSessions = row?.radiusSessions ?? [];
+  const radiusSessionsTotal = row?.radiusSessionsTotal ?? radiusSessions.length;
+  const radiusSessionsTruncated = row?.radiusSessionsTruncated ?? false;
+  const sessionsMeta = row?.sessionsMeta ?? null;
+  const hasAnySessions = captiveSessions.length > 0 || radiusSessions.length > 0;
 
-  const sessionColumns: ColumnsType<CaptiveSessionPreview> = [
+  const captiveColumns: ColumnsType<CaptiveSessionPreview> = [
     {
       title: "Username / token",
       dataIndex: "username",
@@ -92,7 +109,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
       render: (value: string | null) => value ?? "—",
     },
     {
-      title: "MAC",
+      title: "Device (MAC)",
       dataIndex: "mac",
       width: 150,
       render: (value: string | null) =>
@@ -105,17 +122,104 @@ const TokenDetailDrawer: React.FC<Props> = ({
         ),
     },
     {
-      title: "Started",
+      title: "Login",
       dataIndex: "createdAt",
       width: 130,
       render: (value: string) => formatWifiDateTime(value),
     },
   ];
 
+  const radiusColumns: ColumnsType<RadiusSessionPreview> = [
+    {
+      title: "Status",
+      dataIndex: "status",
+      width: 90,
+      render: (status: string, record) => (
+        <div className="flex flex-col gap-1">
+          <Tag color={RADIUS_STATUS_COLOR[status] ?? "default"} style={{ margin: 0 }}>
+            {status}
+          </Tag>
+          {record.source === "archive" ? (
+            <Tag style={{ margin: 0, fontSize: 10 }}>Archived</Tag>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      title: "Device / IP",
+      key: "device",
+      width: 150,
+      render: (_, record) => (
+        <div>
+          <div>
+            {record.callingStationId ? (
+              <Text code style={{ fontSize: 11 }}>
+                {record.callingStationId}
+              </Text>
+            ) : (
+              "—"
+            )}
+          </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {record.framedIpAddress ?? "—"}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: "NAS",
+      key: "nas",
+      width: 120,
+      render: (_, record) => (
+        <Text type="secondary" style={{ fontSize: 11 }}>
+          {record.nasIdentifier || record.nasIpAddress || "—"}
+        </Text>
+      ),
+    },
+    {
+      title: "Login → Logout",
+      key: "window",
+      width: 160,
+      render: (_, record) => (
+        <div style={{ fontSize: 12 }}>
+          <div>{formatWifiDateTime(record.startedAt)}</div>
+          <Text type="secondary">
+            → {record.stoppedAt ? formatWifiDateTime(record.stoppedAt) : "online"}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: "Duration",
+      key: "duration",
+      width: 90,
+      render: (_, record) =>
+        formatSessionDuration(
+          record.sessionTimeSec,
+          record.startedAt,
+          record.stoppedAt,
+          record.status
+        ),
+    },
+    {
+      title: "Data",
+      key: "data",
+      width: 110,
+      render: (_, record) => (
+        <div style={{ fontSize: 12 }}>
+          <div>{formatBytes(record.totalBytes)}</div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            ↓{formatBytes(record.outputBytes)} ↑{formatBytes(record.inputBytes)}
+          </Text>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <Drawer
       title="Access token details"
-      size={560}
+      size={720}
       open={open}
       onClose={onClose}
       destroyOnClose
@@ -173,7 +277,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
                 type="info"
                 showIcon
                 className="mb-3"
-                title={actions.revokeBlockedReason}
+                message={actions.revokeBlockedReason}
               />
             ) : null}
 
@@ -203,19 +307,59 @@ const TokenDetailDrawer: React.FC<Props> = ({
               <Descriptions.Item label="Expires">
                 {row.expiresAt ? formatWifiDateTime(row.expiresAt) : "—"}
               </Descriptions.Item>
-              <Descriptions.Item label="Captive sessions">
-                {(row.captiveSessionCount ?? 0) > 0 ? row.captiveSessionCount : "—"}
+              <Descriptions.Item label="Captive logins">
+                {(row.captiveSessionCount ?? captiveSessionsTotal) > 0
+                  ? row.captiveSessionCount ?? captiveSessionsTotal
+                  : "—"}
+              </Descriptions.Item>
+              <Descriptions.Item label="RADIUS sessions">
+                {radiusSessionsTotal > 0 ? radiusSessionsTotal : "—"}
               </Descriptions.Item>
             </Descriptions>
 
+            <Title level={5} style={{ marginTop: 8 }}>
+              Network sessions (RADIUS)
+            </Title>
+            <Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 13 }}>
+              Usage time, data, login/logout, and device from accounting records
+              {row.radiusSessionsArchiveTotal
+                ? ` · ${row.radiusSessionsArchiveTotal} archived`
+                : ""}
+              .
+            </Paragraph>
+            {radiusSessions.length > 0 ? (
+              <>
+                <Table<RadiusSessionPreview>
+                  size="small"
+                  rowKey={(r) => `${r.source}-${r.id}`}
+                  pagination={false}
+                  columns={radiusColumns}
+                  dataSource={radiusSessions}
+                  scroll={{ x: 720 }}
+                  className="mb-2"
+                />
+                {radiusSessionsTruncated ? (
+                  <Alert
+                    type="info"
+                    showIcon
+                    className="mb-4"
+                    message={`Showing latest ${radiusSessions.length} of ${radiusSessionsTotal} RADIUS sessions`}
+                  />
+                ) : null}
+              </>
+            ) : null}
+
+            <Title level={5}>Captive portal logins</Title>
+            <Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 13 }}>
+              Portal handoff records (IP / MAC at login). These do not include data usage.
+            </Paragraph>
             {captiveSessions.length > 0 ? (
               <>
-                <Title level={5}>Captive portal sessions</Title>
                 <Table<CaptiveSessionPreview>
                   size="small"
                   rowKey="id"
                   pagination={false}
-                  columns={sessionColumns}
+                  columns={captiveColumns}
                   dataSource={captiveSessions}
                   className="mb-2"
                 />
@@ -223,13 +367,29 @@ const TokenDetailDrawer: React.FC<Props> = ({
                   <Alert
                     type="info"
                     showIcon
-                    message={`Showing latest ${captiveSessions.length} of ${captiveSessionsTotal} sessions`}
+                    className="mb-4"
+                    message={`Showing latest ${captiveSessions.length} of ${captiveSessionsTotal} captive logins`}
                   />
                 ) : null}
               </>
-            ) : (
-              <Paragraph type="secondary">No captive portal sessions recorded yet.</Paragraph>
-            )}
+            ) : null}
+
+            {!hasAnySessions ? (
+              <Alert
+                type="info"
+                showIcon
+                className="mt-2"
+                message={
+                  sessionsMeta?.emptyStateMessage ??
+                  "No portal or network sessions recorded yet."
+                }
+                description={
+                  sessionsMeta && row.activatedAt
+                    ? `Retention: captive ${sessionsMeta.captiveRetentionDays}d · RADIUS hot ${sessionsMeta.radiusHotRetentionDays}d · archive ${sessionsMeta.radiusArchiveRetentionDays}d.`
+                    : undefined
+                }
+              />
+            ) : null}
           </>
         ) : null}
       </Spin>

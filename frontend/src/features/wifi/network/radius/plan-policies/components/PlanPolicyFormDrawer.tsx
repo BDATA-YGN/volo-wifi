@@ -405,7 +405,7 @@ const PlanPolicyFormDrawer: React.FC<Props> = ({
         filterOption={(input, item) =>
           (item.title ?? "").toLowerCase().includes(input.toLowerCase())
         }
-        listStyle={{ width: 320, height: 280 }}
+        styles={{ section: { width: 320, height: 280 } }}
         className="mb-3"
       />
 

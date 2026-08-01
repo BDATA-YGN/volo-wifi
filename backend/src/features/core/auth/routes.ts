@@ -47,6 +47,18 @@ export class AuthRoute implements Route {
     this.router.get(`${this.path}/me`, AuthMiddleware, this.authController.me);
 
     /**
+     * @api {post} /auth/change-password Change password
+     * @apiGroup AUTH
+     * @apiVersion 1.0.0
+     * @apiDescription Requires current password; invalidates other sessions.
+     */
+    this.router.post(
+      `${this.path}/change-password`,
+      AuthMiddleware,
+      this.authController.changePassword,
+    );
+
+    /**
      * @api {get} /auth/token/refresh Refresh Token
      * @apiName Refresh Token
      * @apiGroup API

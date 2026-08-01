@@ -32,6 +32,7 @@ export function useMobilePwaInstall(actor: MobileActorType) {
   const [installed, setInstalled] = useState(false);
   const [dismissed, setDismissed] = useState(true);
   const [installing, setInstalling] = useState(false);
+  const [showManualHint, setShowManualHint] = useState(false);
 
   useEffect(() => {
     setInstalled(isStandaloneDisplay());
@@ -41,17 +42,27 @@ export function useMobilePwaInstall(actor: MobileActorType) {
     const onBeforeInstall = (event: Event) => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
+      setShowManualHint(false);
     };
 
     const onInstalled = () => {
       setInstalled(true);
       setDeferredPrompt(null);
+      setShowManualHint(false);
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
 
+    // If the browser never fires beforeinstallprompt, still surface how to install.
+    const timer = window.setTimeout(() => {
+      if (!isStandaloneDisplay() && !isIosDevice()) {
+        setShowManualHint(true);
+      }
+    }, 2000);
+
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
     };
@@ -81,7 +92,8 @@ export function useMobilePwaInstall(actor: MobileActorType) {
 
   const showIosGuide = isIosDevice() && !installed;
   const showAndroidInstall = Boolean(deferredPrompt) && !installed;
-  const visible = !installed && !dismissed && (showIosGuide || showAndroidInstall);
+  const showBrowserHint = showManualHint && !showAndroidInstall && !showIosGuide && !installed;
+  const visible = !installed && !dismissed && (showIosGuide || showAndroidInstall || showBrowserHint);
 
   return {
     config,
@@ -90,6 +102,7 @@ export function useMobilePwaInstall(actor: MobileActorType) {
     installing,
     showIosGuide,
     showAndroidInstall,
+    showBrowserHint,
     install,
     dismiss,
   };

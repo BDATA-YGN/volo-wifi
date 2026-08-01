@@ -15,6 +15,7 @@ import {
   CAPTIVE_REFRESH_COOKIE_MAX_AGE_MS,
   captiveAuthCookieOptions,
 } from '@/features/captive/services/cookie-options';
+import { AUTH_COOKIE_NAMES } from '@/features/auth/auth-cookies';
 import {
   captiveDeviceLimitReached,
   captiveErrors,
@@ -27,6 +28,8 @@ import { recordCaptivePortalSession } from '@/features/captive/services/captive-
 const prisma = PrismaDBConnection.getConnection();
 
 const cookieOptions = captiveAuthCookieOptions();
+const portalAccessCookie = AUTH_COOKIE_NAMES.captive.access;
+const portalRefreshCookie = AUTH_COOKIE_NAMES.captive.refresh;
 
 function mapLoginGuardError(error: unknown): never {
   const code = (error as { code?: string }).code;
@@ -148,11 +151,11 @@ export class CaptiveAuthController {
       const accessToken = CaptiveJwtService.createAccessToken(credential.id);
       const refreshToken = CaptiveJwtService.createRefreshToken(credential.id);
 
-      res.cookie('access_token', accessToken, {
+      res.cookie(portalAccessCookie, accessToken, {
         ...cookieOptions,
         maxAge: CAPTIVE_ACCESS_COOKIE_MAX_AGE_MS,
       });
-      res.cookie('refresh_token', refreshToken, {
+      res.cookie(portalRefreshCookie, refreshToken, {
         ...cookieOptions,
         maxAge: CAPTIVE_REFRESH_COOKIE_MAX_AGE_MS,
       });
@@ -215,8 +218,8 @@ export class CaptiveAuthController {
           }
         }
 
-        res.clearCookie('access_token', cookieOptions);
-        res.clearCookie('refresh_token', cookieOptions);
+        res.clearCookie(portalAccessCookie, cookieOptions);
+        res.clearCookie(portalRefreshCookie, cookieOptions);
 
         responseSuccess(res, { message: captiveSuccess.LOGOUT, data: {} });
       } catch (error) {

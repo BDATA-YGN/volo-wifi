@@ -9,3 +9,8 @@ export const LogoutSchema = Joi.object({
   token: Joi.string().required()
 });
 
+export const ChangePasswordSchema = Joi.object({
+  currentPassword: Joi.string().min(1).max(128).required(),
+  newPassword: Joi.string().min(8).max(128).required(),
+}).unknown(false);
+

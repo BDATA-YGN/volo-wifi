@@ -118,7 +118,7 @@ const CommercePartnersWorkspacePage: React.FC = () => {
             <Alert
               type="info"
               showIcon
-              message="Select an organization"
+              title="Select an organization"
               description="Choose a tenant to open a partner workspace."
             />
           ) : null}

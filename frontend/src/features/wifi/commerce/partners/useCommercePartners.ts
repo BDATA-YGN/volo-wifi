@@ -51,8 +51,14 @@ export function useCommercePartners() {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as PartnersFormOptions;
     setFormOptions(opts);
+    // Without orgId the API returns empty stations/plans — hydrate when there is a single membership.
     if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+      const onlyOrgId = opts.memberships[0].id;
+      setOrgId(onlyOrgId);
+      const withOrg = await Query.loadFormOptions(onlyOrgId);
+      const hydrated = withOrg.data as PartnersFormOptions;
+      setFormOptions(hydrated);
+      return hydrated;
     }
     return opts;
   }, []);

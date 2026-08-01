@@ -11,8 +11,8 @@ export function getMobileAntdTheme(
   const isPartner = actor === "partner";
   const colorPrimary = isPartner
     ? isDark
-      ? "#a78bfa"
-      : "#7c3aed"
+      ? "#a8b4e0"
+      : "#6d7fc9"
     : isCustomer
       ? isDark
         ? "#60a5fa"

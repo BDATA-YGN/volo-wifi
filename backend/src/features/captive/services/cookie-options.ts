@@ -2,7 +2,7 @@ import type { CookieOptions } from 'express';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-/** Cookie options aligned with legacy captive portal (access_token / refresh_token). */
+/** Cookie options for captive portal session (`portal_access_token` / `portal_refresh_token`). */
 export function captiveAuthCookieOptions(): CookieOptions {
   return {
     httpOnly: isProduction,

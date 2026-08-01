@@ -24,14 +24,57 @@ export function formatMoney(amount: number, currency: string): string {
   }
 }
 
+export function formatBytes(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = n;
+  let i = 0;
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024;
+    i += 1;
+  }
+  return `${size < 10 && i > 0 ? size.toFixed(1) : Math.round(size)} ${units[i]}`;
+}
+
+export function formatSessionDuration(
+  sessionTimeSec: number | null | undefined,
+  startedAt: string,
+  stoppedAt: string | null,
+  status: string
+): string {
+  let sec = sessionTimeSec ?? undefined;
+  if (sec == null) {
+    const start = new Date(startedAt).getTime();
+    const end =
+      stoppedAt != null
+        ? new Date(stoppedAt).getTime()
+        : status === "STOP"
+          ? start
+          : Date.now();
+    sec = Math.max(0, Math.floor((end - start) / 1000));
+  }
+
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 export function resolvePlanPrice(
   plans: SellablePlan[],
   planId: string,
   stationId: string | undefined
 ): number | null {
   const plan = plans.find((p) => p.id === planId);
-  if (!plan?.hasPricing || plan.unitPrice == null) return null;
-  void stationId;
+  if (!plan) return null;
+  if (stationId && plan.pricesByStation?.[stationId] != null) {
+    return plan.pricesByStation[stationId]!;
+  }
+  if (!plan.hasPricing || plan.unitPrice == null) return null;
   return plan.unitPrice;
 }
 

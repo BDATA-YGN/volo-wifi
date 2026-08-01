@@ -16,6 +16,7 @@ export default function MobileInstallBanner({ actor }: MobileInstallBannerProps)
     installing,
     showIosGuide,
     showAndroidInstall,
+    showBrowserHint,
     install,
     dismiss,
   } = useMobilePwaInstall(actor);
@@ -35,6 +36,11 @@ export default function MobileInstallBanner({ actor }: MobileInstallBannerProps)
             <span className={styles.installIosHint}>
               <Share size={14} aria-hidden />
               Tap Share, then &quot;Add to Home Screen&quot;
+            </span>
+          ) : null}
+          {showBrowserHint ? (
+            <span className={styles.installIosHint}>
+              Use your browser menu → Install app / Add to Home screen
             </span>
           ) : null}
         </div>

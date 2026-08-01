@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIES_CONSTANTS, HTTP_ONLY_COOKIE_NAMES } from "@/utils/constants";
-import { handleMobileProxyAuth } from "@/features/mobile/shared/proxy-mobile-auth";
 import { handlePartnerProxyAuth } from "@/features/mobile/partner/proxy-partner-auth";
 import {
   isPartnerHost,
@@ -13,12 +12,6 @@ import {
   handleCaptiveSubdomainRoot,
 } from "@/features/captive-portal/proxy-captive-auth";
 import { isCaptivePortalPath, isCaptiveHost } from "@/features/captive-portal/subdomain";
-import { MOBILE_ROUTES } from "@/features/mobile/shared/constants";
-import {
-  isMobileSubdomainSharedPath,
-  mobileAppFromHost,
-  mobileAppFromPathname,
-} from "@/features/mobile/shared/subdomain";
 import * as lzString from 'lz-string';
 import { withForwardedClientIpHeaders } from "@/lib/http/client-ip";
 import { CONSOLE_LOGIN_PATH } from "@/lib/auth/console-paths";
@@ -42,14 +35,12 @@ const publicUrls = [
   "/storage",
   "/file-proxy",
   "/verify",
-  "/collector/login",
-  "/customer/login",
   "/partner/login",
   "/portal",
   "/portal-api",
 ];
 const SKIP_PATH_REGEX =
-  /^(\/images\/.*|\/uploads\/.*|\/assets\/.*|\/storage\/.*|\/file-proxy\/.*|\/portal-api\/.*|\/basic\/.*|\/fonts\/.*|\/logo\.png|\/_next\/static|\/_next\/image|.*\.png|.*\.svg|.*\.webp|\/collector\/sw\.js|\/customer\/sw\.js|\/partner\/sw\.js|\/collector\/manifest\.webmanifest|\/customer\/manifest\.webmanifest|\/partner\/manifest\.webmanifest)$/;
+  /^(\/images\/.*|\/uploads\/.*|\/assets\/.*|\/storage\/.*|\/file-proxy\/.*|\/portal-api\/.*|\/basic\/.*|\/fonts\/.*|\/logo\.png|\/_next\/static|\/_next\/image|.*\.png|.*\.svg|.*\.webp|\/partner\/sw\.js|\/partner\/manifest\.webmanifest)$/;
 
 const REDIRECT_URLS = {
   unauthorized: "/unauthorized",
@@ -70,25 +61,6 @@ function handlePartnerSubdomainCanonicalPaths(request: NextRequest): NextRespons
   return NextResponse.redirect(new URL(PARTNER_ROUTES.root, request.url));
 }
 
-/** On mobile subdomains, non-prefixed paths (e.g. /profile) must not hit admin routes. */
-function handleMobileSubdomainCanonicalPaths(request: NextRequest): NextResponse | null {
-  const app = mobileAppFromHost(request.headers.get("host"));
-  if (!app) return null;
-
-  const { pathname } = request.nextUrl;
-  const root = MOBILE_ROUTES[app].root;
-
-  if (mobileAppFromPathname(pathname) === app) {
-    return null;
-  }
-
-  if (isMobileSubdomainSharedPath(pathname) || SKIP_PATH_REGEX.test(pathname)) {
-    return nextWithClientIp(request);
-  }
-
-  return NextResponse.redirect(new URL(root, request.url));
-}
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -99,11 +71,6 @@ export async function proxy(request: NextRequest) {
   const captiveRootResponse = handleCaptiveSubdomainRoot(request);
   if (captiveRootResponse) {
     return captiveRootResponse;
-  }
-
-  const subdomainCanonicalResponse = handleMobileSubdomainCanonicalPaths(request);
-  if (subdomainCanonicalResponse) {
-    return subdomainCanonicalResponse;
   }
 
   const partnerSubdomainResponse = handlePartnerSubdomainCanonicalPaths(request);
@@ -123,14 +90,6 @@ export async function proxy(request: NextRequest) {
     return nextWithClientIp(request);
   }
 
-  const mobileAuthResponse = handleMobileProxyAuth(request);
-  if (mobileAuthResponse) {
-    if (!mobileAuthResponse.headers.get("location")) {
-      return nextWithClientIp(request);
-    }
-    return mobileAuthResponse;
-  }
-
   const partnerAuthResponse = handlePartnerProxyAuth(request);
   if (partnerAuthResponse) {
     if (!partnerAuthResponse.headers.get("location")) {
@@ -140,10 +99,6 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isPartnerPath(pathname)) {
-    return nextWithClientIp(request);
-  }
-
-  if (mobileAppFromHost(request.headers.get("host"))) {
     return nextWithClientIp(request);
   }
 

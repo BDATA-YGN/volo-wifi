@@ -2,12 +2,12 @@ import { Response, Request, NextFunction } from 'express';
 import { Container } from 'typedi';
 import { responseSuccess } from '@/utils/api-response';
 import { asyncController } from '@/utils/async-controller';
-import { LoginSchema, LogoutSchema } from './schema';
+import { LoginSchema, LogoutSchema, ChangePasswordSchema } from './schema';
 import { Location, ValidationMiddleware } from '@/middlewares/validation.middleware';
 import { CustomException, InvalidPayloadException } from '@/utils/exception';
 import { AuthenticatedRequest } from '@/interfaces/express.interface';
 import { JwtService } from '@/utils/jwt';
-import { comparePassword } from '@/utils/password';
+import { comparePassword, hashPassword } from '@/utils/password';
 import { WebSocketService } from "@/third-party/bdataSocket";
 import cookieOptions from "@/lib/cookies";
 import * as lzString from 'lz-string';
@@ -27,6 +27,11 @@ import {
 } from '@/features/core/auth/login-lockout.service';
 import { resolveClientIp, resolveUserAgent } from '@/utils/request-ip';
 import { assertOrgMembershipAllowsConsoleAccess } from '@/features/wifi/shared/org-membership-auth';
+import {
+  cookieNamesForProfile,
+  resolveConsoleAuthProfile,
+} from '@/features/auth/auth-cookies';
+import { invalidateAdminSessions } from '@/features/mobile/v1/auth/auth.security';
 const prisma = PrismaDBConnection.getConnection();
 
 const extraRolesAndMenus = (mapRoleSettings: any) => {
@@ -70,6 +75,8 @@ export class Controller {
     ValidationMiddleware(LoginSchema),
     asyncController(async (req: Request, res: Response): Promise<void> => {
       const request = req.body;
+      const profile = resolveConsoleAuthProfile(req);
+      const names = cookieNamesForProfile(profile);
       const checkUser: Admin = await this.adminService.findWithCustomKey('username', request.username);
 
       if (!checkUser || checkUser.deletedAt !== null || checkUser.isActive === false) {
@@ -108,9 +115,12 @@ export class Controller {
         await this.jwtService.getSessionCookieMaxAges();
       const futureTimestamp = dayjs().add(accessCookieMaxAge, 'millisecond').valueOf();
 
-      res.clearCookie('menus', { ...cookieOptions });
-      res.cookie('access_token', token, { ...cookieOptions, maxAge: accessCookieMaxAge });
-      res.cookie('refresh_token', refreshToken, { ...cookieOptions, maxAge: refreshCookieMaxAge });
+      // Only touch this profile's cookies so /wifi and /partner can coexist.
+      if (profile === 'admin') {
+        res.clearCookie('menus', { ...cookieOptions });
+      }
+      res.cookie(names.access, token, { ...cookieOptions, maxAge: accessCookieMaxAge });
+      res.cookie(names.refresh, refreshToken, { ...cookieOptions, maxAge: refreshCookieMaxAge });
 
       this.socketService.broadcast(
         BROADCAST_EVENTS.FETCH_ADMINS,
@@ -133,7 +143,7 @@ export class Controller {
         resource: 'auth/login',
         ipAddress: clientIp || undefined,
         userAgent: userAgent || undefined,
-        details: JSON.stringify({ username: checkUser.username }),
+        details: JSON.stringify({ username: checkUser.username, authApp: profile }),
       });
 
       responseSuccess(res, {
@@ -204,15 +214,19 @@ export class Controller {
       const jsonString = JSON.stringify(permissions);
       const compressed = lzString.compressToEncodedURIComponent(jsonString);
       const { refreshMs: menusCookieMaxAge } = await this.jwtService.getSessionCookieMaxAges();
-      res.cookie('menus', compressed, { ...cookieOptions, maxAge: menusCookieMaxAge });
+      // Partner app does not use console menu RBAC cookies.
+      if (resolveConsoleAuthProfile(req) === 'admin') {
+        res.cookie('menus', compressed, { ...cookieOptions, maxAge: menusCookieMaxAge });
+      }
       responseSuccess(res, { message: 'success', data: resp });
     }),
   ];
 
   public logout = [
     asyncController(async (req: AuthenticatedRequest, res: Response) => {
-      // Get token from cookies instead of header
-      const token = req.cookies.access_token;
+      const profile = resolveConsoleAuthProfile(req);
+      const names = cookieNamesForProfile(profile);
+      const token = req.cookies[names.access] as string | undefined;
 
       if (!token) {
         throw new CustomException(401, 'INVALID_TOKEN', 'Please login first');
@@ -232,10 +246,12 @@ export class Controller {
         isOnline: false
       });
 
-      // Clear session cookies (menus must not leak to the next user on shared browsers)
-      res.clearCookie('access_token', { ...cookieOptions });
-      res.clearCookie('refresh_token', { ...cookieOptions });
-      res.clearCookie('menus', { ...cookieOptions });
+      // Clear only this profile's cookies so sibling sessions stay intact.
+      res.clearCookie(names.access, { ...cookieOptions });
+      res.clearCookie(names.refresh, { ...cookieOptions });
+      if (profile === 'admin') {
+        res.clearCookie('menus', { ...cookieOptions });
+      }
 
       // Fire-and-forget audit + sign-in history rows.
       void recordLogin({
@@ -253,16 +269,79 @@ export class Controller {
         resource: 'auth/logout',
         ipAddress: resolveClientIp(req) || undefined,
         userAgent: resolveUserAgent(req) || undefined,
-        details: '',
+        details: JSON.stringify({ authApp: profile }),
       });
 
       responseSuccess(res, { message: 'success' });
     }),
   ];
 
+  public changePassword = [
+    ValidationMiddleware(ChangePasswordSchema),
+    asyncController(async (req: AuthenticatedRequest, res: Response) => {
+      const { currentPassword, newPassword } = req.body as {
+        currentPassword: string;
+        newPassword: string;
+      };
+      const adminId = req.userId!;
+      const admin = await this.adminService.findById(adminId);
+      if (!admin?.password) {
+        throw new CustomException(401, 'INVALID_CREDENTIALS', 'Please login first');
+      }
+
+      const isMatch = await comparePassword(currentPassword, admin.password);
+      if (!isMatch) {
+        throw new CustomException(401, 'INVALID_CREDENTIALS', 'Current password is incorrect');
+      }
+
+      if (currentPassword === newPassword) {
+        throw new CustomException(
+          400,
+          'VALIDATION_ERROR',
+          'New password must be different from the current password',
+        );
+      }
+
+      const hashed = await hashPassword(newPassword);
+      await this.adminService.update(adminId, {
+        password: hashed,
+        updatedBy: admin.username,
+      });
+
+      const profile = resolveConsoleAuthProfile(req);
+      const names = cookieNamesForProfile(profile);
+      const accessToken = req.cookies[names.access] as string | undefined;
+      const currentRecord = accessToken
+        ? await this.adminTokenService.findWithCustomKey('token', accessToken)
+        : null;
+
+      await invalidateAdminSessions(prisma, adminId, {
+        exceptTokenId: currentRecord?.id,
+      });
+
+      void createAuditLog({
+        type: 'UPDATE',
+        severity: 'INFO',
+        userId: adminId,
+        userEmail: admin.username,
+        action: `${req.method} ${req.originalUrl}`,
+        resource: 'auth/change-password',
+        ipAddress: resolveClientIp(req) || undefined,
+        userAgent: resolveUserAgent(req) || undefined,
+        details: JSON.stringify({ authApp: profile }),
+      });
+
+      responseSuccess(res, {
+        message: 'Password updated successfully. Other signed-in devices have been signed out.',
+        data: {},
+      });
+    }),
+  ];
+
   public refreshToken = asyncController(async (req: Request, res: Response): Promise<void> => {
-    // Get refresh token from cookies
-    const refreshTokenFromCookie = req.cookies.refresh_token;
+    const profile = resolveConsoleAuthProfile(req);
+    const names = cookieNamesForProfile(profile);
+    const refreshTokenFromCookie = req.cookies[names.refresh] as string | undefined;
 
     if (!refreshTokenFromCookie) {
       throw new CustomException(401, 'INVALID_TOKEN', 'Refresh token missing');
@@ -299,8 +378,8 @@ export class Controller {
       await this.jwtService.getSessionCookieMaxAges();
     const futureTimestamp = dayjs().add(accessCookieMaxAge, 'millisecond').valueOf();
 
-    res.cookie('access_token', token, { ...cookieOptions, maxAge: accessCookieMaxAge });
-    res.cookie('refresh_token', newRefreshToken, { ...cookieOptions, maxAge: refreshCookieMaxAge });
+    res.cookie(names.access, token, { ...cookieOptions, maxAge: accessCookieMaxAge });
+    res.cookie(names.refresh, newRefreshToken, { ...cookieOptions, maxAge: refreshCookieMaxAge });
 
     responseSuccess(res, { message: 'Success', data: { maxAge: futureTimestamp } });
   });

@@ -41,6 +41,9 @@ export const extractAccessToken = (req: Request, preferredProfile?: AuthAppProfi
   if (profile === 'customer') {
     return readCookie(req, AUTH_COOKIE_NAMES.customer.access);
   }
+  if (profile === 'partner') {
+    return readCookie(req, AUTH_COOKIE_NAMES.partner.access);
+  }
   if (profile === 'admin') {
     return readCookie(req, AUTH_COOKIE_NAMES.admin.access);
   }
@@ -48,6 +51,7 @@ export const extractAccessToken = (req: Request, preferredProfile?: AuthAppProfi
   return (
     readCookie(req, AUTH_COOKIE_NAMES.collector.access) ??
     readCookie(req, AUTH_COOKIE_NAMES.customer.access) ??
+    readCookie(req, AUTH_COOKIE_NAMES.partner.access) ??
     readCookie(req, AUTH_COOKIE_NAMES.admin.access)
   );
 };
@@ -66,6 +70,9 @@ export const extractRefreshToken = (req: Request, preferredProfile?: AuthAppProf
   if (profile === 'customer') {
     return readCookie(req, AUTH_COOKIE_NAMES.customer.refresh);
   }
+  if (profile === 'partner') {
+    return readCookie(req, AUTH_COOKIE_NAMES.partner.refresh);
+  }
   if (profile === 'admin') {
     return readCookie(req, AUTH_COOKIE_NAMES.admin.refresh);
   }
@@ -73,6 +80,7 @@ export const extractRefreshToken = (req: Request, preferredProfile?: AuthAppProf
   return (
     readCookie(req, AUTH_COOKIE_NAMES.collector.refresh) ??
     readCookie(req, AUTH_COOKIE_NAMES.customer.refresh) ??
+    readCookie(req, AUTH_COOKIE_NAMES.partner.refresh) ??
     readCookie(req, AUTH_COOKIE_NAMES.admin.refresh)
   );
 };

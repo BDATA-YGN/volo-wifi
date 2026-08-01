@@ -5,6 +5,7 @@ import { Button } from "antd";
 import { Home, RotateCcw } from "lucide-react";
 import clsx from "clsx";
 import { MOBILE_ROUTES } from "../constants";
+import { PARTNER_ROUTES } from "@/features/mobile/partner/constants";
 import { useMobileThemeStore } from "../mobileThemeStore";
 import type { MobileActorType } from "../types";
 import styles from "./mobile.module.css";
@@ -27,8 +28,17 @@ export default function MobileGeneralError({
 }: MobileGeneralErrorProps) {
   const theme = useMobileThemeStore((s) => s.theme);
   const homeHref =
-    actor === "collector" ? MOBILE_ROUTES.collector.home : MOBILE_ROUTES.customer.home;
-  const appLabel = actor === "collector" ? "VOLO Collector" : "StarLink Customer";
+    actor === "partner"
+      ? PARTNER_ROUTES.home
+      : actor === "collector"
+        ? MOBILE_ROUTES.collector.home
+        : MOBILE_ROUTES.customer.home;
+  const appLabel =
+    actor === "partner"
+      ? "VOLO Partner"
+      : actor === "collector"
+        ? "VOLO Collector"
+        : "StarLink Customer";
 
   return (
     <div

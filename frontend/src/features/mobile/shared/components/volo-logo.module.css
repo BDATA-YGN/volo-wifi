@@ -79,3 +79,22 @@
 :global([data-theme="dark"]) .logoDark {
   display: block;
 }
+
+/* White plate keeps the color logo even on dark screens (e.g. partner login). */
+.logoPlate_white {
+  --volo-logo-plate-bg: #ffffff;
+  --volo-logo-plate-border: #e2e8f0;
+}
+
+:global([data-theme="dark"]) .logoPlate_white {
+  --volo-logo-plate-bg: #ffffff;
+  --volo-logo-plate-border: #e2e8f0;
+}
+
+:global([data-theme="dark"]) .logoPlate_white .logoLight {
+  display: block;
+}
+
+:global([data-theme="dark"]) .logoPlate_white .logoDark {
+  display: none;
+}

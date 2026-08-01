@@ -59,10 +59,12 @@ const CommercePartnersPage: React.FC = () => {
   }, [loadFormOptions]);
 
   useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
-      selectOrg(meta.memberships[0].id);
+    // Multi-org: wait for explicit OrgSwitcher selection.
+    // Single-org is hydrated inside loadFormOptions (with stations/plans).
+    if (initDone && !orgId && formOptions.memberships.length === 1) {
+      selectOrg(formOptions.memberships[0].id);
     }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
+  }, [initDone, formOptions.memberships, orgId, selectOrg]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(search), 300);
@@ -182,8 +184,9 @@ const CommercePartnersPage: React.FC = () => {
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
             Onboard reseller partners with a console login, mapped sites, and sellable plans in one
             step. Partners sign in with the PARTNER role and sell tokens under{" "}
-            <Link href="/wifi/commerce/access-tokens">Access Tokens</Link>. Set reseller prices
-            under <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link>.
+            <Link href="/wifi/commerce/access-tokens">Access Tokens</Link>. Set partner/site prices
+            under <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link> (organization
+            default, reseller, or site books).
           </Paragraph>
         </div>
 
@@ -226,7 +229,7 @@ const CommercePartnersPage: React.FC = () => {
                   title="No sites configured"
                   description={
                     <span>
-                      Add WiFi sites before onboarding partners.{" "}
+                      Partners need mapped WiFi sites for POS.{" "}
                       <Link href="/wifi/sites">Open Site Directory</Link>
                     </span>
                   }
@@ -240,7 +243,8 @@ const CommercePartnersPage: React.FC = () => {
                   title="No service plans"
                   description={
                     <span>
-                      Create internet plans before assigning partner entitlements.{" "}
+                      Create plans to assign sellable entitlements, then set prices in{" "}
+                      <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link>.{" "}
                       <Link href="/wifi/catalog/service-plans">Open Service Plans</Link>
                     </span>
                   }
@@ -314,6 +318,7 @@ const CommercePartnersPage: React.FC = () => {
         open={detailOpen}
         partnerId={selected?.id ?? null}
         fallback={selected}
+        availablePlans={formOptions.plans}
         onClose={() => {
           setDetailOpen(false);
           setSelected(null);

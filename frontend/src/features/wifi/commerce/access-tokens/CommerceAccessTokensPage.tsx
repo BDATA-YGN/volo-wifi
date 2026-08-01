@@ -272,7 +272,7 @@ const CommerceAccessTokensPage: React.FC = () => {
               type="info"
               showIcon
               title="Admin preview mode"
-              description="Issuing tokens on behalf of the selected partner. Full token lifecycle actions are available."
+              description="Issuing tokens on behalf of the selected partner. Pause/unlock follow token status; revoke is only before use; revert to sold is developer-only."
             />
           ) : null}
 

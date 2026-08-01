@@ -43,7 +43,8 @@ async function loadPricingReadiness(
   prisma: PrismaClient,
   orgId: string,
   resellerId: string,
-  entitledPlanIds: string[]
+  entitledPlanIds: string[],
+  stationIds: string[]
 ): Promise<{ pricedPlanCount: number; hasPricing: boolean }> {
   if (entitledPlanIds.length === 0) {
     return { pricedPlanCount: 0, hasPricing: false };
@@ -53,11 +54,18 @@ async function loadPricingReadiness(
     where: {
       orgId,
       deletedAt: null,
-      OR: [{ resellers: { some: { resellerId } } }, { isDefault: true }],
+      OR: [
+        { resellers: { some: { resellerId } } },
+        ...(stationIds.length > 0
+          ? [{ stations: { some: { stationId: { in: stationIds } } } }]
+          : []),
+        { isDefault: true },
+      ],
     },
     select: {
       id: true,
       isDefault: true,
+      stations: { select: { stationId: true } },
       resellers: { select: { resellerId: true } },
     },
   });
@@ -81,12 +89,27 @@ async function loadPricingReadiness(
   const resellerBookIds = new Set(
     books.filter((b) => b.resellers.some((r) => r.resellerId === resellerId)).map((b) => b.id)
   );
+  const siteBookIds = new Set(
+    books
+      .filter((b) => b.stations.some((s) => stationIds.includes(s.stationId)))
+      .map((b) => b.id)
+  );
   const defaultBookIds = new Set(books.filter((b) => b.isDefault).map((b) => b.id));
 
+  // Priority: Reseller → Site → Organization default (same as sell-time resolution)
   const covered = new Set<string>();
-  for (const row of pricedPlans) {
-    if (resellerBookIds.has(row.priceBookId) || defaultBookIds.has(row.priceBookId)) {
-      covered.add(row.planId);
+  for (const planId of entitledPlanIds) {
+    const rows = pricedPlans.filter((p) => p.planId === planId);
+    if (rows.some((r) => resellerBookIds.has(r.priceBookId))) {
+      covered.add(planId);
+      continue;
+    }
+    if (rows.some((r) => siteBookIds.has(r.priceBookId))) {
+      covered.add(planId);
+      continue;
+    }
+    if (rows.some((r) => defaultBookIds.has(r.priceBookId))) {
+      covered.add(planId);
     }
   }
 
@@ -142,6 +165,7 @@ async function buildDashboard(
   }
 
   const entitledPlanIds = reseller.planEntitlements.map((e) => e.planId);
+  const mappedStationIds = reseller.resellerStations.map((rs) => rs.station.id);
 
   const [
     credentialsNew,
@@ -213,7 +237,7 @@ async function buildDashboard(
       orderBy: [{ soldAt: 'desc' }, { createdAt: 'desc' }],
       take: 8,
     }),
-    loadPricingReadiness(prisma, orgId, resellerId, entitledPlanIds),
+    loadPricingReadiness(prisma, orgId, resellerId, entitledPlanIds, mappedStationIds),
   ]);
 
   const stationCount = reseller.resellerStations.length;

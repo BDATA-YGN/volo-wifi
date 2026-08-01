@@ -69,7 +69,13 @@ export default function PartnerLoginPage() {
   return (
     <div className={mobileStyles.loginCard}>
       <div className={mobileStyles.loginBrand}>
-        <VoloLogo variant="full" height={72} title="VOLO" className={mobileStyles.loginBrandLogo} />
+        <VoloLogo
+          variant="full"
+          height={72}
+          title="VOLO"
+          plate="white"
+          className={mobileStyles.loginBrandLogo}
+        />
         <h1 className={mobileStyles.loginBrandTitle}>Volo Partner</h1>
         <p className={mobileStyles.loginBrandSub}>Sign in to sell WiFi tokens</p>
       </div>

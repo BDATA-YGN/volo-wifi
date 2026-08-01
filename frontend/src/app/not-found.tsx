@@ -9,11 +9,10 @@ export default function NotFoundPage() {
   const pathname = usePathname();
 
   if (isMobileWebPath(pathname)) {
-    const actor = pathname.startsWith("/collector") ? "collector" : "customer";
     return (
       <MobileThemeProvider>
         <MobileGeneralError
-          actor={actor}
+          actor="partner"
           standalone
           title="Page not found"
           message="This page does not exist. Go back to home to continue."

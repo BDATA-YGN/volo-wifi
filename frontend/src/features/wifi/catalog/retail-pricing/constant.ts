@@ -14,17 +14,17 @@ export const SCOPE_OPTIONS: { value: PriceBookScope; label: string; description:
   {
     value: "DEFAULT",
     label: "Organization default",
-    description: "Fallback retail prices for the whole tenant",
+    description: "Fallback when no reseller or site book applies (lowest priority)",
   },
   {
     value: "RESELLER",
     label: "Reseller",
-    description: "Override prices for one or more partners",
+    description: "Highest priority — wins over site and organization default",
   },
   {
     value: "STATION",
     label: "Site",
-    description: "Override prices for one or more WiFi sites",
+    description: "Used when no reseller book matches (ahead of organization default)",
   },
 ];
 

@@ -8,6 +8,7 @@ import {
   CAPTIVE_ACCESS_COOKIE_MAX_AGE_MS,
   captiveAuthCookieOptionsStrict,
 } from '@/features/captive/services/cookie-options';
+import { AUTH_COOKIE_NAMES } from '@/features/auth/auth-cookies';
 
 export const CaptiveClientAuthMiddleware = async (
   req: AuthenticatedRequest,
@@ -15,8 +16,10 @@ export const CaptiveClientAuthMiddleware = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const accessToken = req.cookies.access_token as string | undefined;
-    const refreshToken = req.cookies.refresh_token as string | undefined;
+    const accessName = AUTH_COOKIE_NAMES.captive.access;
+    const refreshName = AUTH_COOKIE_NAMES.captive.refresh;
+    const accessToken = req.cookies[accessName] as string | undefined;
+    const refreshToken = req.cookies[refreshName] as string | undefined;
 
     if (!refreshToken) {
       responseError(res, 401, { code: '401', message: 'Unauthorized' });
@@ -42,7 +45,7 @@ export const CaptiveClientAuthMiddleware = async (
     req.credential = credential;
 
     if (verification.newToken != null) {
-      res.cookie('access_token', verification.newToken, {
+      res.cookie(accessName, verification.newToken, {
         ...captiveAuthCookieOptionsStrict(),
         maxAge: CAPTIVE_ACCESS_COOKIE_MAX_AGE_MS,
       });

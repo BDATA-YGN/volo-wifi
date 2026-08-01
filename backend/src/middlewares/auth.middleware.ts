@@ -9,6 +9,10 @@ import { logger } from '@/logging/logger';
 import { resolveClientIp, resolveUserAgent } from '@/utils/request-ip';
 import md5 from 'md5';
 import crypto from 'crypto';
+import {
+  cookieNamesForProfile,
+  resolveConsoleAuthProfile,
+} from '@/features/auth/auth-cookies';
 
 const scrubSensitiveData = (data: any, sensitiveKeys: string[] = ['password', 'token', 'secret', 'refreshToken', 'authorization', 'cookie', 'creditcard']) => {
   if (!data || typeof data !== 'object') return data;
@@ -99,8 +103,9 @@ const shouldSkipMiddlewareAuditForChatNoise = (req: Request): boolean => {
 
 export const AuthMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const accessToken = req.cookies.access_token;
-    const refreshToken = req.cookies.refresh_token;
+    const names = cookieNamesForProfile(resolveConsoleAuthProfile(req));
+    const accessToken = req.cookies[names.access] as string | undefined;
+    const refreshToken = req.cookies[names.refresh] as string | undefined;
 
     if (!refreshToken) throw new CustomException(401, 'INVALID_TOKEN', 'Please login first');
 

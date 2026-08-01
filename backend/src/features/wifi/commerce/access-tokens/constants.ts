@@ -37,3 +37,4 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export const MAX_ISSUE_QUANTITY = 20;
 export const CAPTIVE_SESSION_PREVIEW_LIMIT = 20;
+export const RADIUS_SESSION_PREVIEW_LIMIT = 20;

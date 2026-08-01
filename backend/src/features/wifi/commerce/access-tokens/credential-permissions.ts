@@ -6,8 +6,8 @@ export type CredentialActions = {
   revokeBlockedReason?: string;
 };
 
-const PARTNER_REVOKABLE = new Set(['SOLD', 'NEW']);
-const ADMIN_REVOKABLE = new Set(['SOLD', 'NEW', 'ACTIVATED', 'PAUSED', 'IN_USE', 'ACTIVE']);
+/** Revoke is only allowed before the token has been used (sold / unused inventory). */
+const REVOKABLE = new Set(['SOLD', 'NEW']);
 const PAUSABLE = new Set(['ACTIVATED', 'IN_USE', 'ACTIVE']);
 const UNLOCKABLE = new Set(['PAUSED']);
 const REVERTABLE = new Set(['ACTIVATED', 'PAUSED', 'IN_USE', 'ACTIVE']);
@@ -32,43 +32,37 @@ export function resolveCredentialActions(
   credential: { status: string; soldAt: Date | null | undefined },
   revokeWindowMinutes: number
 ): CredentialActions {
-  const isElevated = ctx.isDeveloper || ctx.mode === 'preview';
   const status = credential.status;
-
-  if (isElevated) {
-    return {
-      canRevoke: ADMIN_REVOKABLE.has(status),
-      canPause: PAUSABLE.has(status),
-      canUnlock: UNLOCKABLE.has(status),
-      canRevertToSold: REVERTABLE.has(status),
-    };
-  }
-
+  const isOpsElevated = ctx.isDeveloper || ctx.mode === 'preview';
+  const statusAllowsRevoke = REVOKABLE.has(status);
   const withinWindow = isRevokeWindowOpen(credential.soldAt, revokeWindowMinutes);
-  const canRevoke = PARTNER_REVOKABLE.has(status) && withinWindow;
 
+  // Elevated roles skip the post-sale time window; status rule still applies for everyone.
+  const canRevoke = statusAllowsRevoke && (isOpsElevated || withinWindow);
+
+  // Only surface a reason when status would allow revoke but the sale window blocks it.
+  // Used tokens simply omit the Revoke action (no banner noise on every detail view).
   let revokeBlockedReason: string | undefined;
-  if (PARTNER_REVOKABLE.has(status) && !withinWindow) {
+  if (statusAllowsRevoke && !canRevoke) {
     revokeBlockedReason = `Revoke is only allowed within ${revokeWindowMinutes} minutes after sale.`;
-  } else if (!PARTNER_REVOKABLE.has(status)) {
-    revokeBlockedReason = 'This token cannot be revoked in its current status.';
   }
 
   return {
     canRevoke,
-    canPause: false,
+    canPause: isOpsElevated && PAUSABLE.has(status),
     canUnlock: UNLOCKABLE.has(status),
-    canRevertToSold: false,
-    revokeBlockedReason: canRevoke ? undefined : revokeBlockedReason,
+    // Developer role only — not other platform roles, even in preview mode.
+    canRevertToSold: ctx.isDeveloper && REVERTABLE.has(status),
+    revokeBlockedReason,
   };
 }
 
 export function partnerRevocableStatuses(): Set<string> {
-  return new Set(PARTNER_REVOKABLE);
+  return new Set(REVOKABLE);
 }
 
 export function adminRevocableStatuses(): Set<string> {
-  return new Set(ADMIN_REVOKABLE);
+  return new Set(REVOKABLE);
 }
 
 export function assertCredentialActionAllowed(
@@ -84,8 +78,11 @@ export function assertCredentialActionAllowed(
   if (!allowed) {
     const message =
       action === 'revoke'
-        ? actions.revokeBlockedReason ?? 'Revoke is not allowed for this token.'
-        : `Action "${action}" is not allowed for this token.`;
+        ? actions.revokeBlockedReason ??
+          'Revoke is only allowed before the token has been used.'
+        : action === 'revertToSold'
+          ? 'Revert to sold is only available to developers.'
+          : `Action "${action}" is not allowed for this token.`;
     throw Object.assign(new Error(message), { status: 403, code: 'ACTION_NOT_ALLOWED' });
   }
 }

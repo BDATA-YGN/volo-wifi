@@ -4,7 +4,6 @@ export const PARTNER_ROUTES = {
   home: "/partner",
   tokens: "/partner/tokens",
   orders: "/partner/orders",
-  payments: "/partner/payments",
   insights: "/partner/insights",
   profile: "/partner/profile",
 } as const;

@@ -24,12 +24,13 @@ export type PartnerPortalAccount = {
 };
 
 export type PartnerStation = {
-  mappingId: string;
+  /** Present on detail payload; list fallback may omit it. */
+  mappingId?: string;
   id: string;
   code: string;
   name: string;
   status: string;
-  assignedAt: string;
+  assignedAt?: string;
 };
 
 export type PartnerPlanEntitlement = {

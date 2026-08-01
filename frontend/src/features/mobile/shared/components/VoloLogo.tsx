@@ -12,6 +12,8 @@ interface VoloLogoProps {
   /** Height in pixels; width scales from asset aspect ratio */
   height?: number;
   title?: string;
+  /** White plate + color logo — readable on dark login screens */
+  plate?: "default" | "white";
 }
 
 const VARIANT_CONFIG = {
@@ -25,14 +27,16 @@ export default function VoloLogo({
   className,
   height = 40,
   title = "VOLO",
+  plate = "default",
 }: VoloLogoProps) {
   const config = VARIANT_CONFIG[variant];
   const width = Math.round(height * config.aspect);
+  const plateClass = plate === "white" ? styles.logoPlate_white : undefined;
 
   if (variant === "wordmark") {
     return (
       <span
-        className={clsx(styles.logoPlate, styles.logoPlate_wordmark, className)}
+        className={clsx(styles.logoPlate, styles.logoPlate_wordmark, plateClass, className)}
         data-volo-logo-variant={variant}
         style={{ width, height }}
         role="img"
@@ -64,7 +68,7 @@ export default function VoloLogo({
 
   return (
     <span
-      className={clsx(styles.logoPlate, styles[`logoPlate_${variant}`], className)}
+      className={clsx(styles.logoPlate, styles[`logoPlate_${variant}`], plateClass, className)}
       data-volo-logo-variant={variant}
     >
       <img

@@ -14,10 +14,9 @@ export default function ErrorPage({
   const pathname = usePathname();
 
   if (isMobileWebPath(pathname)) {
-    const actor = pathname.startsWith("/collector") ? "collector" : "customer";
     return (
       <MobileThemeProvider>
-        <MobileGeneralError actor={actor} onRetry={reset} standalone />
+        <MobileGeneralError actor="partner" onRetry={reset} standalone />
       </MobileThemeProvider>
     );
   }

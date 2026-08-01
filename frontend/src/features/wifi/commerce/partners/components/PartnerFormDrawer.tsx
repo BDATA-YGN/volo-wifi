@@ -377,8 +377,13 @@ const PartnerFormDrawer: React.FC<Props> = ({
         <Alert
           type="warning"
           showIcon
-          message="No sites configured"
-          description="Add sites in Site Directory before mapping partners."
+          message="No sites available"
+          description={
+            <span>
+              Add sites in <Text strong>Site Directory</Text> before mapping partners. Site-scoped
+              retail prices are configured under Retail Pricing.
+            </span>
+          }
         />
       ) : (
         <Form.Item name="stationIds" label="Mapped sites">
@@ -401,8 +406,9 @@ const PartnerFormDrawer: React.FC<Props> = ({
   const plansTab = (
     <>
       <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        Plans this partner is allowed to sell. Configure retail prices under{" "}
-        <Text strong>Retail Pricing</Text> (RESELLER scope).
+        Plans this partner is allowed to sell. Retail prices resolve as{" "}
+        <Text strong>Reseller → Site → Organization default</Text> under{" "}
+        <Text strong>Retail Pricing</Text>.
       </Paragraph>
       <Form.Item name="enabledPlanIds" hidden>
         <Input />
@@ -412,7 +418,12 @@ const PartnerFormDrawer: React.FC<Props> = ({
           type="warning"
           showIcon
           message="No service plans"
-          description="Create plans in Service Plans before assigning entitlements."
+          description={
+            <span>
+              Create plans in <Text strong>Service Plans</Text>, then set organization / reseller /
+              site prices under <Text strong>Retail Pricing</Text>.
+            </span>
+          }
         />
       ) : (
         <Table<PlanRow>
@@ -455,7 +466,7 @@ const PartnerFormDrawer: React.FC<Props> = ({
           type="info"
           showIcon
           className="mb-4"
-          message={`Login: ${editing.portalAccount.username}`}
+          title={`Login: ${editing.portalAccount.username}`}
           description="Partner login credentials cannot be changed here."
         />
       ) : null}

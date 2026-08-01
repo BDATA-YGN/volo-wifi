@@ -52,6 +52,14 @@
   --mobile-highlight-border: #bfdbfe;
 }
 
+.drawerPortalTheme[data-actor="partner"],
+.drawerFooter[data-actor="partner"] {
+  --mobile-accent: #6d7fc9;
+  --mobile-accent-hover: #5c6db8;
+  --mobile-accent-soft: #f2f4fb;
+  --mobile-accent-border: #d0d7ee;
+}
+
 .drawerPortalTheme[data-theme="dark"],
 .drawerFooter[data-theme="dark"] {
   --mobile-accent: #2dd4bf;
@@ -96,6 +104,14 @@
   --mobile-accent-hover: #93c5fd;
   --mobile-accent-soft: #1e3a8a;
   --mobile-accent-border: #1d4ed8;
+}
+
+.drawerPortalTheme[data-actor="partner"][data-theme="dark"],
+.drawerFooter[data-actor="partner"][data-theme="dark"] {
+  --mobile-accent: #a8b4e0;
+  --mobile-accent-hover: #c0c8eb;
+  --mobile-accent-soft: #2a314f;
+  --mobile-accent-border: #4a5578;
 }
 
 .drawerPortalTheme {

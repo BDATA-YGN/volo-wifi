@@ -41,6 +41,8 @@ export type SellablePlan = {
   isActive: boolean;
   unitPrice: number | null;
   hasPricing: boolean;
+  /** Retail price per mapped site (Reseller → Site → Size → Org default). */
+  pricesByStation?: Record<string, number>;
 };
 
 export type SellableCatalog = {
@@ -112,10 +114,44 @@ export type CaptiveSessionPreview = {
   updatedAt: string;
 };
 
+export type RadiusAcctStatus = "START" | "INTERIM" | "STOP";
+
+export type RadiusSessionPreview = {
+  id: string;
+  source: "hot" | "archive";
+  status: RadiusAcctStatus | string;
+  userName: string | null;
+  callingStationId: string | null;
+  framedIpAddress: string | null;
+  nasIpAddress: string | null;
+  nasIdentifier: string | null;
+  startedAt: string;
+  lastInterimAt: string | null;
+  stoppedAt: string | null;
+  sessionTimeSec: number | null;
+  inputBytes: string | null;
+  outputBytes: string | null;
+  totalBytes: string | null;
+  terminateCause: string | null;
+};
+
+export type TokenSessionsMeta = {
+  captiveRetentionDays: number;
+  radiusHotRetentionDays: number;
+  radiusArchiveRetentionDays: number;
+  emptyStateMessage: string | null;
+};
+
 export type AccessTokenDetail = AccessTokenRecord & {
   captiveSessions: CaptiveSessionPreview[];
   captiveSessionsTotal: number;
   captiveSessionsTruncated: boolean;
+  radiusSessions: RadiusSessionPreview[];
+  radiusSessionsTotal: number;
+  radiusSessionsTruncated: boolean;
+  radiusSessionsHotTotal: number;
+  radiusSessionsArchiveTotal: number;
+  sessionsMeta: TokenSessionsMeta | null;
 };
 
 export type IssueTokenFormValues = {

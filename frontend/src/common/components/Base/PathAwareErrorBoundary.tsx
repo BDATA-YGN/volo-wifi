@@ -13,8 +13,7 @@ export default function PathAwareErrorBoundary({
   const pathname = usePathname();
 
   if (isMobileWebPath(pathname)) {
-    const actor = pathname.startsWith("/collector") ? "collector" : "customer";
-    return <MobileRouteErrorBoundary actor={actor}>{children}</MobileRouteErrorBoundary>;
+    return <MobileRouteErrorBoundary actor="partner">{children}</MobileRouteErrorBoundary>;
   }
 
   return <ErrorBoundary>{children}</ErrorBoundary>;

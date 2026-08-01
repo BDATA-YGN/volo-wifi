@@ -14,7 +14,13 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { formatWifiDateTime } from "@/features/wifi/shared/format";
-import type { PartnerDetail, PartnerPlanEntitlement, PartnerRecord, PartnerStation } from "../types";
+import type {
+  PartnerDetail,
+  PartnerPlanEntitlement,
+  PartnerRecord,
+  PartnerStation,
+  PlanOption,
+} from "../types";
 import { STATUS_COLOR } from "../constant";
 import { formatStatusLabel } from "../utils";
 
@@ -24,6 +30,8 @@ type Props = {
   open: boolean;
   partnerId: string | null;
   fallback?: PartnerRecord | null;
+  /** All org plans — used so View matches Edit plan list. */
+  availablePlans?: PlanOption[];
   onClose: () => void;
   onEdit: (record: PartnerDetail) => void;
   loadPartner: (id: string) => Promise<PartnerDetail>;
@@ -33,6 +41,7 @@ const PartnerDetailDrawer: React.FC<Props> = ({
   open,
   partnerId,
   fallback,
+  availablePlans = [],
   onClose,
   onEdit,
   loadPartner,
@@ -105,6 +114,20 @@ const PartnerDetailDrawer: React.FC<Props> = ({
   const stations = row?.stations ?? [];
   const enabledPlans = planEntitlements.filter((p) => p.isEnabled);
 
+  // Match Edit drawer: list every org plan, with sellable from entitlements.
+  const planRows: PartnerPlanEntitlement[] =
+    availablePlans.length > 0
+      ? availablePlans.map((plan) => {
+          const pe = planEntitlements.find((e) => e.planId === plan.id);
+          return {
+            id: pe?.id ?? plan.id,
+            planId: plan.id,
+            isEnabled: pe?.isEnabled ?? false,
+            plan,
+          };
+        })
+      : planEntitlements;
+
   return (
     <Drawer
       title="Partner details"
@@ -168,9 +191,9 @@ const PartnerDetailDrawer: React.FC<Props> = ({
                 title="Setup incomplete"
                 description={
                   <span>
-                    Partners need at least one mapped site and one sellable plan before they can
-                    issue tokens.{" "}
-                    <Link href="/wifi/catalog/retail-pricing">Configure reseller pricing</Link>
+                    Partners need at least one mapped site and one sellable plan. Prices resolve as{" "}
+                    <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link> priority:
+                    Reseller → Site → Organization default.
                   </span>
                 }
               />
@@ -182,7 +205,7 @@ const PartnerDetailDrawer: React.FC<Props> = ({
             {stations.length > 0 ? (
               <Table<PartnerStation>
                 size="small"
-                rowKey="mappingId"
+                rowKey={(s) => s.mappingId || s.id}
                 pagination={false}
                 columns={stationColumns}
                 dataSource={stations}
@@ -193,13 +216,17 @@ const PartnerDetailDrawer: React.FC<Props> = ({
             )}
 
             <Title level={5}>Plan entitlements</Title>
-            {planEntitlements.length > 0 ? (
+            <Paragraph type="secondary" style={{ marginBottom: 12 }}>
+              Sellable toggles control which plans this partner may sell. Retail price is resolved
+              as Reseller book → Site book → Organization default.
+            </Paragraph>
+            {planRows.length > 0 ? (
               <Table<PartnerPlanEntitlement>
                 size="small"
-                rowKey="id"
+                rowKey={(pe) => pe.id || pe.planId}
                 pagination={false}
                 columns={planColumns}
-                dataSource={planEntitlements}
+                dataSource={planRows}
               />
             ) : (
               <Paragraph type="secondary">No plans assigned.</Paragraph>

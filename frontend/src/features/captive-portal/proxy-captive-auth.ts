@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HTTP_ONLY_COOKIE_NAMES } from "@/utils/constants";
+import { AUTH_COOKIE_NAMES } from "@/lib/auth/cookies";
 import { CAPTIVE_ROUTES } from "@/features/captive-portal/constants";
 import {
   captiveAuthPath,
@@ -23,12 +23,12 @@ function isCaptiveDashboardPath(pathname: string): boolean {
   return pathname === CAPTIVE_ROUTES.dashboard || pathname === CAPTIVE_ROUTES.dashboardShort;
 }
 
-/** Session gate for captive portal routes (credential cookies). */
+/** Session gate for captive portal routes (`portal_*` cookies). */
 export function handleCaptiveProxyAuth(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl;
   if (!isCaptivePortalPath(pathname)) return null;
 
-  const token = request.cookies.get(HTTP_ONLY_COOKIE_NAMES.ACCESS_TOKEN)?.value;
+  const token = request.cookies.get(AUTH_COOKIE_NAMES.captive.access)?.value;
   const host = request.headers.get("host");
   const authPath = captiveAuthPath(host);
   const dashboardPath = captiveDashboardPath(host);

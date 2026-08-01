@@ -27,19 +27,20 @@ export async function getForwardedClientHeaders(): Promise<Record<string, string
 export async function syncServerCookies(
   response: AxiosResponse,
   authApp: AuthApp = "admin",
-): Promise<void> {
+): Promise<string> {
   if (!response || !response.headers) {
-    return;
+    return "";
   }
 
   const setCookieHeader = response.headers['set-cookie'];
-  if (!setCookieHeader) return;
+  if (!setCookieHeader) return "";
 
   const allowedNames = new Set(cookieNamesForAuthApp(authApp));
   const cookieStore = await cookies();
   
   const splitCookies = setCookie.splitCookiesString(setCookieHeader as unknown as string);
   const parsedCookies = setCookie.parse(splitCookies);
+  const applied: string[] = [];
 
   parsedCookies.forEach((c: any) => {
     if (!allowedNames.has(c.name)) return;
@@ -51,7 +52,10 @@ export async function syncServerCookies(
       maxAge: c.maxAge,
       expires: c.expires,
     });
+    applied.push(`${c.name}=${c.value}`);
   });
+
+  return applied.join('; ');
 }
 
 export async function getServerCookiesForAuthApp(app: AuthApp = 'admin'): Promise<string> {
@@ -70,7 +74,7 @@ export async function getServerCookiesForAuthApp(app: AuthApp = 'admin'): Promis
   }
 }
 
-/** @deprecated Prefer getServerCookiesForAuthApp so admin/collector/customer sessions stay isolated. */
+/** @deprecated Prefer getServerCookiesForAuthApp so admin/partner/portal sessions stay isolated. */
 export async function getServerCookies(): Promise<string> {
   return getServerCookiesForAuthApp('admin');
 }

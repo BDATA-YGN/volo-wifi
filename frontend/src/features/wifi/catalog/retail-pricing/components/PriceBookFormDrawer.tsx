@@ -52,7 +52,7 @@ const IdsTransfer: React.FC<IdsTransferProps> = ({
         (item.title ?? "").toLowerCase().includes(input.toLowerCase()) ||
         (item.description ?? "").toLowerCase().includes(input.toLowerCase())
       }
-      listStyle={{ width: 280, height: 320 }}
+      styles={{ section: { width: 280, height: 320 } }}
       oneWay={false}
     />
   );
@@ -156,8 +156,8 @@ const PriceBookFormDrawer: React.FC<Props> = ({
           onFinish={(v) => void handleFinish(v)}
         >
           <Paragraph type="secondary" style={{ marginBottom: 16, fontSize: 13 }}>
-            Group retail and cost prices for service plans. Use a default book for the tenant, or
-            override prices for one or more resellers or sites.
+            Group retail and cost prices for service plans. Sell-time resolution order:{" "}
+            <Text strong>Reseller → Site → Organization default</Text>.
           </Paragraph>
 
           <Form.Item

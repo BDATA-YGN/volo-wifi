@@ -48,9 +48,11 @@ function TagList({
     <div className="flex flex-wrap gap-1">
       {visible.map((item) => (
         <Tooltip key={item.code} title={item.name}>
-          <Tag style={{ margin: 0, fontFamily: "monospace", fontSize: 11 }}>
-            {item.code}
-          </Tag>
+          <span className="inline-flex">
+            <Tag style={{ margin: 0, fontFamily: "monospace", fontSize: 11 }}>
+              {item.code}
+            </Tag>
+          </span>
         </Tooltip>
       ))}
       {rest > 0 ? (
@@ -121,7 +123,9 @@ const PartnersTable: React.FC<Props> = ({
         }
         return (
           <Tooltip title={dayjs(lastLogin).format("YYYY-MM-DD HH:mm:ss")}>
-            <Text style={{ fontSize: 12 }}>{dayjs(lastLogin).format("MMM D, HH:mm")}</Text>
+            <span style={{ fontSize: 12 }}>
+              {dayjs(lastLogin).format("MMM D, HH:mm")}
+            </span>
           </Tooltip>
         );
       },

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Spin } from "antd";
-import { BarChart3, KeyRound, Wallet } from "lucide-react";
+import { BarChart3, KeyRound } from "lucide-react";
 import { useCommercePartnersWorkspace } from "@/features/wifi/commerce/partners/workspace/useCommercePartnersWorkspace";
 import { formatMoney } from "@/features/wifi/commerce/partners/workspace/utils";
 import { formatStatusLabel } from "@/features/wifi/commerce/partners/utils";
@@ -82,15 +82,11 @@ export default function PartnerHomePage() {
         <div className={styles.quickGrid}>
           <Link href={PARTNER_ROUTES.tokens} className={styles.quickAction}>
             <KeyRound size={18} aria-hidden />
-            <span className={styles.quickLabel}>Issue tokens</span>
+            <span className={styles.quickLabel}>Sell tokens</span>
           </Link>
           <Link href={PARTNER_ROUTES.orders} className={styles.quickAction}>
             <BarChart3 size={18} aria-hidden />
             <span className={styles.quickLabel}>View orders</span>
-          </Link>
-          <Link href={PARTNER_ROUTES.payments} className={styles.quickAction}>
-            <Wallet size={18} aria-hidden />
-            <span className={styles.quickLabel}>Payments</span>
           </Link>
           <Link href={PARTNER_ROUTES.insights} className={styles.quickAction}>
             <BarChart3 size={18} aria-hidden />
