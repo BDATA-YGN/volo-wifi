@@ -63,29 +63,13 @@ const AdminUsersPage: React.FC = () => {
     [searchWords, tableState, roleFilter, statusFilter]
   );
 
-  /** Defensive client-side filter so the UI works even when the API ignores params. */
-  const displayedList = useMemo(() => {
-    const term = (searchWords ?? "").trim().toLowerCase();
-    return dataList.filter((row: Record<string, unknown>) => {
-      if (roleFilter !== undefined && row.roleId !== roleFilter) return false;
-      if (statusFilter === "active" && row.isActive !== true) return false;
-      if (statusFilter === "inactive" && row.isActive === true) return false;
-      if (term) {
-        const haystack = [
-          row.fullName,
-          row.username,
-          row.email,
-          row.phoneNumber,
-        ]
-          .filter(Boolean)
-          .map(String)
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [dataList, searchWords, roleFilter, statusFilter]);
+  const resetToFirstPage = () => {
+    setTableState((prev) => ({
+      ...(prev ?? { take: 10, skip: 0, limit: 10 }),
+      page: 1,
+      skip: 0,
+    }));
+  };
 
   useEffect(() => {
     void fetchMngRoles("", { take: 100, skip: 0, page: 1, limit: 100 });
@@ -180,7 +164,7 @@ const AdminUsersPage: React.FC = () => {
           <Space>
             <TeamOutlined style={{ color: token.colorPrimary }} />
             <span style={{ fontWeight: 600 }}>Administrators</span>
-            <Tag>{displayedList.length}</Tag>
+            <Tag>{pagination.totalRows}</Tag>
           </Space>
         }
         extra={
@@ -188,13 +172,22 @@ const AdminUsersPage: React.FC = () => {
             loading={loading}
             searchPlaceholder={t("search")}
             searchValue={searchWords ?? ""}
-            onSearch={(value) => setSearchWords(value)}
+            onSearch={(value) => {
+              setSearchWords(value);
+              resetToFirstPage();
+            }}
             roles={mngRolesList as Array<{ roleId: number; roleName: string }>}
             rolesLoading={!!permLoading?.fetchMngRoles}
             roleFilter={roleFilter}
-            onRoleChange={setRoleFilter}
+            onRoleChange={(value) => {
+              setRoleFilter(value);
+              resetToFirstPage();
+            }}
             statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
+            onStatusChange={(value) => {
+              setStatusFilter(value);
+              resetToFirstPage();
+            }}
             onRefresh={() => void fetchAdmins(filter)}
             onAdd={openCreate}
           />
@@ -205,9 +198,9 @@ const AdminUsersPage: React.FC = () => {
         }}
       >
         <AdminUsersTable
-          dataList={displayedList}
+          dataList={dataList}
           loading={loading}
-          totalRows={displayedList.length}
+          totalRows={pagination.totalRows}
           onStateChange={setTableState}
           roles={mngRolesList as Array<{ roleId: number; roleName: string }>}
           onEdit={openEdit}

@@ -22,7 +22,24 @@ export class Controller {
         const admins = await this.adminService.findWithCustomKey('id', paginationParams?.id);
         responseSuccess(res, { message: 'Success', data: admins });
       } else {
-        const admins = await this.adminService.findAll(paginationParams, ['username'], {}, { isSuper: false});
+        const { roleId, isActive, ...listParams } = paginationParams as Record<string, unknown>;
+
+        const where: Record<string, unknown> = { isSuper: false };
+        if (!isUndefinedOrUndefinedString(roleId)) {
+          const parsedRoleId = Number(roleId);
+          if (Number.isFinite(parsedRoleId)) where.roleId = parsedRoleId;
+        }
+        if (!isUndefinedOrUndefinedString(isActive)) {
+          if (isActive === true || isActive === 'true') where.isActive = true;
+          else if (isActive === false || isActive === 'false') where.isActive = false;
+        }
+
+        const admins = await this.adminService.findAll(
+          listParams as any,
+          ['username', 'fullName', 'email', 'phoneNumber'],
+          {},
+          where,
+        );
         responseSuccess(res, { message: 'Success', data: admins?.data, meta: admins?.meta });
       }
     }),
