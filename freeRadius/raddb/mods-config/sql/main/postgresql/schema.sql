@@ -1,15 +1,21 @@
 /*
- * PostgreSQL schema for FreeRADIUS — Volo database integration
+ * Optional PostgreSQL views for FreeRADIUS — Volo wifi DB integration
  *
- * Views map FreeRADIUS table names to Volo tables. Keep in sync with:
- * volo-api-console/backend/src/prisma/seed/seed-freeradius.ts
+ * Prefer the live queries in queries.conf (they hit wf_* tables directly).
+ * These views are optional helpers only — do NOT require a separate FreeRADIUS
+ * schema. Apply only if you want classic radcheck/nas names for debugging:
+ *   psql "$DATABASE_URL" -f schema.sql
  *
- * - radcheck: password + Simultaneous-Use (plan maxDevices)
- * - radreply: per-user REPLY (station-scoped plan attributes + remaining quota)
- * - radusergroup: username → {planCode}{tokenOrUsername} for radgroupcheck
- * - radgroupcheck: CHECK attrs for that composite group
- * - radgroupreply: empty (REPLY is on radreply per user)
- * - nas: RADIUS clients from wf_station_device
+ * Maps:
+ * - nas            → wf_station_device (+ secrets)
+ * - radcheck       → wf_credential + wf_plan (password / Simultaneous-Use)
+ * - radreply       → wf_credential + wf_plan_radius_attribute (REPLY)
+ * - radusergroup   → wf_credential + wf_plan
+ * - radgroupcheck  → CHECK attrs
+ * - radgroupreply  → empty (REPLY is per-user)
+ *
+ * Keep column names in sync with backend/src/prisma/models/wifi (@map snake_case
+ * plus quoted camelCase leftovers such as "nasShortname", "timeRemainingSec").
  */
 
 --
@@ -17,17 +23,20 @@
 --
 CREATE OR REPLACE VIEW nas AS
 SELECT
-	ROW_NUMBER() OVER (ORDER BY id)::integer AS id,
-	COALESCE(ip_addr, id) AS nasname,
-	COALESCE("nasShortname", LEFT(id, 32)) AS shortname,
-	COALESCE(nas_type, 'other') AS type,
-	"nasPorts" AS ports,
-	COALESCE(radius_secret, '') AS secret,
-	"nasServer" AS server,
-	"nasCommunity" AS community,
-	COALESCE(note, vendor || ' ' || model) AS description
-FROM wf_station_device
-WHERE is_radius_client = true;
+	ROW_NUMBER() OVER (ORDER BY d.id)::integer AS id,
+	COALESCE(d.ip_addr, s."radiusClientIp", d.id) AS nasname,
+	COALESCE(d."nasShortname", LEFT(d.id, 32)) AS shortname,
+	COALESCE(d.nas_type, 'other') AS type,
+	d."nasPorts" AS ports,
+	COALESCE(NULLIF(d.radius_secret, ''), rp.shared_secret, '') AS secret,
+	d."nasServer" AS server,
+	d."nasCommunity" AS community,
+	COALESCE(d.note, d.vendor || ' ' || d.model) AS description
+FROM wf_station_device d
+LEFT JOIN wf_station s ON s.id = d.station_id AND s.deleted_at IS NULL
+LEFT JOIN wf_org_radius_profile rp ON rp.id = d.radius_profile_id AND rp.deleted_at IS NULL
+WHERE d.is_radius_client = true
+	AND d.deleted_at IS NULL;
 
 --
 -- View: radcheck — password + Simultaneous-Use (concurrent / maxDevices)

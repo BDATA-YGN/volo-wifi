@@ -9,4 +9,4 @@
  * and no cache / retry-login pages on the router.
  */
 window.VOLO_PORTAL_AUTH = 'https://portal-v2.volowifi.com/portal/auth';
-window.VOLO_PORTAL_AFTER_LOGIN = 'https://portal-v2.volowifi.com/portal/auth';
+window.VOLO_PORTAL_AFTER_LOGIN = 'https://portal-v2.volowifi.com/portal';

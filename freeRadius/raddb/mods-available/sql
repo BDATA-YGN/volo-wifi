@@ -252,32 +252,14 @@ sql {
 		max_retries = 5
 	}
 
-	# Set to 'yes' to read radius clients from the database ('nas' table)
-	# Clients will ONLY be read on server startup.
-	#
-	#  A client can be link to a virtual server via the SQL
-	#  module.  This link is done via the following process:
-	#
-	#  If there is no listener in a virtual server, SQL clients
-	#  are added to the global list for that virtual server.
-	#
-	#  If there is a listener, and the first listener does not
-	#  have a "clients=..." configuration item, SQL clients are
-	#  added to the global list.
-	#
-	#  If there is a listener, and the first one does have a
-	#  "clients=..." configuration item, SQL clients are added to
-	#  that list.  The client { ...} ` configured in that list are
-	#  also added for that listener.
-	#
-	#  The only issue is if you have multiple listeners in a
-	#  virtual server, each with a different client list, then
-	#  the SQL clients are added only to the first listener.
-	#
-	read_clients = yes
+	# Do NOT load NAS clients from SQL.
+	# FreeRADIUS is on a public cloud host; routers usually NAT / have no stable
+	# public IP, so per-device IP allowlists from wf_station_device cannot work.
+	# Allow any IPv4 source via clients.conf → client any { ipaddr = 0.0.0.0/0 }.
+	read_clients = no
 
-	# Table to keep radius client info (view in DB maps wf_station -> nas)
-	client_table = "nas"
+	# Unused while read_clients = no
+	client_table = "wf_station_device"
 
 	#
 	# The group attribute specific to this instance of rlm_sql
