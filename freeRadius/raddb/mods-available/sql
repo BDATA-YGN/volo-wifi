@@ -90,7 +90,7 @@ sql {
 	#
 	# DB: volo_wifi_db (Prisma wifi models / @map snake_case). Not the legacy volo_db.
 	# sslmode=require encrypts; sslrootcert is present for verify-full if you tighten later.
-	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_wifi_db user=version201 password=AVNS_W_QYN6Biiq9Ajlk6fxS sslmode=require sslrootcert=/etc/raddb/certs/do-ca-certificate.crt"
+	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_wifi_db user=doadmin password=AVNS_PNTd5Vkn-X6ywZcAdbR sslmode=require sslrootcert=/etc/raddb/certs/do-ca-certificate.crt"
 
 	# If you want both stop and start records logged to the
 	# same SQL table, leave this as is.  If you want them in
