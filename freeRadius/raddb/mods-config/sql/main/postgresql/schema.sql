@@ -45,18 +45,18 @@ FROM (
 		c.id AS cred_id,
 		COALESCE(c.username, c.token) AS username,
 		CASE
-			WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN 'Crypt-Password'
+			WHEN c.username IS NOT NULL AND c."passwordHash" IS NOT NULL THEN 'Crypt-Password'
 			WHEN c.token IS NOT NULL THEN 'Cleartext-Password'
 		END AS attribute,
 		':=' AS op,
 		CASE
-			WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN c.password_hash
+			WHEN c.username IS NOT NULL AND c."passwordHash" IS NOT NULL THEN c."passwordHash"
 			WHEN c.token IS NOT NULL THEN c.token
 		END AS value
 	FROM wf_credential c
 	WHERE (c.username IS NOT NULL OR c.token IS NOT NULL)
 		AND (
-			(c.username IS NOT NULL AND c.password_hash IS NOT NULL)
+			(c.username IS NOT NULL AND c."passwordHash" IS NOT NULL)
 			OR c.token IS NOT NULL
 		)
 

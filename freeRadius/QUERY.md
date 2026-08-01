@@ -1,9 +1,9 @@
 # PostgreSQL Query Documentation - Volo Radius Project
 
-> **Column naming (2026):** Live DB follows Prisma `@map` snake_case
-> (`password_hash`, `acct_session_id`, `plan_id`, …). A few fields still use
-> camelCase because `@map` was left inside a comment in Prisma — keep these
-> quoted in SQL: `"timeRemainingSec"`, `"callingStationId"`, `"inputBytes"`,
+> **Column naming (2026):** Live DB mostly follows Prisma `@map` snake_case
+> (`acct_session_id`, `plan_id`, …). A few fields are still camelCase in the
+> live DB (even if Prisma now has `@map`) — keep these quoted in SQL:
+> `"passwordHash"`, `"timeRemainingSec"`, `"callingStationId"`, `"inputBytes"`,
 > `"outputBytes"`, `"totalBytes"`, `"sessionTimeSec"`, `"attributeName"`, and
 > on `wf_station` / `wf_station_device`: `"nasIdentifier"`, `"radiusClientIp"`,
 > `"nasShortname"`, `"nasPorts"`, `"nasServer"`, `"nasCommunity"`.
