@@ -3,7 +3,7 @@
  * Keeps one row per (acctSessionId, nasIpAddress): prefer STOP > INTERIM > START,
  * then latest lastInterimAt / stoppedAt.
  *
- * Run: psql volo_db -f dedupe_wf_radius_session.sql
+ * Run: psql volo_wifi_db -f dedupe_wf_radius_session.sql
  */
 
 BEGIN;

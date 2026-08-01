@@ -15,8 +15,9 @@ This guide covers what you need to deploy this repo on [Dokploy](https://dokploy
 2. **Compose type**: Docker Compose (not Stack).
 3. **Source**: Git.
 4. **Repository**: your repo URL (e.g. `https://github.com/your-org/freeRadius`).
-5. **Branch**: e.g. `main`.
-6. **Compose path**: `./docker-compose.yml`.
+5. **Branch**: e.g. `deployment` (production).
+6. **Compose path**: `./freeRadius/docker-compose.yml` (monorepo root).  
+   That compose file bind-mounts `./raddb` → `/etc/raddb`, which resolves to repo path `freeRadius/raddb`.
 7. Save (e.g. **General** tab).
 
 ## 3. RadDB config and AutoDeploy (important)

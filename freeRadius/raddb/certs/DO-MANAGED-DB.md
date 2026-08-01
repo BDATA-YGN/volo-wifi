@@ -46,7 +46,7 @@ Adjust group to `radiusd` if your distro uses that name.
 ```bash
 freeradius -X
 # look for:
-# Connected to database 'volo_db' on '...ondigitalocean.com' ...
+# Connected to database 'volo_wifi_db' on '...ondigitalocean.com' ...
 ```
 
 If you see `root certificate file ... does not exist`, check that `${confdir}/certs/do-ca-certificate.crt` exists and is readable by the freerad user.

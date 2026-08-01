@@ -1,15 +1,15 @@
 # PostgreSQL Query Documentation - Volo Radius Project
 
-> **Column naming (2026):** Live DB mostly follows Prisma `@map` snake_case
-> (`acct_session_id`, `plan_id`, …). A few fields are still camelCase in the
-> live DB (even if Prisma now has `@map`) — keep these quoted in SQL:
-> `"passwordHash"`, `"timeRemainingSec"`, `"callingStationId"`, `"inputBytes"`,
-> `"outputBytes"`, `"totalBytes"`, `"sessionTimeSec"`, `"attributeName"`, and
-> on `wf_station` / `wf_station_device`: `"nasIdentifier"`, `"radiusClientIp"`,
+> **Column naming (FreeRADIUS DB = `volo_wifi_db`):** Follow Prisma wifi
+> `@map` **snake_case** for mapped fields (`expires_at`, `password_hash`,
+> `plan_id`, `acct_session_id`, `user_name`, …). A few fields still have no
+> real `@map` (only a comment) and stay quoted camelCase in SQL:
+> `"timeRemainingSec"`, `"callingStationId"`, `"inputBytes"`, `"outputBytes"`,
+> `"totalBytes"`, `"sessionTimeSec"`, `"attributeName"`, and on
+> `wf_station` / `wf_station_device`: `"nasIdentifier"`, `"radiusClientIp"`,
 > `"nasShortname"`, `"nasPorts"`, `"nasServer"`, `"nasCommunity"`.
 >
-> Source of truth for live queries: `raddb/mods-config/sql/main/postgresql/queries.conf`
-> (not the older examples below if they still show camelCase).
+> Source of truth for live queries: `raddb/mods-config/sql/main/postgresql/queries.conf`.
 
 This document provides detailed information about all PostgreSQL queries used in the Volo Wifi Station Management System with FreeRADIUS integration.
 

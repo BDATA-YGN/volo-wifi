@@ -1,6 +1,6 @@
 /*
  * Optional performance indexes for FreeRADIUS + Volo (PostgreSQL).
- * Run once on volo_db, e.g. psql -f indexes.sql
+ * Run once on volo_wifi_db, e.g. psql -f indexes.sql
  * Use CONCURRENTLY in production if tables are large.
  */
 

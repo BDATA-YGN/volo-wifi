@@ -77,7 +77,7 @@ sql {
 	#port = 5430
 	#login = "postgres"
 	#password = "ypUMAdJpOOaSCFkEftBc"
-	#radius_db = "volo_db"
+	#radius_db = "volo_wifi_db"
 
 	# --- DigitalOcean Managed PostgreSQL (SSL) ---
 	# libpq connection string. With sslrootcert set + sslmode=verify-full the
@@ -88,7 +88,8 @@ sql {
 	#   ${confdir}/certs/do-ca-certificate.crt
 	#   → /etc/raddb/certs/do-ca-certificate.crt  (Docker / -d /etc/raddb)
 	#
-	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_db user=version201 password=AVNS_W_QYN6Biiq9Ajlk6fxS sslmode=require sslrootcert=${confdir}/certs/do-ca-certificate.crt"
+	# DB: volo_wifi_db (Prisma wifi models / @map snake_case). Not the legacy volo_db.
+	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_wifi_db user=version201 password=AVNS_W_QYN6Biiq9Ajlk6fxS sslmode=require sslrootcert=${confdir}/certs/do-ca-certificate.crt"
 
 	# If you want both stop and start records logged to the
 	# same SQL table, leave this as is.  If you want them in
