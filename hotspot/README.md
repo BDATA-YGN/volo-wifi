@@ -11,7 +11,9 @@ After a successful RADIUS login (`alogin.html` / `status.html`), the client is s
 
 `https://portal-v2.volowifi.com/portal/auth`
 
-Without `link-login`, the portal can still POST to `http://{nas_ip}/login` using `nas_ip`. Including `link-login` / `link-logout` is more reliable (exact router paths).
+Without `link-login`, the portal falls back to `http://{nas_ip}/login` when `mac`/`ip` are present (MikroTik http-pap). Including `link-login` / `link-logout` is more reliable.
+
+Ruijie gateways should redirect to the same portal URL with vendor params (`login_url`, `uamip`+`uamport`, `gw_address`, or ePortal markers). The portal picks MikroTik vs Ruijie handoff from those query keys.
 
 ## Files
 

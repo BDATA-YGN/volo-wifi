@@ -1,18 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import CaptiveShell from "./CaptiveShell";
 import NasRedirectForm from "./NasRedirectForm";
-import { CAPTIVE_ROUTES, CAPTIVE_ROUTER_CREDENTIAL_KEY, CAPTIVE_ROUTER_PASSWORD_KEY } from "../constants";
+import { CAPTIVE_ROUTER_CREDENTIAL_KEY, CAPTIVE_ROUTER_PASSWORD_KEY } from "../constants";
 import { hasNasRedirectContext, loadStoredNasParams } from "../utils/nas-params";
 import { buildRouterLoginAction, vendorDisplayName } from "../utils/router-redirect";
 import { clearRouterHandoffStorage } from "../utils/router-handoff";
-import { captiveDashboardPath } from "../subdomain";
+import { captiveAuthPath, captiveDashboardPath } from "../subdomain";
 import styles from "../captive-portal.module.css";
 
+function goToLogin(): void {
+  clearRouterHandoffStorage();
+  const authPath = captiveAuthPath(window.location.host);
+  // Full navigation avoids Next soft-nav loops when a portal session still exists.
+  window.location.replace(authPath);
+}
+
 export default function CaptiveRouterLoginPage() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
 
@@ -33,18 +38,25 @@ export default function CaptiveRouterLoginPage() {
     return { action };
   }, []);
 
+  // Incomplete handoff → always return to login (never strand here).
+  useEffect(() => {
+    if (handoff) return;
+    goToLogin();
+  }, [handoff]);
+
   useEffect(() => {
     if (!handoff || started) return;
 
     const { action } = handoff;
     setStarted(true);
 
-    if (action.form?.method === "POST") {
+    if (action.form) {
+      // GET/POST form auto-submits via NasRedirectForm (Ruijie WiFiDog / ePortal).
       clearRouterHandoffStorage();
       return;
     }
 
-    const target = action.redirectUrl ?? action.form?.action;
+    const target = action.redirectUrl;
     if (!target) {
       setError("Router login URL not found — check NAS redirect parameters.");
       return;
@@ -59,13 +71,9 @@ export default function CaptiveRouterLoginPage() {
       <CaptiveShell subtitle="Router handoff">
         <div className={styles.card}>
           <p className={styles.muted}>
-            Router connection context is missing — return to the login page.
+            Router connection context is missing — returning to the login page…
           </p>
-          <button
-            type="button"
-            className={styles.submitBtn}
-            onClick={() => router.replace(CAPTIVE_ROUTES.auth)}
-          >
+          <button type="button" className={styles.submitBtn} onClick={goToLogin}>
             Back to login
           </button>
         </div>
@@ -92,7 +100,7 @@ export default function CaptiveRouterLoginPage() {
           <div className={styles.spinner} aria-label="Connecting to router" />
         </div>
 
-        {action.form?.method === "POST" ? (
+        {action.form ? (
           <NasRedirectForm
             action={action.form.action}
             method={action.form.method}
@@ -116,7 +124,7 @@ export default function CaptiveRouterLoginPage() {
           style={{ marginTop: "1rem" }}
           onClick={() => {
             clearRouterHandoffStorage();
-            router.replace(captiveDashboardPath(window.location.host));
+            window.location.replace(captiveDashboardPath(window.location.host));
           }}
         >
           Continue to dashboard

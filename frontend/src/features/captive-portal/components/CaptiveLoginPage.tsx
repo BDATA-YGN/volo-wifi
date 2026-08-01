@@ -51,6 +51,13 @@ export default function CaptiveLoginPage() {
       const session = await captiveGetSession();
       if (!session) return;
 
+      // Rehydrate handoff credential from session so a refresh can still
+      // complete gateway login when NAS params are complete (e.g. link-login).
+      if (session.username) {
+        // Voucher / PAP: NAS password is typically the same as username (token).
+        storeRouterHandoff(session.username, session.username);
+      }
+
       const storedNas = loadStoredNasParams();
       const nextPath = resolvePostLoginPath(window.location.host, storedNas);
       router.replace(nextPath);
@@ -83,7 +90,8 @@ export default function CaptiveLoginPage() {
 
       storeRouterHandoff(
         credential,
-        mode === "USER_PASSWORD" ? form.password : undefined,
+        // Spec: voucher NAS password = token; account uses form password.
+        mode === "USER_PASSWORD" ? form.password : credential,
       );
 
       const nextPath = resolvePostLoginPath(window.location.host, nasParams ?? null);

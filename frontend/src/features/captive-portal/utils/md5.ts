@@ -170,12 +170,29 @@ export function md5Hex(input: string): string {
   return process(toWords(utf8));
 }
 
-/** MikroTik Hotspot HTTP-CHAP response password. */
+/** MikroTik Hotspot HTTP-CHAP response password.
+ * When `rawIdByte` is true, `chapId` is already the single identity byte string.
+ * Otherwise `chapId` is parsed as a decimal integer (legacy).
+ */
 export function mikrotikChapPassword(
   chapId: string,
   plainPassword: string,
   chapChallenge: string,
+  options?: { rawIdByte?: boolean },
 ): string {
-  const idByte = String.fromCharCode(parseInt(chapId, 10) & 0xff);
+  const idByte = options?.rawIdByte
+    ? chapId.charAt(0)
+    : String.fromCharCode(parseInt(chapId, 10) & 0xff);
   return md5Hex(idByte + plainPassword + chapChallenge);
+}
+
+/** Decode hex (e.g. chap-id-hex from hotspot/login.html) to binary string. */
+export function hexToBinaryString(hex: string): string {
+  const clean = hex.replace(/[^0-9a-fA-F]/g, "");
+  if (!clean || clean.length % 2 !== 0) return "";
+  let out = "";
+  for (let i = 0; i < clean.length; i += 2) {
+    out += String.fromCharCode(parseInt(clean.slice(i, i + 2), 16));
+  }
+  return out;
 }

@@ -32,6 +32,14 @@ function appendQueryParams(
   }
 }
 
+/** Voucher: username = password = token. Account: use supplied password. */
+function resolveNasPassword(username: string, options: BuildRouterLoginOptions): string {
+  if (options.nasPassword != null && options.nasPassword !== "") {
+    return options.nasPassword;
+  }
+  return username;
+}
+
 /** Ruijie / WISPr-style login_url handoff (common on RG-EG external portal + RADIUS). */
 export function buildRuijieWisprLogin(
   params: NasParams,
@@ -48,7 +56,7 @@ export function buildRuijieWisprLogin(
   ]);
   if (!loginUrl) return null;
 
-  const password = options.nasPassword ?? username;
+  const password = resolveNasPassword(username, options);
   const redirect = firstParam(params, [
     "redirect",
     "redirect_url",
@@ -82,15 +90,17 @@ export function buildRuijieWifiDogLogin(
   username: string,
   options: BuildRouterLoginOptions = {},
 ): RouterLoginAction | null {
-  const gwAddress = firstParam(params, ["gw_address", "gw_ip", "gwAddress", "gwIp", "nas_ip", "nasip"]);
+  // Do not treat MikroTik `nas_ip` as WiFiDog gateway — require gw_* markers.
+  const gwAddress = firstParam(params, ["gw_address", "gw_ip", "gwAddress", "gwIp"]);
   if (!gwAddress) return null;
 
-  const gwPort = firstParam(params, ["auth_port", "authPort", "gw_port", "gwPort", "uamport"]) ?? "2060";
+  const gwPort =
+    firstParam(params, ["auth_port", "authPort", "gw_port", "gwPort", "uamport"]) ?? "2060";
   const gwId = firstParam(params, ["gw_id", "gwId", "interface"]) ?? "br-lan";
   const clientIp = firstParam(params, ["ip", "userip", "user_ip", "wlanuserip", "client_ip"]);
   const clientMac = firstParam(params, ["mac", "usermac", "user_mac", "client_mac"]);
   const originalUrl = firstParam(params, ["url", "firsturl", "redirect", "redirect_url"]);
-  const password = options.nasPassword ?? username;
+  const password = resolveNasPassword(username, options);
 
   const action = `http://${gwAddress}:${gwPort}/wifidog/logincheck/`;
   const fields: Record<string, string> = {
@@ -98,7 +108,7 @@ export function buildRuijieWifiDogLogin(
     pwd: password,
     Submit: "submit",
     gw_address: gwAddress,
-    gw_port: firstParam(params, ["gw_port", "gwPort"]) ?? "2060",
+    gw_port: firstParam(params, ["gw_port", "gwPort"]) ?? gwPort,
     gw_id: gwId,
     authtype: "web",
   };
@@ -123,9 +133,20 @@ export function buildRuijieEportalLogin(
   username: string,
   options: BuildRouterLoginOptions = {},
 ): RouterLoginAction | null {
+  // Require Ruijie-specific markers so MikroTik (mac/ip/nas_ip) never matches.
+  const eportalMarker = firstParam(params, [
+    "wlanuserip",
+    "wlanacname",
+    "wlanacip",
+    "NASID",
+    "nasid",
+    "auth_url",
+    "authUrl",
+  ]);
+  if (!eportalMarker) return null;
+
   const userIp = firstParam(params, ["wlanuserip", "userip", "user_ip", "ip"]);
-  const nasIp = firstParam(params, ["nasip", "nas_ip", "nasIp", "wlanacip", "wlanacname"]);
-  if (!userIp && !nasIp) return null;
+  const nasIp = firstParam(params, ["wlanacip", "wlanacname", "nasip", "nas_ip", "nasIp"]);
 
   const explicitLogin = firstParam(params, ["login_url", "loginUrl", "auth_url", "authUrl"]);
   const port = firstParam(params, ["uamport", "auth_port", "authPort", "port"]) ?? "8080";
@@ -136,7 +157,7 @@ export function buildRuijieEportalLogin(
 
   if (!loginAction) return null;
 
-  const password = options.nasPassword ?? username;
+  const password = resolveNasPassword(username, options);
   const fields: Record<string, string> = {
     userName: username,
     userPassword: password,
@@ -164,17 +185,32 @@ export function buildRuijieEportalLogin(
   };
 }
 
-/** Build login URL from nas_ip + uamport when router does not send login_url. */
+/**
+ * Build login URL from gateway IP + UAM port when router does not send login_url.
+ * Supports `uamip` / `uamport` (common on Ruijie / Coova-style portals).
+ */
 export function buildRuijieUamFallback(
   params: NasParams,
   username: string,
   options: BuildRouterLoginOptions = {},
 ): RouterLoginAction | null {
-  const nasIp = firstParam(params, ["nas_ip", "nasip", "nasIp"]);
-  const uamPort = firstParam(params, ["uamport", "auth_port", "authPort", "port"]);
+  const nasIp = firstParam(params, [
+    "uamip",
+    "uamIp",
+    "UAMIP",
+    "nas_ip",
+    "nasip",
+    "nasIp",
+  ]);
+  const uamPort = firstParam(params, ["uamport", "uamPort", "UAMPORT", "auth_port", "authPort"]);
   if (!nasIp || !uamPort) return null;
 
-  const password = options.nasPassword ?? username;
+  // MikroTik hotspot uses link-login; if present, let MikroTik builder win upstream.
+  if (firstParam(params, ["link-login", "link-login-only", "link_login", "linkLogin"])) {
+    return null;
+  }
+
+  const password = resolveNasPassword(username, options);
   const loginAction = `http://${nasIp}:${uamPort}/login`;
   const redirectUrl = appendQueryParams(loginAction, {
     username,

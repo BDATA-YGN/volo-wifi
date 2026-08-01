@@ -19,6 +19,10 @@ export interface RouterLoginAction {
 }
 
 export interface BuildRouterLoginOptions {
-  /** Plain password for NAS handoff (USER_PASSWORD mode). Empty for voucher tokens. */
+  /**
+   * Plain password for NAS handoff.
+   * USER_PASSWORD: account password.
+   * VOUCHER_TOKEN: usually the same as the token/username (omit to default to username).
+   */
   nasPassword?: string;
 }

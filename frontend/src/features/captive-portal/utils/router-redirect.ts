@@ -1,5 +1,8 @@
 import type { NasParams } from "../api/types";
-import { buildMikrotikRouterLogin } from "./mikrotik-redirect";
+import {
+  buildMikrotikNasIpFallback,
+  buildMikrotikRouterLogin,
+} from "./mikrotik-redirect";
 import {
   type BuildRouterLoginOptions,
   type NasVendor,
@@ -15,6 +18,10 @@ function firstParam(params: NasParams, keys: string[]): string | undefined {
   return undefined;
 }
 
+/**
+ * Best-effort vendor label for UI. Prefer calling this on a successful
+ * RouterLoginAction.vendor instead of guessing before build.
+ */
 export function detectNasVendor(params: NasParams): NasVendor {
   if (
     firstParam(params, ["link-login", "link-login-only", "link_login", "linkLogin"])
@@ -22,11 +29,13 @@ export function detectNasVendor(params: NasParams): NasVendor {
     return "mikrotik";
   }
 
-  if (firstParam(params, ["gw_address", "gw_ip", "gwAddress", "gwIp"]) && firstParam(params, ["gw_id", "gwId", "interface"])) {
+  if (firstParam(params, ["gw_address", "gw_ip", "gwAddress", "gwIp"])) {
     return "ruijie-wifidog";
   }
 
-  if (firstParam(params, ["wlanuserip", "wlanacname", "NASID", "nasid"])) {
+  if (
+    firstParam(params, ["wlanuserip", "wlanacname", "wlanacip", "NASID", "nasid"])
+  ) {
     return "ruijie-eportal";
   }
 
@@ -36,37 +45,50 @@ export function detectNasVendor(params: NasParams): NasVendor {
       "loginUrl",
       "LogonURL",
       "logon_url",
-      "nas_ip",
-      "nasip",
-      "uamport",
+      "logonUrl",
+      "login-url",
     ])
   ) {
     return "ruijie-wispr";
   }
 
+  if (
+    firstParam(params, ["uamip", "uamIp", "UAMIP"]) ||
+    (firstParam(params, ["nas_ip", "nasip", "nasIp"]) &&
+      firstParam(params, ["uamport", "uamPort", "UAMPORT", "auth_port", "authPort"]))
+  ) {
+    return "ruijie-wispr";
+  }
+
+  if (firstParam(params, ["nas_ip", "nasip", "nasIp"])) {
+    return "mikrotik";
+  }
+
   return "unknown";
 }
 
-export function hasNasRedirectContext(params: NasParams): boolean {
-  return detectNasVendor(params) !== "unknown";
-}
-
+/**
+ * Build the gateway handoff for MikroTik and Ruijie.
+ * Tries specific markers first so the two vendors do not steal each other's params.
+ */
 export function buildRouterLoginAction(
   params: NasParams,
   username: string,
   options: BuildRouterLoginOptions = {},
 ): RouterLoginAction | null {
-  const vendor = detectNasVendor(params);
+  return (
+    // MikroTik: explicit Hotspot login URL
+    buildMikrotikRouterLogin(params, username, options) ??
+    // Ruijie: login_url / WiFiDog / ePortal / uamip+uamport
+    buildRuijieRouterLogin(params, username, options) ??
+    // MikroTik: nas_ip + mac/ip without Ruijie UAM markers
+    buildMikrotikNasIpFallback(params, username, options)
+  );
+}
 
-  if (vendor === "mikrotik") {
-    return buildMikrotikRouterLogin(params, username, options);
-  }
-
-  if (vendor.startsWith("ruijie")) {
-    return buildRuijieRouterLogin(params, username, options);
-  }
-
-  return null;
+/** True only when we can actually build a NAS login handoff URL/form. */
+export function hasNasRedirectContext(params: NasParams): boolean {
+  return buildRouterLoginAction(params, "__probe__") != null;
 }
 
 export function vendorDisplayName(vendor: NasVendor): string {
