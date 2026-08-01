@@ -148,27 +148,34 @@ const initializeCronJobs = async (): Promise<void> => {
 
 const startConsoleApp = async (): Promise<void> => {
   if (!enableConsole) return;
-  consoleApp = new App('/console', [
-    new AuthRoute(),
-    new AdminRoute(),
-    new MenuPermissionRoute(),
-    new MenuRoute(),
-    new TranslationRoute(),
-    new DatabaseRoute(),
-    new AuditRoute(),
-    new UploadRoute(),
-    new MinioRoute(),
-    new ThemeRoute(),
-    new FileLogRoute(),
-    new ReceiptsRoute(),
-    new PrinterRoute(),
-    new AppSettingRoute(),
-    new PlacesRoute(),
-    new ConversationRoute(),
-    ...createWifiRoutes(),
-    ...createMobileV1Routes(),
-    new StorageProxyRoute(),
-  ]);
+  consoleApp = new App(
+    '/console',
+    [
+      new AuthRoute(),
+      new AdminRoute(),
+      new MenuPermissionRoute(),
+      new MenuRoute(),
+      new TranslationRoute(),
+      new DatabaseRoute(),
+      new AuditRoute(),
+      new UploadRoute(),
+      new MinioRoute(),
+      new ThemeRoute(),
+      new FileLogRoute(),
+      new ReceiptsRoute(),
+      new PrinterRoute(),
+      new AppSettingRoute(),
+      new PlacesRoute(),
+      new ConversationRoute(),
+      ...createWifiRoutes(),
+      ...createMobileV1Routes(),
+      new StorageProxyRoute(),
+    ],
+    // Captive portal FE proxies to CAPTIVE_API_URL (.../api). When that URL is
+    // derived from console host (same host, /console → /api), expose captive
+    // routes here too so login is not "Route not found".
+    [{ prefix: '/api', routes: [...createCaptiveRoutes()] }],
+  );
   await consoleApp.listen(Number(PORT), 'CONSOLE');
 };
 

@@ -27,7 +27,16 @@ export class App {
   public env: string;
   public server: Server;
 
-  constructor(prefix: string, routes: Route[]) {
+  constructor(
+    prefix: string,
+    routes: Route[],
+    /**
+     * Extra mount groups on the same Express instance (e.g. console also serves
+     * captive `/api` so CAPTIVE_API_URL derived from API_URL host keeps working
+     * when only PORT is exposed).
+     */
+    extraMounts: Array<{ prefix: string; routes: Route[] }> = [],
+  ) {
     this.app = express();
     this.env = NODE_ENV || 'development';
     this.server = new Server(this.app);
@@ -40,6 +49,9 @@ export class App {
     this.initializeView();
     this.initializeLocals();
     this.initializeRoutes(prefix, routes);
+    for (const mount of extraMounts) {
+      this.mountRouteGroup(mount.prefix, mount.routes);
+    }
     this.initializeErrorHandling();
   }
 
@@ -209,6 +221,14 @@ export class App {
     routes.forEach((route) => {
       this.app.use(prefix, route.router);
     });
+  }
+
+  /** Mount a second API prefix without re-registering /health. */
+  private mountRouteGroup(prefix: string, routes: Route[]) {
+    routes.forEach((route) => {
+      this.app.use(prefix, route.router);
+    });
+    logger.info(`Extra routes mounted at ${prefix} (${routes.length} routers)`);
   }
 
   private initializeConsoleDocs() {

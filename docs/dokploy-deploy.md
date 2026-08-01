@@ -96,6 +96,9 @@ Startup prints phase lines and a final `========== System Ready ==========` bann
 
 Point all hosts to the **same** frontend Dokploy service (port `4488`).
 
+`portal-v2.volowifi.com` is an alternate captive frontend host — it must use the
+same `CAPTIVE_API_URL` (API app `…/api`, **not** console `…/console`).
+
 ### Build-time env (set once — `NEXT_PUBLIC_*` are auto-mirrored)
 
 ```env
@@ -109,12 +112,11 @@ CAPTIVE_HOST=captive.volowifi.com
 PARTNER_HOST=partner.volowifi.com
 COLLECTOR_HOST=collector.volowifi.com
 CUSTOMER_HOST=customer.volowifi.com
-# Optional legacy CDN rewrites only — skip when using backend MinIO/S3:
-# FILE_SERVER_URL=https://cdn.volowifi.com/public
-# HOST_NAME=console.volowifi.com
 ```
 
-Do **not** duplicate `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_SOCKET_URL` / `NEXT_PUBLIC_PARTNER_HOST` unless you need a different public value. `frontend/env/apply-defaults.mjs` fills them from the keys above at build time.
+If `CAPTIVE_API_URL` is omitted, it is derived by rewriting `API_URL`’s `/console` → `/api` on the **same host**. That only works when the console process also mounts captive routes at `/api` (current backend does). Prefer an explicit API host in production.
+
+Login from the portal posts to `/portal-api/login` (Next proxy) → `{CAPTIVE_API_URL}/login` (e.g. `https://api.volowifi.com/api/login`). Seeing **Route not found** on Connect almost always means this upstream URL is wrong or the API/captive routes are not deployed.
 
 ### CORS
 

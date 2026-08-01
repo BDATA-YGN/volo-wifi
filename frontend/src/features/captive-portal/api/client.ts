@@ -61,10 +61,17 @@ captiveApiClient.interceptors.response.use(
 
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<CaptiveApiError>;
-  return (
+  const message =
     axiosError.response?.data?.error?.message ??
-    (error instanceof Error ? error.message : "တောင်းဆိုမှု မအောင်မြင်ပါ")
-  );
+    (error instanceof Error ? error.message : "တောင်းဆိုမှု မအောင်မြင်ပါ");
+
+  // Backend NotFoundMiddleware — usually CAPTIVE_API_URL pointing at console
+  // without /api captive mounts, or API app not running.
+  if (message === "Route not found" || axiosError.response?.status === 404) {
+    return "Portal API route မတွေ့ပါ — server CAPTIVE_API_URL (…/api) နှင့် backend API deploy ကို စစ်ပါ။";
+  }
+
+  return message;
 }
 
 export async function captiveLogin(payload: CaptiveLoginPayload): Promise<void> {
