@@ -7,9 +7,7 @@ import CaptiveShell from "./CaptiveShell";
 import { captiveLogin } from "../api/client";
 import type { CredentialLoginType } from "../api/types";
 import {
-  loadStoredNasParams,
-  mergeNasParams,
-  parseNasParamsFromSearch,
+  resolveNasParamsForPage,
   storeNasParams,
 } from "../utils/nas-params";
 import { hasNasRedirectContext } from "../utils/router-redirect";
@@ -31,20 +29,22 @@ export default function CaptiveLoginPage() {
   const [nasError, setNasError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({ token: "", username: "", password: "" });
 
-  const nasParams = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    const fromUrl = parseNasParamsFromSearch(window.location.search);
-    const stored = loadStoredNasParams();
-    return mergeNasParams(fromUrl, stored);
+  const { nasParams, gatewayError } = useMemo(() => {
+    if (typeof window === "undefined") {
+      return { nasParams: undefined, gatewayError: undefined };
+    }
+    const resolved = resolveNasParamsForPage(window.location.search);
+    return { nasParams: resolved.active, gatewayError: resolved.gatewayError };
   }, []);
 
   useEffect(() => {
-    if (!nasParams) return;
-    storeNasParams(nasParams);
-    if (nasParams.error) {
-      setNasError(nasParams.error);
+    if (nasParams && hasNasRedirectContext(nasParams)) {
+      storeNasParams(nasParams);
     }
-  }, [nasParams]);
+    if (gatewayError) {
+      setNasError(gatewayError);
+    }
+  }, [nasParams, gatewayError]);
 
   // Do not auto-redirect from an existing portal cookie/session.
   // User must submit voucher or username/password before leaving this page.
@@ -71,6 +71,10 @@ export default function CaptiveLoginPage() {
           : { username: form.username.trim(), password: form.password }),
         ...(nasParams ? { nasParams } : {}),
       });
+
+      if (nasParams) {
+        storeNasParams(nasParams);
+      }
 
       storeRouterHandoff(
         credential,

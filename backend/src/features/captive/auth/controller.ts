@@ -46,8 +46,14 @@ function mapLoginGuardError(error: unknown): never {
         'DEVICE_LIMIT_REACHED',
         captiveDeviceLimitReached(maxDevices ?? 1),
       );
-    default:
+    case 'INVALID_CREDENTIAL':
       throw new CustomException(400, 'INVALID_CREDENTIAL', captiveErrors.INVALID_CREDENTIAL);
+    default:
+      // Do not mask DB / unexpected guard failures as "wrong token".
+      logger.error(
+        `Captive login guard failed code=${code ?? 'unknown'}: ${(error as Error)?.message ?? error}`,
+      );
+      throw new CustomException(500, 'INTERNAL_SERVER_ERROR', captiveErrors.INTERNAL_SERVER_ERROR);
   }
 }
 
