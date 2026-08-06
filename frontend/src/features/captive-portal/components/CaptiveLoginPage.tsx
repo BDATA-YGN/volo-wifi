@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequest } from "ahooks";
 import CaptiveShell from "./CaptiveShell";
-import { captiveLogin, captiveGetSession } from "../api/client";
+import { captiveLogin } from "../api/client";
 import type { CredentialLoginType } from "../api/types";
 import {
   loadStoredNasParams,
@@ -46,24 +46,8 @@ export default function CaptiveLoginPage() {
     }
   }, [nasParams]);
 
-  const { loading: checkingSession } = useRequest(
-    async () => {
-      const session = await captiveGetSession();
-      if (!session) return;
-
-      // Rehydrate handoff credential from session so a refresh can still
-      // complete gateway login when NAS params are complete (e.g. link-login).
-      if (session.username) {
-        // Voucher / PAP: NAS password is typically the same as username (token).
-        storeRouterHandoff(session.username, session.username);
-      }
-
-      const storedNas = loadStoredNasParams();
-      const nextPath = resolvePostLoginPath(window.location.host, storedNas);
-      router.replace(nextPath);
-    },
-    { refreshDeps: [router] },
-  );
+  // Do not auto-redirect from an existing portal cookie/session.
+  // User must submit voucher or username/password before leaving this page.
 
   const { runAsync: submitLogin, loading } = useRequest(
     async () => {
@@ -113,16 +97,6 @@ export default function CaptiveLoginPage() {
     nasParams && hasNasRedirectContext(nasParams)
       ? "Router မှ redirect လုပ်ထားပါသည် — login ပြီးရင် gateway သို့ အလိုအလျောက် ပြန်ပို့ပါမည်။"
       : null;
-
-  if (checkingSession) {
-    return (
-      <CaptiveShell subtitle="ချိတ်ဆက်နေပါသည်…">
-        <div className={styles.loadingWrap}>
-          <div className={styles.spinner} aria-label="Loading" />
-        </div>
-      </CaptiveShell>
-    );
-  }
 
   return (
     <CaptiveShell subtitle="WiFi သုံးရန် ဝင်ပါ">

@@ -119,17 +119,19 @@ export class CaptiveAuthController {
         credential = refreshed;
       }
 
+      const nasParamsBody =
+        req.body?.nasParams != null && typeof req.body.nasParams === 'object'
+          ? (req.body.nasParams as Record<string, unknown>)
+          : null;
+      const clientMac = resolveCaptiveClientMac(req, nasParamsBody) ?? null;
+
       try {
-        await runCaptiveLoginGuards(credential);
+        await runCaptiveLoginGuards(credential, { clientMac });
       } catch (error) {
         mapLoginGuardError(error);
       }
 
       const radiusUserName = credential.username ?? credential.token ?? '';
-      const nasParamsBody =
-        req.body?.nasParams != null && typeof req.body.nasParams === 'object'
-          ? (req.body.nasParams as Record<string, unknown>)
-          : null;
 
       await prisma.wifiAuditLog.create({
         data: {
@@ -140,7 +142,7 @@ export class CaptiveAuthController {
           meta: {
             username: radiusUserName,
             reply: 'Access-Accept',
-            CallingStationId: resolveCaptiveClientMac(req, nasParamsBody),
+            CallingStationId: clientMac,
             CalledStationId: (req.headers['x-called-station-id'] as string) ?? undefined,
           },
           ip: resolveCaptiveClientIp(req, nasParamsBody) ?? undefined,

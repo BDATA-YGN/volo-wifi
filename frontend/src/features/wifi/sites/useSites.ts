@@ -50,8 +50,15 @@ export function useSites() {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as SitesFormOptions;
     setFormOptions(opts);
+    // Vendor profiles are org-scoped; without orgId the API returns []. Hydrate when
+    // there is a single membership (same pattern as commerce partners / retail pricing).
     if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+      const onlyOrgId = opts.memberships[0].id;
+      setOrgId(onlyOrgId);
+      const withOrg = await Query.loadFormOptions(onlyOrgId);
+      const hydrated = withOrg.data as SitesFormOptions;
+      setFormOptions(hydrated);
+      return hydrated;
     }
     return opts;
   }, []);

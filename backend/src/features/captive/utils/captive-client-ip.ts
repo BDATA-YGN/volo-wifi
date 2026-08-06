@@ -64,3 +64,10 @@ export function resolveCaptiveClientMac(
   const fromNas = readNasString(nasParams, ['mac', 'usermac', 'user_mac', 'client_mac']);
   return fromNas ?? undefined;
 }
+
+/** Strip separators for MAC compare (`aa:bb` / `AABB` / `aa-bb` → `aabb…`). */
+export function normalizeCaptiveMac(mac: string | null | undefined): string | null {
+  if (!mac?.trim()) return null;
+  const hex = mac.trim().toLowerCase().replace(/[^a-f0-9]/g, '');
+  return hex.length >= 8 ? hex : null;
+}

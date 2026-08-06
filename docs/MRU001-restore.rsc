@@ -77,7 +77,7 @@ add address=68.183.181.73 authentication-port=1812 accounting-port=1813 \
 set accept=yes port=3799
 
 /ip hotspot walled-garden ip
-add action=accept comment=MRU001-portal dst-host=portal.volowifi.com
+add action=accept dst-host=portal.volowifi.com
 add action=accept comment=MRU001-api dst-host=portal-api.volowifi.com
 add action=accept comment=MRU001-dns-udp dst-port=53 protocol=udp
 add action=accept comment=MRU001-dns-tcp dst-port=53 protocol=tcp

@@ -12,10 +12,14 @@ import {
   planTimeQuotaSec,
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
+import { normalizeCaptiveMac } from '@/features/captive/utils/captive-client-ip';
 
 const prisma = PrismaDBConnection.getConnection();
 
-const RADIUS_INTERIM_STALE_MS = 15 * 60 * 1000;
+/** INTERIM with no fresh accounting treated as ended for device-slot checks. */
+const RADIUS_INTERIM_STALE_MS = 5 * 60 * 1000;
+/** Recent portal logins reserve a device slot before Accounting-Start arrives. */
+const PORTAL_LOGIN_SLOT_MS = 3 * 60 * 1000;
 
 export const captiveLoginCredentialInclude = {
   plan: {
@@ -42,8 +46,8 @@ function radiusSessionDeviceKey(row: {
   callingStationId: string | null;
   acctSessionId: string;
 }): string {
-  const mac = row.callingStationId?.trim();
-  return mac ? mac.toLowerCase() : `acct:${row.acctSessionId}`;
+  const mac = normalizeCaptiveMac(row.callingStationId);
+  return mac ?? `acct:${row.acctSessionId}`;
 }
 
 function isRadiusSessionEnded(
@@ -99,98 +103,153 @@ export async function assertRadiusTimeQuotaAllowsLogin(
   return { usedSec, quotaSec };
 }
 
-async function hasActiveRadiusAccountingWithoutStop(params: {
+/**
+ * Soft-end open RADIUS rows for this credential that match the client MAC
+ * (same-device portal re-login / missing Acct-Stop).
+ */
+async function endOpenRadiusSessionsForSameDevice(params: {
   userNameVariants: string[];
-  strictNoStopMeansOpen?: boolean;
-}): Promise<boolean> {
-  const { userNameVariants, strictNoStopMeansOpen = false } = params;
-  if (userNameVariants.length === 0) {
-    return false;
-  }
+  clientMacNorm: string;
+}): Promise<number> {
+  const { userNameVariants, clientMacNorm } = params;
+  if (userNameVariants.length === 0) return 0;
 
-  const rows = await prisma.radiusSession.findMany({
+  const openRows = await prisma.radiusSession.findMany({
     where: {
       userName: { in: userNameVariants },
       status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
       stoppedAt: null,
     },
     select: {
-      status: true,
-      stoppedAt: true,
-      lastInterimAt: true,
+      id: true,
+      callingStationId: true,
     },
   });
 
-  if (rows.length === 0) return false;
-  if (strictNoStopMeansOpen) return true;
+  const ids = openRows
+    .filter((row) => normalizeCaptiveMac(row.callingStationId) === clientMacNorm)
+    .map((row) => row.id);
 
-  const now = Date.now();
-  for (const row of rows) {
-    if (!isRadiusSessionEnded(row, now)) {
-      return true;
-    }
-  }
+  if (ids.length === 0) return 0;
 
-  return false;
+  const now = new Date();
+  await prisma.radiusSession.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      stoppedAt: now,
+      status: RadiusAcctStatus.STOP,
+      terminateCause: 'Portal-ReLogin',
+      updatedAt: now,
+    },
+  });
+
+  return ids.length;
 }
 
-async function countActiveDevicesForMaxDevicesCheck(userNameVariants: string[]): Promise<number> {
-  if (userNameVariants.length === 0) {
-    return 0;
+async function collectOccupiedDeviceKeys(params: {
+  credentialId: string;
+  userNameVariants: string[];
+  nowMs?: number;
+}): Promise<Set<string>> {
+  const { credentialId, userNameVariants, nowMs = Date.now() } = params;
+  const occupied = new Set<string>();
+
+  if (userNameVariants.length > 0) {
+    const radiusRows = await prisma.radiusSession.findMany({
+      where: {
+        userName: { in: userNameVariants },
+        status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
+        stoppedAt: null,
+      },
+      select: {
+        acctSessionId: true,
+        callingStationId: true,
+        status: true,
+        stoppedAt: true,
+        lastInterimAt: true,
+      },
+    });
+
+    for (const row of radiusRows) {
+      if (!isRadiusSessionEnded(row, nowMs)) {
+        occupied.add(radiusSessionDeviceKey(row));
+      }
+    }
   }
 
-  const rows = await prisma.radiusSession.findMany({
-    where: { userName: { in: userNameVariants } },
-    select: {
-      acctSessionId: true,
-      callingStationId: true,
-      status: true,
-      stoppedAt: true,
-      startedAt: true,
-      lastInterimAt: true,
+  const since = new Date(nowMs - PORTAL_LOGIN_SLOT_MS);
+  const portalRows = await prisma.captivePortalSession.findMany({
+    where: {
+      credentialId,
+      createdAt: { gte: since },
     },
-    orderBy: { startedAt: 'desc' },
+    select: { mac: true },
+    orderBy: { createdAt: 'desc' },
   });
 
-  const latestByDevice = new Map<string, (typeof rows)[number]>();
-  for (const row of rows) {
-    const key = radiusSessionDeviceKey(row);
-    if (!latestByDevice.has(key)) {
-      latestByDevice.set(key, row);
-    }
+  for (const row of portalRows) {
+    const mac = normalizeCaptiveMac(row.mac);
+    if (mac) occupied.add(mac);
   }
 
-  const now = Date.now();
-  let active = 0;
-  for (const session of latestByDevice.values()) {
-    if (!isRadiusSessionEnded(session, now)) {
-      active++;
-    }
-  }
-  return active;
+  return occupied;
 }
 
 export type CaptiveLoginCredential = Awaited<
   ReturnType<typeof prisma.credential.findFirst<{ include: typeof captiveLoginCredentialInclude }>>
 >;
 
-export async function runCaptiveLoginGuards(credential: NonNullable<CaptiveLoginCredential>): Promise<void> {
+export type CaptiveLoginGuardOptions = {
+  /** Client MAC from NAS redirect / x-calling-station-id (optional). */
+  clientMac?: string | null;
+};
+
+/**
+ * Device / session gates for captive login.
+ *
+ * - Same MAC with an open RADIUS session → soft-end those rows, then allow.
+ * - Occupied slots = open RADIUS MACs ∪ CaptivePortalSession MACs (last 3 min).
+ * - Same MAC already occupied → allow (reconnect).
+ * - Other devices at maxDevices → DEVICE_LIMIT_REACHED.
+ * - No client MAC but someone else online → RADIUS_SESSION_ACTIVE.
+ */
+export async function runCaptiveLoginGuards(
+  credential: NonNullable<CaptiveLoginCredential>,
+  options: CaptiveLoginGuardOptions = {},
+): Promise<void> {
   const plan = credential.plan;
   if (!plan) {
     throw Object.assign(new Error('INVALID_CREDENTIAL'), { code: 'INVALID_CREDENTIAL' });
   }
 
   const userNameVariants = radiusUserNameVariants(credential);
+  const clientMacNorm = normalizeCaptiveMac(options.clientMac);
 
-  const radiusAccountingBusy =
-    userNameVariants.length > 0
-      ? await hasActiveRadiusAccountingWithoutStop({
-          userNameVariants,
-          strictNoStopMeansOpen: true,
-        })
-      : false;
+  if (clientMacNorm && userNameVariants.length > 0) {
+    await endOpenRadiusSessionsForSameDevice({
+      userNameVariants,
+      clientMacNorm,
+    });
+  }
 
-  if (radiusAccountingBusy) {
+  const occupied = await collectOccupiedDeviceKeys({
+    credentialId: credential.id,
+    userNameVariants,
+  });
+
+  const maxDevices =
+    plan.timeUsageMode === PlanTimeUsageMode.SINGLE_SESSION
+      ? 1
+      : Math.max(1, plan.maxDevices ?? 1);
+
+  if (clientMacNorm && occupied.has(clientMacNorm)) {
+    // Same device reconnect / portal retry — already cleared matching RADIUS rows above.
+  } else if (occupied.size >= maxDevices) {
+    throw Object.assign(new Error('DEVICE_LIMIT_REACHED'), {
+      code: 'DEVICE_LIMIT_REACHED',
+      maxDevices,
+    });
+  } else if (!clientMacNorm && occupied.size > 0) {
     throw Object.assign(new Error('RADIUS_SESSION_ACTIVE'), { code: 'RADIUS_SESSION_ACTIVE' });
   }
 
@@ -203,15 +262,7 @@ export async function runCaptiveLoginGuards(credential: NonNullable<CaptiveLogin
     throw Object.assign(new Error('CREDENTIAL_CONSUMED'), { code: 'CREDENTIAL_CONSUMED' });
   }
 
-  if (plan.timeUsageMode === PlanTimeUsageMode.CUMULATIVE_SESSIONS) {
-    const activeDeviceCount = await countActiveDevicesForMaxDevicesCheck(userNameVariants);
-    if (plan.maxDevices != null && activeDeviceCount >= plan.maxDevices) {
-      throw Object.assign(new Error('DEVICE_LIMIT_REACHED'), {
-        code: 'DEVICE_LIMIT_REACHED',
-        maxDevices: plan.maxDevices,
-      });
-    }
-  } else if (plan.timeUsageMode === PlanTimeUsageMode.SINGLE_SESSION) {
+  if (plan.timeUsageMode === PlanTimeUsageMode.SINGLE_SESSION) {
     if (isPlanActivationWindowExceeded(credential, plan)) {
       await prisma.credential.update({
         where: { id: credential.id },
@@ -220,5 +271,4 @@ export async function runCaptiveLoginGuards(credential: NonNullable<CaptiveLogin
       throw Object.assign(new Error('CREDENTIAL_CONSUMED'), { code: 'CREDENTIAL_CONSUMED' });
     }
   }
-
 }
