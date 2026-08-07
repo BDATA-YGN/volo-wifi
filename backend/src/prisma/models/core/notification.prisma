@@ -61,9 +61,9 @@ model NotificationTemplate {
 
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime? @updatedAt @db.Timestamptz(3) @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   notifications Notification[]
 
@@ -88,8 +88,8 @@ model Notification {
   priority NotificationPriority @map("priority")
   tag      NotificationTag?     @map("tag") // Optional tag for categorizing notifications
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime? @updatedAt @db.Timestamptz(3) @map("updated_at")
 
   recipients NotificationRecipient[]
 
@@ -113,13 +113,13 @@ model NotificationRecipient {
   renderedTitle String? @map("rendered_title")
   renderedBody  String? @map("rendered_body")
 
-  readAt       DateTime? @map("read_at")
-  sentAt       DateTime? @map("sent_at")
+  readAt       DateTime? @db.Timestamptz(3) @map("read_at")
+  sentAt       DateTime? @db.Timestamptz(3) @map("sent_at")
   failedReason String?   @map("failed_reason")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime? @updatedAt @db.Timestamptz(3) @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@index([userId, status])
   @@map("tbl_notification_recipient")
@@ -134,8 +134,8 @@ model UserNotificationSetting {
   channel   NotificationChannel @map("channel")
   isEnabled Boolean             @default(true) @map("is_enabled")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime? @updatedAt @db.Timestamptz(3) @map("updated_at")
 
   @@unique([userId, channel])
   @@map("tbl_user_notification_setting")

@@ -90,7 +90,8 @@ sql {
 	#
 	# DB: volo_wifi_db (Prisma wifi models / @map snake_case). Not the legacy volo_db.
 	# sslmode=require encrypts; sslrootcert is present for verify-full if you tighten later.
-	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_wifi_db user=doadmin password=AVNS_PNTd5Vkn-X6ywZcAdbR sslmode=require sslrootcert=/etc/raddb/certs/do-ca-certificate.crt"
+	# Session TimeZone=Asia/Yangon (display/NOW). Columns are timestamptz (absolute instants).
+	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_wifi_db user=doadmin password=AVNS_PNTd5Vkn-X6ywZcAdbR sslmode=require sslrootcert=/etc/raddb/certs/do-ca-certificate.crt options=-c%20timezone%3DAsia%2FYangon"
 
 	# If you want both stop and start records logged to the
 	# same SQL table, leave this as is.  If you want them in
@@ -115,13 +116,14 @@ sql {
 	# Table to keep group info
 	usergroup_table = "radusergroup"
 
-	# If set to 'yes' (default) we read the group tables unless Fall-Through = no in the reply table.
-	# If set to 'no' we do not read the group tables unless Fall-Through = yes in the reply table.
-#	read_groups = yes
+	# Volo: REPLY attrs come from authorize_reply_query (wf_plan_radius_attribute).
+	# There are no live CHECK-phase group policies, so skip group_membership /
+	# authorize_group_* on every Access-Request (saves 2–3 DB round-trips).
+	# Set yes only if you start using CHECK-phase Plan RADIUS Policies.
+	read_groups = no
 
-	# If set to 'yes' (default) we read profiles unless Fall-Through = no in the groupreply table.
-	# If set to 'no' we do not read profiles unless Fall-Through = yes in the groupreply table.
-#	read_profiles = yes
+	# Profiles unused — same reason as read_groups.
+	read_profiles = no
 
 	# Remove stale session if checkrad does not see a double login
 	delete_stale_sessions = yes

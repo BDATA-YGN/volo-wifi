@@ -19,7 +19,9 @@ services:
     restart: unless-stopped
     network_mode: "host"
     environment:
+      # Process + PG session Asia/Yangon. DB columns are timestamptz (absolute instants).
       TZ: Asia/Yangon
+      PGTZ: Asia/Yangon
     ports:
       - "1812:1812/udp"   # Authentication
       - "1813:1813/udp"   # Accounting

@@ -7,9 +7,9 @@ model MenuGroup {
   items     MenuItem[]
   level     String?    @default("app") @map("level")
   mode      Int        @default(0) @map("mode")
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
-  deletedAt DateTime?  @map("deleted_at")
+  createdAt DateTime   @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime   @updatedAt @db.Timestamptz(3) @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3)  @map("deleted_at")
 
   @@index([position])
   @@map("tbl_menu_group")
@@ -25,9 +25,9 @@ model MenuItem {
   groupId   Int       @map("group_id")
   level     String?   @default("app") @map("level")
   group     MenuGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3) @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@map("tbl_menu_item")
 }

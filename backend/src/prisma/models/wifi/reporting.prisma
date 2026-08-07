@@ -4,8 +4,8 @@ model DailySalesStat {
   orgId String @map("org_id")
   org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
 
-  /// Store as date bucket (00:00 Asia/Yangon (app timezone)), handle timezone in app/UI
-  date      DateTime @map("date")
+  /// Store as date bucket (00:00 Asia/Yangon), as timestamptz absolute instant
+  date      DateTime @db.Timestamptz(3) @map("date")
   stationId String? @map("station_id")
   station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
 
@@ -21,9 +21,9 @@ model DailySalesStat {
   commission  Decimal @map("commission") @default(0) @db.Decimal(18, 2)
   netRevenue  Decimal @map("net_revenue") @default(0) @db.Decimal(18, 2)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   /// Prevent duplicates per bucket/dimension set (cron can upsert safely)
   @@unique([orgId, date, stationId, resellerId, planId], map: "uq_rpt_daily_sales_stat__orgid_date_statid_reseid_planid")
@@ -57,9 +57,9 @@ model MonthlySalesStat {
   commission  Decimal @map("commission") @default(0) @db.Decimal(18, 2)
   netRevenue  Decimal @map("net_revenue") @default(0) @db.Decimal(18, 2)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, year, month, stationId, resellerId, planId], map: "uq_rpt_monthly_sales_stat__orgid_year_mont_statid_reseid_planid")
   @@index([orgId, year, month], map: "idx_rpt_monthly_sales_stat__org_id__year__month")
@@ -88,9 +88,9 @@ model YearlySalesStat {
   commission  Decimal @map("commission") @default(0) @db.Decimal(18, 2)
   netRevenue  Decimal @map("net_revenue") @default(0) @db.Decimal(18, 2)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, year, stationId, resellerId, planId], map: "uq_rpt_yearly_sales_stat__orgid_year_statid_reseid_planid")
   @@index([orgId, year], map: "idx_rpt_yearly_sales_stat__org_id__year")
@@ -102,8 +102,8 @@ model DailyRadiusUsageStat {
   orgId String @map("org_id")
   org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
 
-  /// Store as date bucket (00:00 Asia/Yangon (app timezone)), handle timezone in app/UI
-  date      DateTime @map("date")
+  /// Store as date bucket (00:00 Asia/Yangon), as timestamptz absolute instant
+  date      DateTime @db.Timestamptz(3) @map("date")
   stationId String? @map("station_id")
   station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
 
@@ -120,9 +120,9 @@ model DailyRadiusUsageStat {
   totalBytes         BigInt @map("total_bytes") @default(0)
   totalSessionTimeSec Int @map("total_session_time_sec")   @default(0)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, date, stationId, resellerId, planId], map: "uq_rpt_daily_radius_usage_stat__orgid_date_statid_reseid_planid")
   @@index([orgId, date], map: "idx_rpt_daily_radius_usage_stat__org_id__date")

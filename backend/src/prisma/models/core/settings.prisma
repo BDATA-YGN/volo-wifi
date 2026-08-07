@@ -24,8 +24,8 @@ model AppSetting {
   description String? @map("description") @db.Text
   isPublic    Boolean @default(false) @map("is_public")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime @updatedAt @db.Timestamptz(3) @map("updated_at")
 
   @@index([category, sortOrder])
   @@map("app_settings")
@@ -38,13 +38,13 @@ model Otp {
   contactMethod String    @map("contact_method")
   contactValue  String    @map("contact_value")
   otpHash       String    @map("otp_hash") @db.VarChar(255)
-  expiredTime   DateTime? @map("expired_time") @db.Timestamp(6)
-  generatedTime DateTime? @map("generated_time") @db.Timestamp(6)
+  expiredTime   DateTime? @map("expired_time") @db.Timestamptz(6)
+  generatedTime DateTime? @map("generated_time") @db.Timestamptz(6)
   status        String?   @map("status")
   useCase       String    @map("use_case")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime? @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt     DateTime? @db.Timestamptz(3) @map("updated_at")
+  deletedAt     DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@map("tbl_otp")
 }
@@ -55,9 +55,9 @@ model Places {
   town      String?   @map("town") @db.VarChar(300)
   ward      String?   @map("ward") @db.VarChar(300)
   postcode  String?   @map("postcode") @db.VarChar(300)
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime? @db.Timestamptz(3) @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([region, town, ward])
   @@index([deletedAt])
@@ -72,9 +72,9 @@ model Databases {
   type      String    @map("type")
   dbName    String    @map("db_name")
   filePath  String    @map("file_path")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt DateTime? @db.Timestamptz(3) @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@map("tbl_databases")
 }

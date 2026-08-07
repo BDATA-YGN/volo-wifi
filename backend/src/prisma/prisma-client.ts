@@ -4,7 +4,7 @@ import { PrismaClient } from '@/generated/prisma/client';
 import { logger } from '@/logging/logger';
 import { DB_LOG, DATABASE_URL } from '@/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { buildPgPoolConfig } from '@/lib/pg-ssl';
+import { buildPgPoolConfig, probePgSessionTimezone } from '@/lib/pg-ssl';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -59,9 +59,13 @@ function createPrismaClient(): PrismaClient {
     throw new Error('DATABASE_URL is not set');
   }
 
+  const createdPool = !globalThis.__pgPool__;
   const pool = globalThis.__pgPool__ ?? new Pool(buildPgPoolConfig(DATABASE_URL));
   attachPoolErrorHandlers(pool);
   globalThis.__pgPool__ = pool;
+  if (createdPool) {
+    probePgSessionTimezone(pool, (message) => logger.info(message));
+  }
 
   const adapter = new PrismaPg(pool, {
     onPoolError: (err) => logger.error(`Prisma PG pool error: ${err.message}`),

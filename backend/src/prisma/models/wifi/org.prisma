@@ -21,9 +21,9 @@ model Org {
   adminId String? @map("admin_id") @unique
   admin   Admin?  @relation(fields: [adminId], references: [id], onDelete: SetNull)
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   wifiAuditLogs   WifiAuditLog[]
   resellers       Reseller[]
@@ -95,7 +95,7 @@ model WifiAuditLog {
   ip        String? @map("ip")
   userAgent String? @map("user_agent")
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@index([orgId, createdAt], map: "idx_wf_audit_log__org_id__created_at")
   @@index([orgId, entity, entityId], map: "idx_wf_audit_log__org_id__entity__entity_id")

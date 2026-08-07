@@ -11,9 +11,9 @@ model RptFinSettlement {
   stationId String @map("station_id")
   station   WifiStation @relation(fields: [stationId], references: [id], onDelete: Restrict)
 
-  /// Inclusive business period in org timezone, stored as absolute instants (UTC) by convention
-  periodStart DateTime @map("period_start")
-  periodEnd   DateTime @map("period_end")
+  /// Inclusive business period in org timezone, stored as timestamptz (absolute instants)
+  periodStart DateTime @db.Timestamptz(3) @map("period_start")
+  periodEnd   DateTime @db.Timestamptz(3) @map("period_end")
 
   status RptFinSettlementStatus @map("status") @default(DRAFT)
 
@@ -34,9 +34,9 @@ model RptFinSettlement {
   /// Exactly one posting record when status becomes POSTED
   posting RptFinPosting?
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, resellerId, stationId, periodStart, periodEnd], map: "uq_rpt_fin_settlement__orgid_reseid_statid_peristar_periend")
   @@index([orgId, status, periodStart], map: "idx_rpt_fin_settlement__org_id__status__period_start")
@@ -65,8 +65,8 @@ model RptFinSettlementLine {
   /// declared - system
   varianceAmount Decimal? @map("variance_amount") @db.Decimal(18, 2)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@unique([settlementId, paymentMethod], map: "uq_rpt_fin_settlement_line__settlement_id__payment_method")
   @@index([orgId, settlementId], map: "idx_rpt_fin_settlement_line__org_id__settlement_id")
@@ -88,12 +88,12 @@ model RptFinAttestation {
   roleName String? @map("role_name")
 
   actorId   String? @map("actor_id")
-  signedAt  DateTime? @map("signed_at")
+  signedAt  DateTime? @db.Timestamptz(3) @map("signed_at")
   note      String? @map("note")
   /// Optional signature of payload at time of signing (store base64/hex; app-defined)
   payloadSig String? @map("payload_sig")
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@index([orgId, settlementId], map: "idx_rpt_fin_attestation__org_id__settlement_id")
   @@index([settlementId, kind, signedAt], map: "idx_rpt_fin_attestation__settlement_id__kind__signed_at")
@@ -116,12 +116,12 @@ model RptFinPosting {
   /// Cheap integrity check for offline verification / support debugging
   payloadHash String @map("payload_hash")
 
-  postedAt  DateTime @map("posted_at") @default(now())
+  postedAt  DateTime @db.Timestamptz(3) @map("posted_at") @default(now())
   postedBy  String? @map("posted_by")
   /// When true, operational rows covered by this posting are eligible for purging (policy-driven)
   sealed    Boolean @map("sealed")  @default(true)
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@index([orgId, postedAt], map: "idx_rpt_fin_posting__org_id__posted_at")
   @@index([postedAt], map: "idx_rpt_fin_posting__posted_at")
@@ -139,11 +139,11 @@ model RptFinSourceCoverage {
   stationId String @map("station_id")
   station   WifiStation @relation(fields: [stationId], references: [id], onDelete: Restrict)
 
-  maxCoveredPaidAt DateTime @map("max_covered_paid_at")
+  maxCoveredPaidAt DateTime @db.Timestamptz(3) @map("max_covered_paid_at")
   lastPostingId    String? @map("last_posting_id")
 
-  updatedAt DateTime @map("updated_at") @updatedAt
-  createdAt DateTime @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@unique([orgId, resellerId, stationId], map: "uq_rpt_fin_source_coverage__org_id__reseller_id__station_id")
   @@index([orgId, maxCoveredPaidAt], map: "idx_rpt_fin_source_coverage__org_id__max_covered_paid_at")

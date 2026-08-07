@@ -14,11 +14,11 @@ model FileLog {
   isFolder     Boolean   @default(false) @map("is_folder")
   parentId     String?   @map("parent_id")
   path         String?   @map("path") // Full directory path for easier searching
-  lastModified DateTime? @map("last_modified")
+  lastModified DateTime? @db.Timestamptz(3) @map("last_modified")
   authorId     String?   @map("author_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3) @map("created_at")
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3) @map("updated_at")
+  deletedAt    DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   parent   FileLog?  @relation("FolderChildren", fields: [parentId], references: [id])
   children FileLog[] @relation("FolderChildren")

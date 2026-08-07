@@ -1,7 +1,7 @@
 import { Pool, QueryConfig } from 'pg';
 import { logger } from '@/logging/logger';
 import { DATABASE_URL, NODE_ENV } from '@/config';
-import { buildPgPoolConfig } from '@/lib/pg-ssl';
+import { buildPgPoolConfig, probePgSessionTimezone } from '@/lib/pg-ssl';
 
 const poolConfig = buildPgPoolConfig(DATABASE_URL);
 // Legacy raw-SQL pool — keep timeouts aligned with Prisma (remote DO).
@@ -20,6 +20,9 @@ pool
     c.release();
   })
   .catch((err) => logger.error('DB connection error:', err));
+
+// Non-prod: confirm session TZ is Asia/Yangon even when DO URL has no options=.
+probePgSessionTimezone(pool, (message) => logger.info(message));
 
 function interpolateQuery(query: string, params: any[] = []) {
   return query.replace(/\$(\d+)/g, (_, num) => {

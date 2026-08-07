@@ -42,9 +42,9 @@ model Plan {
   resellerEntitlements ResellerPlanEntitlement[]
   stationPlanOffers    StationPlanOffer[]
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, code], map: "uq_wf_plan__org_id__code")
   @@index([orgId, quotaType], map: "idx_wf_plan__org_id__quota_type")
@@ -68,9 +68,9 @@ model PlanPriceBook {
   stations  PlanPriceBookStation[]
   resellers PlanPriceBookReseller[]
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@index([orgId, isDefault], map: "idx_wf_plan_price_book__org_id__is_default")
   @@index([orgId, stationSizeId], map: "idx_wf_plan_price_book__org_id__station_size_id")
@@ -85,7 +85,7 @@ model PlanPriceBookStation {
   stationId   String        @map("station_id")
   station     WifiStation   @relation(fields: [stationId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@unique([priceBookId, stationId], map: "uq_wf_plan_price_book_station__book_station")
   @@index([stationId], map: "idx_wf_plan_price_book_station__station_id")
@@ -100,7 +100,7 @@ model PlanPriceBookReseller {
   resellerId  String        @map("reseller_id")
   reseller    Reseller      @relation(fields: [resellerId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@unique([priceBookId, resellerId], map: "uq_wf_plan_price_book_reseller__book_reseller")
   @@index([resellerId], map: "idx_wf_plan_price_book_reseller__reseller_id")
@@ -124,9 +124,9 @@ model PlanPrice {
 
   isActive Boolean @map("is_active") @default(true)
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([priceBookId, planId], map: "uq_wf_plan_price__price_book_id__plan_id")
   @@index([orgId, planId], map: "idx_wf_plan_price__org_id__plan_id")

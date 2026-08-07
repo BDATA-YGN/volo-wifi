@@ -10,12 +10,13 @@ Use this file to re-check queries against `volo_wifi_db` (`psql` / TablePlus / D
 
 | Console page | Primary tables | Used by FreeRADIUS? |
 | --- | --- | --- |
-| **Network → Plan RADIUS Policies** | `wf_plan_radius_attribute`, `wf_plan`, `wf_radius_vendor_profile`, `wf_station` | **Yes** — authorize REPLY / CHECK attrs |
+| **Network → Plan RADIUS Policies** | `wf_plan_radius_attribute`, `wf_plan`, `wf_radius_vendor_profile`, `wf_station` | **Yes** — authorize **REPLY** attrs (`read_groups = no`; CHECK unused) |
 | **Sites → Network tab** (`RADIUS vendor profile`) | `wf_station.radius_vendor_profile_id` | **Yes** — picks MikroTik vs Ruijie policy bundle |
-| **Catalog → Retail Pricing** | `wf_plan_price_book`, `wf_plan_price`, `wf_plan_price_book_station`, `wf_plan_price_book_reseller` | **No** — sell price only (Reseller → Site → Org default) |
+| **Catalog → Retail Pricing** | `wf_plan_price_book`, `wf_plan_price`, `wf_plan_price_book_station`, `wf_plan_price_book_reseller` | **No** — sell price only |
 | **Partners → Plan entitlements** | reseller plan sellable flags + price-book resolution | **No** — commerce only |
-| Credentials / vouchers | `wf_credential` (+ `wf_plan`) | **Yes** — password + plan + optional `station_id` |
+| Credentials / vouchers | `wf_credential` (+ `wf_plan`) | **Yes** — password + Simultaneous-Use + activate |
 | Live sessions | `wf_radius_session` | **Yes** — accounting + Simultaneous-Use |
+| Auth log | `radpostauth` | **Yes** — post-auth insert only |
 
 ### Plan RADIUS Policies model (matches the UI)
 
@@ -68,7 +69,16 @@ Prefer `SELECT` / `EXPLAIN` first. Avoid production `UPDATE`/`INSERT` unless int
 Config defaults:
 
 - `sql_user_name = %{User-Name}`
-- `event_timestamp = TO_TIMESTAMP(${event_timestamp_epoch})`
+- PG session `timezone=Asia/Yangon` (connection `options=` + `PGTZ`)
+- DateTime columns are **`timestamptz`** (absolute instants; Prisma `@db.Timestamptz`)
+- `event_timestamp = TO_TIMESTAMP(${event_timestamp_epoch})` — stores timestamptz directly
+- `CURRENT_TIMESTAMP` for `updated_at` / `activated_at` / `expires_at` checks
+- `EXTRACT(EPOCH FROM started_at)` is correct on timestamptz
+
+### Timezone
+
+Session TZ Asia/Yangon only affects display of `NOW()` / timestamptz in SQL tools.
+Stored values are absolute; the console formats with `Asia/Yangon` via dayjs.
 
 ---
 
@@ -135,51 +145,41 @@ WHERE false;
 
 ## 2. Authorize — check items (`authorize_check_query`)
 
-Password / token + `Simultaneous-Use` from plan `max_devices`. **Does not** read Plan RADIUS Policies.
+Password / token + `Simultaneous-Use` from plan `max_devices` (one credential/plan hit via `LATERAL VALUES`).
 
 ```sql
-SELECT id, username AS "UserName", attribute AS "Attribute", value AS "Value", op AS "Op"
-FROM (
-  SELECT
-    1 AS sort_key,
-    c.id AS id,
-    COALESCE(c.username, c.token) AS username,
-    CASE
-      WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN 'Crypt-Password'
-      WHEN c.token IS NOT NULL THEN 'Cleartext-Password'
-    END AS attribute,
-    ':=' AS op,
-    CASE
-      WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN c.password_hash
-      WHEN c.token IS NOT NULL THEN c.token
-    END AS value
-  FROM wf_credential c
-  WHERE (c.token = 'CKFAGG' OR c.username = 'CKFAGG')
-    AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
-    AND c."status" IN ('SOLD', 'ACTIVATED')
-    AND c.deleted_at IS NULL
-    AND c.revoked_at IS NULL
-    AND (
-      (c.username IS NOT NULL AND c.password_hash IS NOT NULL)
-      OR c.token IS NOT NULL
-    )
-  UNION ALL
-  SELECT
-    2 AS sort_key,
-    c.id AS id,
-    COALESCE(c.username, c.token) AS username,
-    'Simultaneous-Use' AS attribute,
-    ':=' AS op,
-    COALESCE(p.max_devices, 1)::text AS value
-  FROM wf_credential c
-  INNER JOIN wf_plan p ON c.plan_id = p.id AND p.deleted_at IS NULL
-  WHERE (c.token = 'CKFAGG' OR c.username = 'CKFAGG')
-    AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
-    AND c."status" IN ('SOLD', 'ACTIVATED')
-    AND c.deleted_at IS NULL
-    AND c.revoked_at IS NULL
-) combined
-ORDER BY sort_key, id;
+SELECT
+  c.id::text AS id,
+  COALESCE(c.username, c.token) AS "UserName",
+  v.attribute AS "Attribute",
+  v.value AS "Value",
+  ':=' AS "Op"
+FROM wf_credential c
+INNER JOIN wf_plan p ON p.id = c.plan_id AND p.deleted_at IS NULL
+CROSS JOIN LATERAL (
+  VALUES
+    (
+      CASE
+        WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN 'Crypt-Password'
+        ELSE 'Cleartext-Password'
+      END,
+      CASE
+        WHEN c.username IS NOT NULL AND c.password_hash IS NOT NULL THEN c.password_hash
+        ELSE c.token
+      END
+    ),
+    ('Simultaneous-Use', COALESCE(p.max_devices, 1)::text)
+) AS v(attribute, value)
+WHERE (c.token = 'CKFAGG' OR c.username = 'CKFAGG')
+  AND c."status" IN ('SOLD', 'ACTIVATED')
+  AND c.deleted_at IS NULL
+  AND c.revoked_at IS NULL
+  AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
+  AND (
+    (c.username IS NOT NULL AND c.password_hash IS NOT NULL)
+    OR c.token IS NOT NULL
+  )
+ORDER BY CASE WHEN v.attribute = 'Simultaneous-Use' THEN 2 ELSE 1 END, c.id;
 ```
 
 Empty result ⇒ wrong token / status / expired / deleted.
@@ -197,9 +197,11 @@ Filters:
 - vendor profile = site’s `radius_vendor_profile_id` (when set)
 - `DISTINCT ON ("attributeName")` preferring site override, then priority
 
+Console stores `op = ':='` and a concrete `value` (optionally `{timeSeconds}` / `{dataMb}` templates). No FreeRADIUS operator whitelist is needed.
+
 ```sql
 SELECT
-  ROW_NUMBER() OVER (ORDER BY deduped.priority ASC, deduped.pra_id)::integer AS id,
+  deduped.pra_id AS id,
   deduped."UserName",
   deduped."Attribute",
   deduped."Value",
@@ -208,14 +210,8 @@ FROM (
   SELECT DISTINCT ON (pra."attributeName")
     COALESCE(c.username, c.token) AS "UserName",
     pra."attributeName" AS "Attribute",
+    COALESCE(NULLIF(pra.op, ''), ':=') AS "Op",
     CASE
-      WHEN pra.op IN (':=','=','==','+=','-=','!=','>','>=','<','<=','=~','!~','=*','!*') THEN pra.op
-      ELSE ':='
-    END AS "Op",
-    CASE
-      WHEN (pra.value IS NULL OR pra.value = '')
-        AND pra.op NOT IN (':=','=','==','+=','-=','!=','>','>=','<','<=','=~','!~','=*','!*')
-        THEN pra.op
       WHEN pra.value LIKE '%{timeSeconds}%' THEN
         REPLACE(
           pra.value,
@@ -227,6 +223,7 @@ FROM (
                 WHEN 'MINUTE' THEN 60
                 WHEN 'HOUR' THEN 3600
                 WHEN 'DAY' THEN 86400
+                WHEN 'MONTH' THEN 2592000
                 ELSE 0
               END)::text,
             '0'
@@ -257,10 +254,10 @@ FROM (
       OR pra.vendor_profile_id = ws.radius_vendor_profile_id
     )
   WHERE (c.token = 'CKFAGG' OR c.username = 'CKFAGG')
-    AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
+    AND c."status" IN ('SOLD', 'ACTIVATED')
     AND c.deleted_at IS NULL
     AND c.revoked_at IS NULL
-    AND c."status" IN ('SOLD', 'ACTIVATED')
+    AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
   ORDER BY
     pra."attributeName",
     CASE WHEN pra.wifi_station_id IS NOT NULL THEN 0 ELSE 1 END,
@@ -296,89 +293,17 @@ WHERE c.token = 'CKFAGG' OR c.username = 'CKFAGG';
 
 ---
 
-## 4. Group membership (`group_membership_query`)
+## 4–6. Group membership / group check / group reply
 
-Group name = `plan.code || COALESCE(username, token)`.
+**Disabled in production:** `mods-available/sql` sets `read_groups = no` and `read_profiles = no`.
 
-```sql
-SELECT p.code || COALESCE(c.username, c.token) AS groupname
-FROM wf_credential c
-INNER JOIN wf_plan p ON p.id = c.plan_id AND p.deleted_at IS NULL
-WHERE (c.token = 'CKFAGG' OR c.username = 'CKFAGG')
-  AND (c.username IS NOT NULL OR c.token IS NOT NULL)
-  AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
-  AND c.deleted_at IS NULL
-ORDER BY 1;
-```
+Reason: all Access-Accept REPLY attrs come from §3 (`authorize_reply_query`). Live DB has **0** CHECK-phase `wf_plan_radius_attribute` rows, so group queries were wasted round-trips.
 
-Paste returned `groupname` into §5.
+`queries.conf` keeps empty stubs (`WHERE false`). To use CHECK-phase policies later:
 
----
-
-## 5. Authorize — group check (`authorize_group_check_query`)
-
-CHECK-phase rows from the same Plan RADIUS Policies table (same station + vendor rules).
-
-```sql
-SELECT
-  ROW_NUMBER() OVER (ORDER BY deduped.priority ASC, deduped.pra_id)::integer AS id,
-  deduped."GroupName",
-  deduped."Attribute",
-  deduped."Value",
-  deduped."Op"
-FROM (
-  SELECT DISTINCT ON (pra."attributeName")
-    p.code || COALESCE(c.username, c.token) AS "GroupName",
-    pra."attributeName" AS "Attribute",
-    CASE
-      WHEN pra.op IN (':=','=','==','+=','-=','!=','>','>=','<','<=','=~','!~','=*','!*') THEN pra.op
-      ELSE '=='
-    END AS "Op",
-    pra.value AS "Value",
-    pra.priority AS priority,
-    pra.id AS pra_id
-  FROM wf_credential c
-  INNER JOIN wf_plan p ON p.id = c.plan_id AND p.deleted_at IS NULL
-  LEFT JOIN wf_station ws ON ws.id = c.station_id AND ws.deleted_at IS NULL
-  INNER JOIN wf_plan_radius_attribute pra ON pra.plan_id = p.id
-    AND pra.phase = 'CHECK'
-    AND pra.deleted_at IS NULL
-    AND (
-      pra.wifi_station_id IS NULL
-      OR (c.station_id IS NOT NULL AND pra.wifi_station_id = c.station_id)
-    )
-    AND (
-      ws.radius_vendor_profile_id IS NULL
-      OR pra.vendor_profile_id = ws.radius_vendor_profile_id
-    )
-  WHERE (c.token = 'CKFAGG' OR c.username = 'CKFAGG')
-    AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
-    AND c.deleted_at IS NULL
-    AND (p.code || COALESCE(c.username, c.token)) = 'PASTE_GROUPNAME_HERE'
-  ORDER BY
-    pra."attributeName",
-    CASE WHEN pra.wifi_station_id IS NOT NULL THEN 0 ELSE 1 END,
-    pra.priority ASC,
-    pra.id
-) deduped
-ORDER BY deduped.priority ASC, deduped.pra_id;
-```
-
----
-
-## 6. Authorize — group reply (`authorize_group_reply_query`)
-
-Empty on purpose — REPLY already comes from §3.
-
-```sql
-SELECT
-  NULL::integer AS id,
-  NULL::varchar(128) AS "GroupName",
-  NULL::varchar(64) AS "Attribute",
-  NULL::varchar(253) AS "Value",
-  NULL::varchar(2) AS op
-WHERE false;
-```
+1. Add CHECK rows in Plan RADIUS Policies  
+2. Set `read_groups = yes`  
+3. Restore real `group_membership_query` / `authorize_group_check_query` from git history  
 
 ---
 
@@ -642,12 +567,12 @@ Some Prisma fields kept **camelCase** columns in Postgres (legacy):
 | --- | --- |
 | `wf_credential` | Auth identity, plan, station, activate |
 | `wf_plan` | Quotas / `max_devices` / time templates |
-| `wf_plan_radius_attribute` | **Plan RADIUS Policies** UI |
+| `wf_plan_radius_attribute` | Plan RADIUS Policies (**REPLY** phase) |
 | `wf_station` | Vendor profile + optional site overrides |
-| `wf_radius_vendor_profile` | MikroTik / Ruijie profile metadata (via FK) |
+| `wf_radius_vendor_profile` | MikroTik / Ruijie metadata (via FK) |
 | `wf_radius_session` | Accounting + Simultaneous-Use |
-| postauth table | Optional auth log |
+| `radpostauth` | Auth attempt log |
 
-**Not used by FreeRADIUS:** `wf_plan_price_book`, `wf_plan_price`, `wf_plan_price_book_station`, `wf_plan_price_book_reseller` (Retail Pricing / partner sell price).
+**Not used:** `radcheck` / `radreply` / `radgroup*` / `radacct` / `nas` / `nasreload`, retail price books.
 
 Related schema dump: `freeRadius/sql/postgresql-schema.sql`.

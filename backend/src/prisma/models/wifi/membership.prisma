@@ -25,10 +25,10 @@ model OrgMember {
   createdByAdminId String? @map("created_by_admin_id")
   createdByAdmin   Admin?  @relation("WifiOrgMemberCreatedBy", fields: [createdByAdminId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  joinedAt  DateTime? @map("joined_at")
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  joinedAt  DateTime? @db.Timestamptz(3) @map("joined_at")
+  createdAt DateTime @db.Timestamptz(3)  @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3)  @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   roles         OrgMemberRole[]
   stationScopes OrgMemberStation[]
@@ -58,15 +58,15 @@ model OrgMemberRole {
   reseller   Reseller?    @relation(fields: [resellerId], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
   isActive      Boolean   @map("is_active") @default(true)
-  effectiveFrom DateTime? @map("effective_from")
-  effectiveTo   DateTime? @map("effective_to")
+  effectiveFrom DateTime? @db.Timestamptz(3) @map("effective_from")
+  effectiveTo   DateTime? @db.Timestamptz(3) @map("effective_to")
 
   assignedByAdminId String? @map("assigned_by_admin_id")
   assignedByAdmin   Admin?  @relation("WifiOrgMemberRoleAssignedBy", fields: [assignedByAdminId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3)  @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3)  @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgMemberId, roleCode, scopeKey], map: "uq_wf_org_member_role__member__role__scope")
   @@index([orgId, roleCode, isActive], map: "idx_wf_org_member_role__org_id__role_code__is_active")
@@ -88,7 +88,7 @@ model OrgMemberStation {
   stationId   String      @map("station_id")
   station     WifiStation @relation(fields: [stationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@unique([orgMemberId, stationId], map: "uq_wf_org_member_station__org_member_id__station_id")
   @@index([orgId, stationId], map: "idx_wf_org_member_station__org_id__station_id")
@@ -110,9 +110,9 @@ model ResellerStation {
   assignedByAdminId String? @map("assigned_by_admin_id")
   assignedByAdmin   Admin?  @relation("WifiResellerStationAssignedBy", fields: [assignedByAdminId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3)  @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3)  @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([resellerId, stationId], map: "uq_wf_reseller_station__reseller_id__station_id")
   @@index([orgId, resellerId], map: "idx_wf_reseller_station__org_id__reseller_id")

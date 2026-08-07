@@ -34,9 +34,9 @@ model Reseller {
   resellerStations ResellerStation[]
   memberRoles      OrgMemberRole[]
 
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3)  @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3)  @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, code], map: "uq_wf_reseller__org_id__code")
   @@index([orgId, status], map: "idx_wf_reseller__org_id__status")
@@ -53,8 +53,8 @@ model ResellerPlanEntitlement {
   planId     String   @map("plan_id")
   plan       Plan     @relation(fields: [planId], references: [id], onDelete: Restrict)
   isEnabled  Boolean  @map("is_enabled") @default(true)
-  createdAt  DateTime @map("created_at") @default(now())
-  updatedAt  DateTime @map("updated_at") @updatedAt
+  createdAt  DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt  DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@unique([resellerId, planId], map: "uq_wf_reseller_plan_entitlement__reseller_id__plan_id")
   @@index([orgId, resellerId], map: "idx_wf_reseller_plan_entitlement__org_id__reseller_id")

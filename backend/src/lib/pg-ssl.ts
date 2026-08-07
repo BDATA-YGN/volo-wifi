@@ -1,9 +1,90 @@
 import fs from 'fs';
 import path from 'path';
-import type { PoolConfig } from 'pg';
+import type { Pool, PoolConfig } from 'pg';
 import type { ConnectionOptions } from 'tls';
 
+/** Keep in sync with `@/utils/app-time` APP_TIMEZONE (avoid path-alias import for Prisma CLI). */
+const APP_TIMEZONE = 'Asia/Yangon';
+
 const DEFAULT_SSL_CERT = 'ca-certificate-volo-private.crt';
+
+/** IANA-ish names only — used in libpq `-c timezone=...` (no shell metacharacters). */
+const SAFE_TZ_RE = /^[A-Za-z0-9_+\-/]+$/;
+
+/** Resolve business/session timezone (Node TZ, else Asia/Yangon). */
+export function resolvePgSessionTimezone(): string {
+  const tz = (process.env.TZ || APP_TIMEZONE).trim();
+  if (tz && SAFE_TZ_RE.test(tz)) return tz;
+  return APP_TIMEZONE;
+}
+
+/**
+ * Merge `-c timezone=<tz>` into libpq `options`, preserving any other startup flags
+ * already present on the connection string (e.g. search_path).
+ */
+export function mergePgTimezoneOptions(
+  existingOptions: string,
+  tz: string = resolvePgSessionTimezone(),
+): string {
+  const safeTz = SAFE_TZ_RE.test(tz) ? tz : APP_TIMEZONE;
+  const tzFlag = `-c timezone=${safeTz}`;
+  const withoutTz = (existingOptions || '')
+    .replace(/(^|\s)-c\s+timezone=\S+/gi, ' ')
+    .replace(/(^|\s)timezone=\S+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return withoutTz ? `${withoutTz} ${tzFlag}` : tzFlag;
+}
+
+/**
+ * Ensure connection string carries session timezone so DO Managed URLs without
+ * `options=` still get Asia/Yangon for NOW()/CURRENT_DATE/session display.
+ * Returns a connection string with `options` set and a PoolConfig `options` value.
+ */
+export function applyPgSessionTimezone(
+  connectionString: string,
+  tz: string = resolvePgSessionTimezone(),
+): { connectionString: string; options: string } {
+  const options = mergePgTimezoneOptions('', tz);
+  try {
+    const url = new URL(connectionString);
+    const merged = mergePgTimezoneOptions(url.searchParams.get('options') || '', tz);
+    url.searchParams.set('options', merged);
+    return { connectionString: url.toString(), options: merged };
+  } catch {
+    return { connectionString, options };
+  }
+}
+
+/**
+ * Non-prod probe: log `SHOW timezone` once the pool can connect.
+ * No-op in production; failures are swallowed so startup is not blocked.
+ */
+export function probePgSessionTimezone(
+  pool: Pool,
+  log: (message: string) => void = console.info,
+): void {
+  if (process.env.NODE_ENV === 'production') return;
+
+  void pool
+    .connect()
+    .then(async (client) => {
+      try {
+        const result = await client.query<{ TimeZone: string; timezone: string }>(
+          'SHOW timezone',
+        );
+        const row = result.rows[0] as Record<string, string> | undefined;
+        const value =
+          row?.TimeZone ?? row?.timezone ?? (Object.values(row || {})[0] || '?');
+        log(`PostgreSQL session timezone: ${value} (expected ${resolvePgSessionTimezone()})`);
+      } finally {
+        client.release();
+      }
+    })
+    .catch((err: Error) => {
+      log(`PostgreSQL session timezone probe skipped: ${err.message}`);
+    });
+}
 
 function sslMode(): string {
   return (process.env.DATABASE_SSL_MODE ?? '').trim().toLowerCase();
@@ -66,10 +147,19 @@ export function resolvePgSsl(): ConnectionOptions | undefined {
   return { rejectUnauthorized: false };
 }
 
-/** Build pg Pool config with optional SSL from env. */
+/**
+ * Build pg Pool config with optional SSL from env.
+ *
+ * Always applies Asia/Yangon (or TZ) as the PG session timezone via libpq
+ * `options`, even when DigitalOcean Managed URLs omit `options=` (cluster
+ * storage stays UTC; Prisma DateTime remains absolute UTC instants).
+ */
 export function buildPgPoolConfig(connectionString: string): PoolConfig {
+  const { connectionString: cs, options } = applyPgSessionTimezone(connectionString);
   const config: PoolConfig = {
-    connectionString,
+    connectionString: cs,
+    // Prefer PoolConfig.options so session TZ applies even if a driver strips URL options.
+    options,
     // Keep headroom for FreeRADIUS + tools on DigitalOcean managed Postgres.
     max: Number(process.env.DATABASE_POOL_MAX || 8),
     // Recycle idle clients before cloud/LB silent drops (common cause of

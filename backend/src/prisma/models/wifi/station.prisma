@@ -57,9 +57,9 @@ model WifiStation {
   memberStationScopes OrgMemberStation[]
   planOffers          StationPlanOffer[]
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, code], map: "uq_wf_station__org_id__code")
   @@index([orgId, status], map: "idx_wf_station__org_id__status")
@@ -78,8 +78,8 @@ model StationPlanOffer {
   planId    String      @map("plan_id")
   plan      Plan        @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@unique([stationId, planId], map: "uq_wf_station_plan_offer__station_id__plan_id")
   @@index([orgId, stationId], map: "idx_wf_station_plan_offer__org_id__station_id")
@@ -118,9 +118,9 @@ model StationDevice {
   nasServer      String? // Optional RADIUS server IP @map("nas_server")
   nasCommunity   String? // SNMP community string @map("nas_community")
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@index([orgId, stationId], map: "idx_wf_station_device__org_id__station_id")
   @@index([orgId, isRadiusClient], map: "idx_wf_station_device__org_id__is_radius_client")

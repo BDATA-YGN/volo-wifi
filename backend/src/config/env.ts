@@ -19,8 +19,9 @@ export const env = cleanEnv(process.env, {
 
   TZ: str({ default: APP_TIMEZONE }),
 
-  // Database — single source; DB_* below are optional overrides only
-  // Session TimeZone=Asia/Yangon (URL-encoded slash: Asia%2FYangon)
+  // Database — single source; DB_* below are optional overrides only.
+  // DO Managed PG + Prisma DateTime use timestamptz (absolute instants).
+  // Session TimeZone=Asia/Yangon is enforced in buildPgPoolConfig for NOW()/display.
   DATABASE_URL: str({
     default:
       'postgresql://postgres:password@localhost:5432/db?options=-c%20timezone%3DAsia%2FYangon',

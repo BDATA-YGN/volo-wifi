@@ -20,9 +20,9 @@ model RadiusSession {
 
   // Accounting status & times
   status        RadiusAcctStatus @map("status") @default(START)
-  startedAt     DateTime @map("started_at")
-  lastInterimAt DateTime? @map("last_interim_at")
-  stoppedAt     DateTime? @map("stopped_at")
+  startedAt     DateTime @db.Timestamptz(3) @map("started_at")
+  lastInterimAt DateTime? @db.Timestamptz(3) @map("last_interim_at")
+  stoppedAt     DateTime? @db.Timestamptz(3) @map("stopped_at")
 
   // usage counters (bytes)
   inputBytes     BigInt? // Acct-Input-Octets @map("input_bytes")
@@ -32,8 +32,8 @@ model RadiusSession {
 
   terminateCause String? @map("terminate_cause")
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@unique([acctSessionId, nasIpAddress], map: "uq_wf_radius_session__acct_session_id__nas_ip_address")
   @@index([orgId, startedAt], map: "idx_wf_radius_session__org_id__started_at")
@@ -73,9 +73,9 @@ model RadiusSessionArchive {
   nasIdentifier    String? @map("nas_identifier")
 
   status        RadiusAcctStatus @map("status")
-  startedAt     DateTime @map("started_at")
-  lastInterimAt DateTime? @map("last_interim_at")
-  stoppedAt     DateTime? @map("stopped_at")
+  startedAt     DateTime @db.Timestamptz(3) @map("started_at")
+  lastInterimAt DateTime? @db.Timestamptz(3) @map("last_interim_at")
+  stoppedAt     DateTime? @db.Timestamptz(3) @map("stopped_at")
 
   inputBytes     BigInt? @map("input_bytes")
   outputBytes    BigInt? @map("output_bytes")
@@ -83,7 +83,7 @@ model RadiusSessionArchive {
   sessionTimeSec Int? @map("session_time_sec")
   terminateCause String? @map("terminate_cause")
 
-  archivedAt DateTime @map("archived_at") @default(now())
+  archivedAt DateTime @db.Timestamptz(3) @map("archived_at") @default(now())
 
   @@index([orgId, stoppedAt], map: "idx_wf_radius_session_arc__org_id__stopped_at")
   @@index([archivedAt], map: "idx_wf_radius_session_arc__archived_at")
@@ -134,9 +134,9 @@ model OrgRadiusProfile {
 
   devices StationDevice[]
 
-  createdAt DateTime  @map("created_at") @default(now())
-  updatedAt DateTime  @map("updated_at") @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3)  @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3)  @map("updated_at") @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@unique([orgId, name], map: "uq_wf_org_radius_profile__org_id__name")
   @@index([orgId, deletedAt], map: "idx_wf_org_radius_profile__org_id__deleted_at")
@@ -159,9 +159,9 @@ model RadiusVendorProfile {
   supportsCoA Boolean @map("supports_co_a") @default(true)
   coaPort     Int? @map("coa_port")    @default(3799)
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   planAttributes            PlanRadiusAttribute[]
   supportedAttributeRows    RadiusVendorProfileSupportedAttribute[]
@@ -194,8 +194,8 @@ model RouterSupportedAttribute {
 
   note String? @map("note") @db.Text
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   vendorProfileLinks RadiusVendorProfileSupportedAttribute[]
 
@@ -219,7 +219,7 @@ model RadiusVendorProfileSupportedAttribute {
   /// When MUST, plans using this profile should include this attribute (UI pre-fills; API may validate).
   requirement RadiusProfileAttrRequirement @map("requirement") @default(OPTIONAL)
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@unique([vendorProfileId, attributeId], map: "uq_wf_radius_vendor_profile_supported_attr__vendprofid_attrid")
   @@index([orgId, vendorProfileId], map: "idx_wf_rvp_sup_attr__org_id__vendor_profile_id")
@@ -264,9 +264,9 @@ model PlanRadiusAttribute {
 
   note String? @map("note")
 
-  createdAt DateTime @map("created_at")  @default(now())
-  updatedAt DateTime @map("updated_at")  @updatedAt
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   @@index([orgId, planId], map: "idx_wf_plan_radius_attribute__org_id__plan_id")
   @@index([orgId, planId, wifiStationId], map: "idx_wf_plan_radius_attribute__org_id__plan_id__wifi_station_id")

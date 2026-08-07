@@ -16,8 +16,8 @@ model StationSize {
   sortOrder   Int     @map("sort_order") @default(0)
   isActive    Boolean @map("is_active") @default(true)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   stations            WifiStation[]
   globalLicensePrices StationLicensePrice[]
@@ -39,12 +39,12 @@ model StationLicensePrice {
   billingCycle  BillingCycle @map("billing_cycle") @default(MONTHLY)
   unitPrice     Decimal      @map("unit_price") @db.Decimal(18, 2)
   currency      String       @map("currency") @default("MMK")
-  effectiveFrom DateTime     @map("effective_from")
-  effectiveTo   DateTime?    @map("effective_to")
+  effectiveFrom DateTime @db.Timestamptz(3)     @map("effective_from")
+  effectiveTo   DateTime? @db.Timestamptz(3)    @map("effective_to")
   isActive      Boolean      @map("is_active") @default(true)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@index([stationSizeId, billingCycle, isActive], map: "idx_wf_station_license_price__size_cycle_active")
   @@index([effectiveFrom], map: "idx_wf_station_license_price__effective_from")
@@ -63,12 +63,12 @@ model OrgLicenseStationSizePrice {
   unitPrice     Decimal       @map("unit_price") @db.Decimal(18, 2)
   currency      String        @map("currency") @default("MMK")
   pricingSource PricingSource @map("pricing_source") @default(ORG_CUSTOM)
-  effectiveFrom DateTime      @map("effective_from")
-  effectiveTo   DateTime?     @map("effective_to")
+  effectiveFrom DateTime @db.Timestamptz(3)      @map("effective_from")
+  effectiveTo   DateTime? @db.Timestamptz(3)     @map("effective_to")
   isActive      Boolean       @map("is_active") @default(true)
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@unique([orgId, stationSizeId, billingCycle, effectiveFrom], map: "uq_wf_org_lic_size_price__org_size_cycle_from")
   @@index([orgId, isActive], map: "idx_wf_org_lic_size_price__org_id__is_active")
@@ -88,16 +88,16 @@ model OrgLicense {
 
   currency String @map("currency") @default("MMK")
 
-  effectiveFrom DateTime  @map("effective_from")
-  expiresAt     DateTime? @map("expires_at")
+  effectiveFrom DateTime @db.Timestamptz(3)  @map("effective_from")
+  expiresAt     DateTime? @db.Timestamptz(3) @map("expires_at")
 
   notes String? @map("notes")
 
   history  OrgLicenseHistory[]
   invoices OrgInvoice[]
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@index([status], map: "idx_wf_org_license__status")
   @@map("wf_org_license")
@@ -125,13 +125,13 @@ model OrgLicenseHistory {
   previousStatus OrgLicenseStatus? @map("previous_status")
   newStatus      OrgLicenseStatus? @map("new_status")
 
-  effectiveFrom DateTime @map("effective_from")
+  effectiveFrom DateTime @db.Timestamptz(3) @map("effective_from")
   reason        String?  @map("reason")
 
   changedByAdminId String @map("changed_by_admin_id")
   changedByAdmin   Admin  @relation(fields: [changedByAdminId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@index([orgId, createdAt], map: "idx_wf_org_license_history__org_id__created_at")
   @@index([licenseId, createdAt], map: "idx_wf_org_license_history__license_id__created_at")
@@ -148,8 +148,8 @@ model OrgInvoice {
   status    InvoiceStatus @map("status") @default(DRAFT)
 
   billingCycle      BillingCycle @map("billing_cycle") @default(MONTHLY)
-  billingPeriodFrom DateTime     @map("billing_period_from")
-  billingPeriodTo   DateTime     @map("billing_period_to")
+  billingPeriodFrom DateTime @db.Timestamptz(3)     @map("billing_period_from")
+  billingPeriodTo   DateTime @db.Timestamptz(3)     @map("billing_period_to")
 
   licenseId String?     @map("license_id")
   license   OrgLicense? @relation(fields: [licenseId], references: [id], onDelete: SetNull)
@@ -162,17 +162,17 @@ model OrgInvoice {
   taxAmount      Decimal  @map("tax_amount") @db.Decimal(18, 2)
   totalAmount    Decimal  @map("total_amount") @db.Decimal(18, 2)
 
-  dueDate  DateTime  @map("due_date")
-  issuedAt DateTime? @map("issued_at")
-  paidAt   DateTime? @map("paid_at")
+  dueDate  DateTime @db.Timestamptz(3)  @map("due_date")
+  issuedAt DateTime? @db.Timestamptz(3) @map("issued_at")
+  paidAt   DateTime? @db.Timestamptz(3) @map("paid_at")
 
   notes String? @map("notes")
 
   items    OrgInvoiceItem[]
   payments OrgInvoicePayment[]
 
-  createdAt DateTime @map("created_at") @default(now())
-  updatedAt DateTime @map("updated_at") @updatedAt
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
+  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
 
   @@index([orgId, billingPeriodFrom], map: "idx_wf_org_invoice__org_id__billing_period_from")
   @@index([status], map: "idx_wf_org_invoice__status")
@@ -200,7 +200,7 @@ model OrgInvoiceItem {
 
   metadata Json? @map("metadata")
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@index([orgId, invoiceId], map: "idx_wf_org_invoice_item__org_id__invoice_id")
   @@index([stationSizeId], map: "idx_wf_org_invoice_item__station_size_id")
@@ -218,7 +218,7 @@ model OrgInvoicePayment {
   amount   Decimal @map("amount") @db.Decimal(18, 2)
   currency String  @map("currency") @default("MMK")
 
-  paymentDate   DateTime      @map("payment_date")
+  paymentDate   DateTime @db.Timestamptz(3)      @map("payment_date")
   paymentMethod PaymentMethod @map("payment_method") @default(CASH)
   refNo         String?       @map("ref_no")
   note          String?       @map("note")
@@ -226,7 +226,7 @@ model OrgInvoicePayment {
   receivedByAdminId String @map("received_by_admin_id")
   receivedByAdmin   Admin  @relation(fields: [receivedByAdminId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime @map("created_at") @default(now())
+  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
 
   @@index([orgId, invoiceId], map: "idx_wf_org_invoice_payment__org_id__invoice_id")
   @@index([receivedByAdminId, createdAt], map: "idx_wf_org_invoice_payment__received_by_admin_id__created_at")
