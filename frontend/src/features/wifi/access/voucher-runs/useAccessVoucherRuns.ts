@@ -20,6 +20,8 @@ const emptyFormOptions: VoucherRunsFormOptions = {
   plans: [],
   stations: [],
   stationSizes: [],
+  canViewAllOrgs: false,
+  scopedOrgId: null,
 };
 
 function defaultDateRange(): Pick<VoucherRunsListParams, "dateFrom" | "dateTo"> {
@@ -32,6 +34,7 @@ function defaultDateRange(): Pick<VoucherRunsListParams, "dateFrom" | "dateTo"> 
 export function useAccessVoucherRuns() {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [formOptions, setFormOptions] = useState<VoucherRunsFormOptions>(emptyFormOptions);
+  const [optionsReady, setOptionsReady] = useState(false);
 
   const { params, setParams, setPagination, setSearch } = useWifiListState({
     limit: 20,
@@ -41,7 +44,9 @@ export function useAccessVoucherRuns() {
     setParams((prev) => ({ ...prev, ...patch }));
   }, [setParams]);
 
+  const canViewAllOrgs = Boolean(formOptions.canViewAllOrgs);
   const extended = { ...(params as VoucherRunsListParams), orgId };
+  const listReady = optionsReady && (canViewAllOrgs || Boolean(orgId));
 
   const { data, loading, error, refresh } = useRequest(() => Query.list(extended), {
     refreshDeps: [
@@ -56,8 +61,9 @@ export function useAccessVoucherRuns() {
       extended.dateFrom,
       extended.dateTo,
       extended.hasBalance,
+      canViewAllOrgs,
     ],
-    ready: Boolean(orgId),
+    ready: listReady,
   });
 
   const list = ((data as CommonListResponse | undefined)?.data ?? []) as VoucherBatchRecord[];
@@ -69,21 +75,55 @@ export function useAccessVoucherRuns() {
     setFormOptions({
       ...opts,
       stationSizes: opts.stationSizes ?? [],
+      canViewAllOrgs: Boolean(opts.canViewAllOrgs),
     });
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+    setOptionsReady(true);
+
+    // Tenants: auto-scope to sole membership and hydrate catalog (Sites pattern).
+    if (!opts.canViewAllOrgs && !targetOrgId && opts.memberships.length === 1) {
+      const onlyOrgId = opts.memberships[0].id;
+      setOrgId(onlyOrgId);
+      const withOrg = await Query.loadFormOptions(onlyOrgId);
+      const hydrated = withOrg.data as VoucherRunsFormOptions;
+      setFormOptions({
+        ...hydrated,
+        stationSizes: hydrated.stationSizes ?? [],
+        canViewAllOrgs: Boolean(hydrated.canViewAllOrgs),
+      });
+      return hydrated;
     }
+
+    if (opts.canViewAllOrgs && opts.scopedOrgId) {
+      setOrgId(opts.scopedOrgId);
+    }
+
     return opts;
   }, []);
 
   const selectOrg = useCallback(
     (id: string) => {
       setOrgId(id);
-      setParams((prev) => ({ ...prev, page: 1 }));
+      setParams((prev) => ({
+        ...prev,
+        page: 1,
+        planId: undefined,
+        stationId: undefined,
+      }));
       void loadFormOptions(id);
     },
     [loadFormOptions, setParams]
   );
+
+  const clearOrg = useCallback(() => {
+    setOrgId(undefined);
+    setParams((prev) => ({
+      ...prev,
+      page: 1,
+      planId: undefined,
+      stationId: undefined,
+    }));
+    void loadFormOptions(undefined);
+  }, [loadFormOptions, setParams]);
 
   const loadRun = useCallback(
     async (id: string) => {
@@ -95,15 +135,21 @@ export function useAccessVoucherRuns() {
 
   const createRun = useCallback(
     async (payload: VoucherRunFormValues) => {
-      await Query.create(payload, orgId);
+      // When browsing all orgs, derive org from selected site/plan via API hints.
+      const stationOrgId = payload.stationId
+        ? formOptions.stations.find((s) => s.id === payload.stationId)?.orgId
+        : undefined;
+      const planOrgId = formOptions.plans.find((p) => p.id === payload.planId)?.orgId;
+      const mutateOrgId = orgId ?? stationOrgId ?? planOrgId;
+      await Query.create(payload, mutateOrgId);
       refresh();
     },
-    [orgId, refresh]
+    [orgId, formOptions.stations, formOptions.plans, refresh]
   );
 
   const cancelRun = useCallback(
-    async (id: string) => {
-      await Query.cancel(id, orgId);
+    async (id: string, batchOrgId?: string) => {
+      await Query.cancel(id, orgId ?? batchOrgId);
       refresh();
     },
     [orgId, refresh]
@@ -112,15 +158,17 @@ export function useAccessVoucherRuns() {
   return {
     list,
     meta,
-    loading,
+    loading: !optionsReady || loading,
     error,
     params: extended,
     orgId,
     formOptions,
+    canViewAllOrgs: Boolean(formOptions.canViewAllOrgs || meta?.canViewAllOrgs),
     setPagination,
     setSearch,
     patchParams,
     selectOrg,
+    clearOrg,
     refresh,
     loadFormOptions,
     loadRun,

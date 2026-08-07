@@ -105,6 +105,86 @@ async function resolveOrgFromRequest(
   return resolved.orgId;
 }
 
+/** List/formOptions scope: developers may browse all orgs when orgId is omitted. */
+async function resolveListOrgScope(
+  prisma: PrismaClient,
+  req: AuthenticatedRequest,
+  isDeveloper: boolean
+): Promise<{ orgId: string | undefined; canViewAllOrgs: boolean }> {
+  const requestedOrgId = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+  if (requestedOrgId) {
+    const orgId = await resolveOrgFromRequest(prisma, req);
+    return { orgId, canViewAllOrgs: isDeveloper };
+  }
+  if (isDeveloper) {
+    return { orgId: undefined, canViewAllOrgs: true };
+  }
+  const orgId = await resolveOrgFromRequest(prisma, req);
+  return { orgId, canViewAllOrgs: false };
+}
+
+const planOptionSelect = {
+  id: true,
+  code: true,
+  name: true,
+  quotaType: true,
+  orgId: true,
+  org: { select: { id: true, code: true, name: true } },
+} satisfies Prisma.PlanSelect;
+
+const stationOptionSelect = {
+  id: true,
+  code: true,
+  name: true,
+  township: true,
+  stationSizeId: true,
+  orgId: true,
+  org: { select: { id: true, code: true, name: true } },
+  stationSize: { select: { id: true, code: true, name: true } },
+} satisfies Prisma.WifiStationSelect;
+
+async function resolveMutateOrgId(
+  prisma: PrismaClient,
+  req: AuthenticatedRequest,
+  isDeveloper: boolean,
+  hints: { stationId?: string | null; planId?: string | null; batchId?: string | null } = {}
+): Promise<string> {
+  try {
+    return await resolveOrgFromRequest(prisma, req);
+  } catch (err) {
+    if (!isDeveloper) throw err;
+  }
+
+  if (hints.stationId) {
+    const station = await prisma.wifiStation.findFirst({
+      where: { id: hints.stationId, deletedAt: null },
+      select: { orgId: true },
+    });
+    if (station?.orgId) return station.orgId;
+  }
+
+  if (hints.planId) {
+    const plan = await prisma.plan.findFirst({
+      where: { id: hints.planId, deletedAt: null },
+      select: { orgId: true },
+    });
+    if (plan?.orgId) return plan.orgId;
+  }
+
+  if (hints.batchId) {
+    const batch = await prisma.voucherBatch.findFirst({
+      where: { id: hints.batchId, deletedAt: null, resellerId: null },
+      select: { orgId: true },
+    });
+    if (batch?.orgId) return batch.orgId;
+  }
+
+  throw Object.assign(new Error('Select an organization to manage voucher runs.'), {
+    status: 400,
+    code: 'ORG_REQUIRED',
+  });
+}
+
 function serializeBatch(row: BatchRowWithCount) {
   const { _count, ...base } = row;
   const issued = base.quantity;
@@ -143,10 +223,14 @@ function parseDateBoundary(value: string, endOfDay: boolean): Date | null {
 }
 
 function buildListWhere(
-  orgId: string,
+  orgId: string | undefined,
   query: AuthenticatedRequest['query']
 ): Prisma.VoucherBatchWhereInput {
-  const where: Prisma.VoucherBatchWhereInput = { orgId, deletedAt: null, resellerId: null };
+  const where: Prisma.VoucherBatchWhereInput = {
+    deletedAt: null,
+    resellerId: null,
+    ...(orgId ? { orgId } : {}),
+  };
   const search = typeof query.search === 'string' ? query.search.trim() : '';
   const planId = typeof query.planId === 'string' ? query.planId.trim() : '';
   const stationId = typeof query.stationId === 'string' ? query.stationId.trim() : '';
@@ -216,10 +300,11 @@ export class AccessVoucherRunsController {
 
       if (req.query.formOptions === 'true') {
         let orgId: string | undefined;
+        const canViewAllOrgs = isDeveloper;
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
         if (orgIdParam) {
           orgId = orgIdParam;
-        } else {
+        } else if (!isDeveloper) {
           try {
             orgId = await resolveOrgFromRequest(this.prisma, req);
           } catch {
@@ -227,27 +312,30 @@ export class AccessVoucherRunsController {
           }
         }
 
+        const loadAllCatalog = canViewAllOrgs && !orgId;
+
         const [memberships, plans, stations, stationSizes] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
-          orgId
+          orgId || loadAllCatalog
             ? this.prisma.plan.findMany({
-                where: { orgId, deletedAt: null, isActive: true },
-                select: { id: true, code: true, name: true, quotaType: true },
-                orderBy: { name: 'asc' },
+                where: {
+                  deletedAt: null,
+                  isActive: true,
+                  ...(orgId ? { orgId } : {}),
+                },
+                select: planOptionSelect,
+                orderBy: [{ org: { code: 'asc' } }, { name: 'asc' }],
               })
             : Promise.resolve([]),
-          orgId
+          orgId || loadAllCatalog
             ? this.prisma.wifiStation.findMany({
-                where: { orgId, deletedAt: null, status: 'ACTIVE' },
-                select: {
-                  id: true,
-                  code: true,
-                  name: true,
-                  township: true,
-                  stationSizeId: true,
-                  stationSize: { select: { id: true, code: true, name: true } },
+                where: {
+                  deletedAt: null,
+                  status: 'ACTIVE',
+                  ...(orgId ? { orgId } : {}),
                 },
-                orderBy: { name: 'asc' },
+                select: stationOptionSelect,
+                orderBy: [{ org: { code: 'asc' } }, { name: 'asc' }],
               })
             : Promise.resolve([]),
           this.prisma.stationSize.findMany({
@@ -259,13 +347,22 @@ export class AccessVoucherRunsController {
 
         return responseSuccess(res, {
           message: 'Success',
-          data: { memberships, plans, stations, stationSizes },
+          data: {
+            memberships,
+            plans,
+            stations,
+            stationSizes,
+            canViewAllOrgs,
+            canSwitchOrg: isDeveloper || memberships.length > 1,
+            requiresOrgSelection: !canViewAllOrgs && !orgId && memberships.length > 1,
+            scopedOrgId: orgId ?? null,
+          },
         });
       }
 
-      let orgId: string;
+      let listScope: { orgId: string | undefined; canViewAllOrgs: boolean };
       try {
-        orgId = await resolveOrgFromRequest(this.prisma, req);
+        listScope = await resolveListOrgScope(this.prisma, req, isDeveloper);
       } catch (err: unknown) {
         const status =
           err && typeof err === 'object' && 'status' in err
@@ -280,12 +377,20 @@ export class AccessVoucherRunsController {
         return responseError(res, status, { code, message });
       }
 
+      const { orgId, canViewAllOrgs } = listScope;
+      const memberships = await loadOrgMembershipOptions(this.prisma, adminId, isDeveloper);
+
       if (!isUndefinedOrUndefinedString(req.params?.id)) {
         const idParam = req.params.id as string | string[];
         const id = Array.isArray(idParam) ? idParam[0] : idParam;
 
         const batch = await this.prisma.voucherBatch.findFirst({
-          where: { id, orgId, deletedAt: null, resellerId: null },
+          where: {
+            id,
+            deletedAt: null,
+            resellerId: null,
+            ...(orgId ? { orgId } : {}),
+          },
           select: batchListSelect,
         });
 
@@ -332,6 +437,12 @@ export class AccessVoucherRunsController {
             credentialsTotal: totalCredentials,
             credentialsTruncated: totalCredentials > CREDENTIAL_PREVIEW_LIMIT,
           },
+          meta: {
+            canViewAllOrgs,
+            canSwitchOrg: isDeveloper || memberships.length > 1,
+            memberships,
+            scopedOrgId: orgId ?? null,
+          },
         });
       }
 
@@ -365,7 +476,11 @@ export class AccessVoucherRunsController {
           runCount: totals._count._all,
           totalVouchers: totals._sum.quantity ?? 0,
           remainingVouchers: totals._sum.remainingQuantity ?? 0,
-          memberships: await loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
+          memberships,
+          canViewAllOrgs,
+          canSwitchOrg: isDeveloper || memberships.length > 1,
+          requiresOrgSelection: !canViewAllOrgs && !orgId && memberships.length > 1,
+          scopedOrgId: orgId ?? null,
         },
       });
     }),
@@ -376,15 +491,7 @@ export class AccessVoucherRunsController {
       const recordId = (req.params?.id as string) ?? null;
       const isUpdate = Boolean(recordId && recordId !== 'all');
       const adminId = req.userId!;
-
-      let orgId: string;
-      try {
-        orgId = await resolveOrgFromRequest(this.prisma, req);
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : 'Organization context is required.';
-        return responseError(res, 400, { code: 'ORG_REQUIRED', message });
-      }
+      const isDeveloper = isDeveloperAdmin(req.user!);
 
       if (isUpdate) {
         const { error, value } = AccessVoucherRunsUpdateSchema.validate(req.body, {
@@ -397,6 +504,17 @@ export class AccessVoucherRunsController {
             code: 'VALIDATION_ERROR',
             message: error.details.map((d) => d.message).join(', '),
           });
+        }
+
+        let orgId: string;
+        try {
+          orgId = await resolveMutateOrgId(this.prisma, req, isDeveloper, {
+            batchId: recordId,
+          });
+        } catch (err: unknown) {
+          const message =
+            err instanceof Error ? err.message : 'Organization context is required.';
+          return responseError(res, 400, { code: 'ORG_REQUIRED', message });
         }
 
         const existing = await this.prisma.voucherBatch.findFirst({
@@ -433,6 +551,18 @@ export class AccessVoucherRunsController {
           code: 'VALIDATION_ERROR',
           message: error.details.map((d) => d.message).join(', '),
         });
+      }
+
+      let orgId: string;
+      try {
+        orgId = await resolveMutateOrgId(this.prisma, req, isDeveloper, {
+          stationId: value.stationId,
+          planId: value.planId,
+        });
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : 'Organization context is required.';
+        return responseError(res, 400, { code: 'ORG_REQUIRED', message });
       }
 
       const plan = await this.prisma.plan.findFirst({
@@ -501,17 +631,18 @@ export class AccessVoucherRunsController {
 
   public remove = [
     asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+      const isDeveloper = isDeveloperAdmin(req.user!);
+      const idParam = req.params.id as string | string[];
+      const id = Array.isArray(idParam) ? idParam[0] : idParam;
+
       let orgId: string;
       try {
-        orgId = await resolveOrgFromRequest(this.prisma, req);
+        orgId = await resolveMutateOrgId(this.prisma, req, isDeveloper, { batchId: id });
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : 'Organization context is required.';
         return responseError(res, 400, { code: 'ORG_REQUIRED', message });
       }
-
-      const idParam = req.params.id as string | string[];
-      const id = Array.isArray(idParam) ? idParam[0] : idParam;
 
       const batch = await this.prisma.voucherBatch.findFirst({
         where: { id, orgId, deletedAt: null, resellerId: null },

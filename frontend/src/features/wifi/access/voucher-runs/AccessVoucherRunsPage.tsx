@@ -37,9 +37,11 @@ const AccessVoucherRunsPage: React.FC = () => {
     params,
     orgId,
     formOptions,
+    canViewAllOrgs,
     setPagination,
     patchParams,
     selectOrg,
+    clearOrg,
     refresh,
     loadFormOptions,
     loadRun,
@@ -51,16 +53,12 @@ const AccessVoucherRunsPage: React.FC = () => {
     void loadFormOptions().then(() => setInitDone(true));
   }, [loadFormOptions]);
 
-  useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
-      selectOrg(meta.memberships[0].id);
-    }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
-
   const memberships = meta?.memberships ?? formOptions.memberships;
-  const showSwitcher = memberships.length > 1;
-  const needsOrg = initDone && !orgId && memberships.length > 1;
-  const noPlans = formOptions.plans.length === 0;
+  const showSwitcher = canViewAllOrgs || memberships.length > 1;
+  const needsOrg = initDone && !canViewAllOrgs && !orgId && memberships.length > 1;
+  const contextReady = canViewAllOrgs || Boolean(orgId);
+  const noPlans = contextReady && formOptions.plans.length === 0;
+  const showAllOrgLabels = canViewAllOrgs && !orgId;
 
   const openCreate = () => {
     setDetailOpen(false);
@@ -99,7 +97,7 @@ const AccessVoucherRunsPage: React.FC = () => {
       okType: "danger",
       onOk: async () => {
         try {
-          await cancelRun(record.id);
+          await cancelRun(record.id, record.orgId);
           message.success("Voucher run cancelled");
           if (selected?.id === record.id) {
             setDetailOpen(false);
@@ -130,6 +128,9 @@ const AccessVoucherRunsPage: React.FC = () => {
             tied to a{" "}
             <Link href="/wifi/catalog/service-plans">service plan</Link>. Reseller point-of-sale
             flows are separate.
+            {canViewAllOrgs
+              ? " Developer mode can browse every tenant; pick an organization filter to narrow the list."
+              : null}
           </Paragraph>
         </div>
 
@@ -149,8 +150,10 @@ const AccessVoucherRunsPage: React.FC = () => {
               memberships={memberships}
               value={orgId}
               required={needsOrg}
+              allowClear={canViewAllOrgs}
               loading={loading}
               onChange={selectOrg}
+              onClear={canViewAllOrgs ? clearOrg : undefined}
             />
           ) : null}
 
@@ -163,7 +166,7 @@ const AccessVoucherRunsPage: React.FC = () => {
             />
           ) : null}
 
-          {orgId ? (
+          {contextReady ? (
             <>
               {noPlans ? (
                 <Alert
@@ -195,6 +198,7 @@ const AccessVoucherRunsPage: React.FC = () => {
                   dateTo={(params.dateTo as string) ?? null}
                   hasBalance={Boolean(params.hasBalance)}
                   formOptions={formOptions}
+                  showOrgInLabels={showAllOrgLabels}
                   loading={loading}
                   createDisabled={noPlans}
                   onPlanChange={(planId) =>
@@ -278,6 +282,7 @@ const AccessVoucherRunsPage: React.FC = () => {
         open={drawerOpen}
         saving={saving}
         formOptions={formOptions}
+        showOrgInLabels={showAllOrgLabels}
         onClose={() => setDrawerOpen(false)}
         onSubmit={handleCreate}
       />

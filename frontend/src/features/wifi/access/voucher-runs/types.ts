@@ -1,11 +1,19 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
 
+export type OrgBrief = {
+  id: string;
+  code: string;
+  name: string;
+};
+
 export type PlanBrief = {
   id: string;
   code: string;
   name: string;
   quotaType: string;
   isActive?: boolean;
+  orgId?: string;
+  org?: OrgBrief | null;
 };
 
 export type StationSizeBrief = {
@@ -23,6 +31,8 @@ export type StationBrief = {
   township?: string | null;
   stationSizeId?: string | null;
   stationSize?: StationSizeBrief | null;
+  orgId?: string;
+  org?: OrgBrief | null;
 };
 
 export type AdminBrief = {
@@ -86,6 +96,10 @@ export type VoucherRunsFormOptions = {
   plans: PlanBrief[];
   stations: StationBrief[];
   stationSizes: StationSizeBrief[];
+  canViewAllOrgs?: boolean;
+  canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
+  scopedOrgId?: string | null;
 };
 
 export type VoucherRunsMeta = {
@@ -97,6 +111,10 @@ export type VoucherRunsMeta = {
   totalVouchers?: number;
   remainingVouchers?: number;
   memberships?: OrgMembershipOption[];
+  canViewAllOrgs?: boolean;
+  canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
+  scopedOrgId?: string | null;
 };
 
 export type VoucherRunsListParams = {

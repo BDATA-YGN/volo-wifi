@@ -22,10 +22,16 @@ import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 const { TextArea } = Input;
 const { Paragraph } = Typography;
 
+function withOrgLabel(name: string, code: string, orgCode?: string | null) {
+  const base = `${name} (${code})`;
+  return orgCode ? `${base} · ${orgCode}` : base;
+}
+
 type Props = {
   open: boolean;
   saving?: boolean;
   formOptions: VoucherRunsFormOptions;
+  showOrgInLabels?: boolean;
   onClose: () => void;
   onSubmit: (values: VoucherRunFormValues) => Promise<void>;
 };
@@ -34,10 +40,12 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
   open,
   saving,
   formOptions,
+  showOrgInLabels,
   onClose,
   onSubmit,
 }) => {
   const [form] = Form.useForm<VoucherRunFormValues>();
+  const requireSite = Boolean(showOrgInLabels);
 
   const formValues: VoucherRunFormValues = {
     planId: formOptions.plans[0]?.id ?? "",
@@ -75,6 +83,9 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
           <Paragraph type="secondary" style={{ marginBottom: 16, fontSize: 13 }}>
             Reserve prepaid voucher capacity for a service plan. Six-character codes are generated
             when partners sell via Access Tokens — nothing is pre-issued here.
+            {requireSite
+              ? " Pick a site so the run is created under the correct tenant."
+              : null}
           </Paragraph>
 
           <Form.Item
@@ -87,7 +98,11 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
               optionFilterProp="label"
               options={formOptions.plans.map((p) => ({
                 value: p.id,
-                label: `${p.name} (${p.code})`,
+                label: withOrgLabel(
+                  p.name,
+                  p.code,
+                  showOrgInLabels ? p.org?.code : null
+                ),
               }))}
             />
           </Form.Item>
@@ -112,15 +127,25 @@ const VoucherRunFormDrawer: React.FC<Props> = ({
             </Space.Compact>
           </Form.Item>
 
-          <Form.Item name="stationId" label="Default site (optional)">
+          <Form.Item
+            name="stationId"
+            label={requireSite ? "Site" : "Default site (optional)"}
+            rules={
+              requireSite ? [{ required: true, message: "Select a site" }] : undefined
+            }
+          >
             <Select
-              allowClear
+              allowClear={!requireSite}
               showSearch
               optionFilterProp="label"
-              placeholder="Any site"
+              placeholder={requireSite ? "Select site" : "Any site"}
               options={formOptions.stations.map((s) => ({
                 value: s.id,
-                label: `${s.name} (${s.code})`,
+                label: withOrgLabel(
+                  s.name,
+                  s.code,
+                  showOrgInLabels ? s.org?.code : null
+                ),
               }))}
             />
           </Form.Item>

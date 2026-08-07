@@ -69,7 +69,7 @@ Prefer `SELECT` / `EXPLAIN` first. Avoid production `UPDATE`/`INSERT` unless int
 Config defaults:
 
 - `sql_user_name = %{User-Name}`
-- PG session `timezone=Asia/Yangon` (connection `options=` + `PGTZ`)
+- PG session `timezone=Asia/Yangon` (`radius_db` `options=-ctimezone=Asia/Yangon` + compose `PGTZ`)
 - DateTime columns are **`timestamptz`** (absolute instants; Prisma `@db.Timestamptz`)
 - `event_timestamp = TO_TIMESTAMP(${event_timestamp_epoch})` — stores timestamptz directly
 - `CURRENT_TIMESTAMP` for `updated_at` / `activated_at` / `expires_at` checks
@@ -79,6 +79,11 @@ Config defaults:
 
 Session TZ Asia/Yangon only affects display of `NOW()` / timestamptz in SQL tools.
 Stored values are absolute; the console formats with `Asia/Yangon` via dayjs.
+
+FreeRADIUS `radius_db` uses **keyword/value** conninfo, not a PostgreSQL URI. Do not use
+URI percent-encoding (`options=-c%20timezone%3D…`) — that makes libpq pass a literal junk
+GUC name and PostgreSQL fails with `FATAL: … requires a value`, so the `sql` module never
+starts and every Access-Request fails. Correct form: `options=-ctimezone=Asia/Yangon`.
 
 ---
 

@@ -11,6 +11,11 @@ import { usePlaceTowns } from "@/features/system/places/usePlaceTowns";
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
+function withOrgLabel(name: string, code: string, orgCode?: string | null) {
+  const base = `${name} (${code})`;
+  return orgCode ? `${base} · ${orgCode}` : base;
+}
+
 type Props = {
   planId: string | null;
   stationId: string | null;
@@ -20,6 +25,7 @@ type Props = {
   dateTo: string | null;
   hasBalance: boolean;
   formOptions: VoucherRunsFormOptions;
+  showOrgInLabels?: boolean;
   loading?: boolean;
   createDisabled?: boolean;
   onPlanChange: (value: string | null) => void;
@@ -41,6 +47,7 @@ const VoucherRunsToolbar: React.FC<Props> = ({
   dateTo,
   hasBalance,
   formOptions,
+  showOrgInLabels,
   loading,
   createDisabled,
   onPlanChange,
@@ -77,9 +84,13 @@ const VoucherRunsToolbar: React.FC<Props> = ({
       })
       .map((s) => ({
         value: s.id,
-        label: `${s.name} (${s.code})`,
+        label: withOrgLabel(
+          s.name,
+          s.code,
+          showOrgInLabels ? s.org?.code : null
+        ),
       }));
-  }, [formOptions.stations, township, stationSizeId]);
+  }, [formOptions.stations, township, stationSizeId, showOrgInLabels]);
 
   const rangeValue: [Dayjs, Dayjs] | null =
     dateFrom && dateTo ? [dayjs(dateFrom), dayjs(dateTo)] : null;
@@ -97,7 +108,11 @@ const VoucherRunsToolbar: React.FC<Props> = ({
           onChange={(v) => onPlanChange(v ?? null)}
           options={formOptions.plans.map((p) => ({
             value: p.id,
-            label: `${p.name} (${p.code})`,
+            label: withOrgLabel(
+              p.name,
+              p.code,
+              showOrgInLabels ? p.org?.code : null
+            ),
           }))}
         />
         <Select
