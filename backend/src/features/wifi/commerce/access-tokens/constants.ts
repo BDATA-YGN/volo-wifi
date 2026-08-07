@@ -2,18 +2,15 @@
 export const API_PATH = '/wifi/commerce/access-tokens';
 
 export const CREDENTIAL_STATUSES = [
-  'NEW',
   'SOLD',
-  'ACTIVE',
-  'EXPIRED',
-  'REVOKED',
-  'CONSUMED',
   'ACTIVATED',
-  'IN_USE',
+  'CONSUMED',
   'PAUSED',
+  'REVOKED',
+  'EXPIRED',
 ] as const;
 
-/** Status values shown in console filters (legacy internal statuses omitted). */
+/** Status values shown in console filters. */
 export const CREDENTIAL_FILTER_STATUSES = [
   'SOLD',
   'ACTIVATED',

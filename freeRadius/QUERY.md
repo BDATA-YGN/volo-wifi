@@ -1045,13 +1045,12 @@ The system uses PostgreSQL enum types for status tracking:
 ```sql
 -- Credential Status
 enum CredentialStatus {
-    NEW
     SOLD
-    ACTIVE
-    EXPIRED
-    REVOKED
-    CONSUMED
     ACTIVATED
+    CONSUMED
+    PAUSED
+    REVOKED
+    EXPIRED
 }
 
 -- RADIUS Accounting Status

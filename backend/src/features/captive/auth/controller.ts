@@ -107,14 +107,24 @@ export class CaptiveAuthController {
         throw new CustomException(400, 'CREDENTIAL_EXPIRED', captiveErrors.CREDENTIAL_EXPIRED);
       }
 
-      if (credential.status === CredentialStatus.NEW || credential.status === CredentialStatus.ACTIVE) {
-        await prisma.credential.update({
-          where: { id: credential.id },
-          data: {
-            status: CredentialStatus.ACTIVATED,
-            activatedAt: new Date(),
-          },
-        });
+      // First captive login: SOLD → ACTIVATED (matches FreeRADIUS post-auth).
+      const shouldMarkActivated = credential.status === CredentialStatus.SOLD;
+
+      if (shouldMarkActivated || !credential.activatedAt) {
+        if (
+          shouldMarkActivated ||
+          credential.status === CredentialStatus.ACTIVATED
+        ) {
+          await prisma.credential.update({
+            where: { id: credential.id },
+            data: {
+              ...(shouldMarkActivated
+                ? { status: CredentialStatus.ACTIVATED }
+                : {}),
+              activatedAt: credential.activatedAt ?? new Date(),
+            },
+          });
+        }
       }
 
       const refreshed = await prisma.credential.findUnique({

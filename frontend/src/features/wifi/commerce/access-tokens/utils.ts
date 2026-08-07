@@ -1,11 +1,9 @@
-import { STATUS_LABELS, STATUS_OPTIONS } from "./constant";
-import type { CredentialStatus, SellablePlan } from "./types";
+import { STATUS_OPTIONS } from "./constant";
+import type { SellablePlan } from "./types";
 
 export function formatStatusLabel(status: string): string {
   const known = STATUS_OPTIONS.find((o) => o.value === status)?.label;
   if (known) return known;
-  const legacy = STATUS_LABELS[status as CredentialStatus];
-  if (legacy) return legacy;
   return status
     .split("_")
     .map((w) => w.charAt(0) + w.slice(1).toLowerCase())

@@ -44,7 +44,6 @@ export type WorkspaceRecentOrder = {
 export type WorkspaceStats = {
   stationCount: number;
   planCount: number;
-  credentialsNew: number;
   credentialsSold: number;
   credentialsActive: number;
   credentialsIssued: number;

@@ -1,4 +1,10 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
+import {
+  appDayKey as utcDayKey,
+  eachAppDay,
+  previousAppPeriod,
+  resolvePeriodFromPresetDays,
+} from '@/utils/app-time';
 
 export type InsightsSummary = {
   ordersCount: number;
@@ -60,10 +66,6 @@ function bigintToNumber(value: bigint | null | undefined): number {
   return Number.isSafeInteger(n) ? n : 0;
 }
 
-function utcDayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 function emptySummary(): InsightsSummary {
   return {
     ordersCount: 0,
@@ -85,12 +87,7 @@ function mergeDailyMaps(
   periodTo: Date
 ): InsightsDailyPoint[] {
   const points: InsightsDailyPoint[] = [];
-  const cursor = new Date(periodFrom);
-  cursor.setUTCHours(0, 0, 0, 0);
-  const end = new Date(periodTo);
-  end.setUTCHours(0, 0, 0, 0);
-
-  while (cursor <= end) {
+  for (const cursor of eachAppDay(periodFrom, periodTo)) {
     const key = utcDayKey(cursor);
     const sales = salesByDay.get(key) ?? { ordersCount: 0, revenue: 0, commission: 0 };
     const usage = usageByDay.get(key) ?? { sessionsCount: 0, totalBytes: 0 };
@@ -102,7 +99,6 @@ function mergeDailyMaps(
       sessionsCount: usage.sessionsCount,
       totalBytes: usage.totalBytes,
     });
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return points;
@@ -365,21 +361,12 @@ export function resolvePeriodFromPreset(
   preset: string,
   periodTo: Date = new Date()
 ): { periodFrom: Date; periodTo: Date } {
-  const end = new Date(periodTo);
-  end.setUTCHours(23, 59, 59, 999);
-  const start = new Date(end);
   const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
-  start.setUTCDate(start.getUTCDate() - (days - 1));
-  start.setUTCHours(0, 0, 0, 0);
-  return { periodFrom: start, periodTo: end };
+  return resolvePeriodFromPresetDays(days, periodTo);
 }
 
 export function previousPeriod(periodFrom: Date, periodTo: Date): { from: Date; to: Date } {
-  const ms = periodTo.getTime() - periodFrom.getTime();
-  const to = new Date(periodFrom.getTime() - 1);
-  const from = new Date(to.getTime() - ms);
-  from.setUTCHours(0, 0, 0, 0);
-  return { from, to };
+  return previousAppPeriod(periodFrom, periodTo);
 }
 
 export async function buildPartnerInsights(

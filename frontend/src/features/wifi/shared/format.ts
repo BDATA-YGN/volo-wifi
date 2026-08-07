@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import "@/lib/timezone";
 
 /** Date-only display across WiFi console (e.g. 12 Jun 2026). */
 export const WIFI_DATE_FORMAT = "DD MMM YYYY";
@@ -17,27 +18,27 @@ export const WIFI_DATETIME_SECONDS_FORMAT = "DD MMM YYYY, h:mm:ss A";
 
 export function formatWifiDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
-  return dayjs(value).format(WIFI_DATE_FORMAT);
+  return dayjs(value).tz().format(WIFI_DATE_FORMAT);
 }
 
 export function formatWifiDateTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
-  return dayjs(value).format(WIFI_DATETIME_FORMAT);
+  return dayjs(value).tz().format(WIFI_DATETIME_FORMAT);
 }
 
 export function formatWifiTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
-  return dayjs(value).format(WIFI_TIME_FORMAT);
+  return dayjs(value).tz().format(WIFI_TIME_FORMAT);
 }
 
 export function formatWifiTimeWithSeconds(value: string | Date | null | undefined): string {
   if (!value) return "—";
-  return dayjs(value).format(WIFI_TIME_SECONDS_FORMAT);
+  return dayjs(value).tz().format(WIFI_TIME_SECONDS_FORMAT);
 }
 
 export function formatWifiDateTimeWithSeconds(value: string | Date | null | undefined): string {
   if (!value) return "—";
-  return dayjs(value).format(WIFI_DATETIME_SECONDS_FORMAT);
+  return dayjs(value).tz().format(WIFI_DATETIME_SECONDS_FORMAT);
 }
 
 /**

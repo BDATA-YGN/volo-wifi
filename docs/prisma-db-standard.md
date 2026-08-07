@@ -105,7 +105,7 @@ model FileObject {
 - **Booleans**: `Boolean`
 - **Integers**: `Int` or `BigInt`
 - **Money/precision**: `Decimal` (do not use `Float` for money)
-- **Time**: `DateTime` (always store in UTC in the application contract)
+- **Time**: `DateTime` (persist absolute instants / timestamptz; app calendar is Asia/Yangon)
 - **Binary**: `Bytes` (only if you truly store binary in DB; otherwise store object storage keys)
 
 ### Avoid provider-specific `@db.*` unless required
@@ -265,8 +265,9 @@ These rules apply to **every** BDATA service that uses Prisma, in addition to th
 
 ### Timezones and locales
 
-- **Rule**: Persist **`DateTime` in UTC**. Convert to local time only at the UI or reporting boundary.
-- **Rule**: Do not persist “floating” local clock times without a timezone rule unless the domain truly is calendar-date-only; for date-only concepts, prefer explicit `DateTime` at UTC midnight **or** separate date fields—pick one approach per domain and document it.
+- **Rule**: Persist absolute instants as **`DateTime` / timestamptz**. Do not store floating local wall-clock times without a timezone rule.
+- **Rule**: The app/business calendar is **Asia/Yangon**. Session timezone and Node `TZ` should be Asia/Yangon so reporting day boundaries, cron schedules, and `app-time` helpers agree.
+- **Rule**: Convert to local display time at the UI or reporting boundary as needed. For date-only concepts, prefer an explicit day-bucket `DateTime` at **00:00 Asia/Yangon** (app timezone) **or** separate date fields—pick one approach per domain and document it.
 
 ### Character set and collation (when you control the DB)
 

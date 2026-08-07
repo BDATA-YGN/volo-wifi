@@ -8,7 +8,6 @@ import { KeyRound } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
-import PartnerSwitcher from "@/features/wifi/commerce/partners/workspace/components/PartnerSwitcher";
 import { useCommerceAccessTokens } from "./useCommerceAccessTokens";
 import type {
   AccessTokenRecord,
@@ -76,9 +75,12 @@ const CommerceAccessTokensPage: React.FC = () => {
     if (meta?.orgId && !orgId) selectOrg(meta.orgId);
   }, [meta?.orgId, orgId, selectOrg]);
 
+  // Partner-role users are locked to their reseller.
   useEffect(() => {
-    if (meta?.resellerId && !resellerId) selectReseller(meta.resellerId);
-  }, [meta?.resellerId, resellerId, selectReseller]);
+    if (meta?.partnerLocked && meta.resellerId && resellerId !== meta.resellerId) {
+      selectReseller(meta.resellerId);
+    }
+  }, [meta?.partnerLocked, meta?.resellerId, resellerId, selectReseller]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(search), 300);
@@ -92,16 +94,18 @@ const CommerceAccessTokensPage: React.FC = () => {
   const showOrgSwitcher =
     (meta?.requiresOrgSelection || meta?.mode === "preview") && memberships.length > 1;
   const needsOrg = Boolean(meta?.requiresOrgSelection) && !orgId;
-  const showPartnerSwitcher = meta?.mode === "preview" || Boolean(meta?.requiresResellerSelection);
-  const needsPartner = Boolean(meta?.requiresResellerSelection) && !resellerId && Boolean(orgId);
+  const partnerLocked = Boolean(meta?.partnerLocked || meta?.mode === "partner");
+  const showPartnerFilter =
+    Boolean(orgId) && (partnerLocked || meta?.mode === "preview" || resellers.length > 0);
   const isPreview = meta?.mode === "preview";
-  const canSell = Boolean(activeCatalog?.canSell);
-  const contextReady =
-    Boolean(meta?.resellerId && meta?.orgId) ||
-    Boolean(orgId && resellerId) ||
-    meta?.mode === "partner";
+  const canSell = Boolean(activeCatalog?.canSell) && Boolean(resellerId);
+  const contextReady = Boolean(orgId) || meta?.mode === "partner" || Boolean(meta?.orgId);
 
   const openIssue = () => {
+    if (!resellerId) {
+      message.warning("Select a partner before issuing tokens.");
+      return;
+    }
     setDetailOpen(false);
     setDrawerOpen(true);
   };
@@ -228,31 +232,7 @@ const CommerceAccessTokensPage: React.FC = () => {
             />
           ) : null}
 
-          {showPartnerSwitcher && orgId && resellers.length > 0 ? (
-            <PartnerSwitcher
-              resellers={resellers}
-              value={resellerId ?? meta?.resellerId}
-              required={needsPartner}
-              loading={loading}
-              onChange={selectReseller}
-            />
-          ) : null}
-
-          {needsPartner ? (
-            <Alert
-              type="info"
-              showIcon
-              title="Select a partner"
-              description={
-                <span>
-                  Pick a reseller account or link your login in{" "}
-                  <Link href="/wifi/commerce/partners">Partner Directory</Link>.
-                </span>
-              }
-            />
-          ) : null}
-
-          {contextReady && activeCatalog && !canSell ? (
+          {contextReady && activeCatalog && resellerId && !canSell ? (
             <Alert
               type="warning"
               showIcon
@@ -267,12 +247,16 @@ const CommerceAccessTokensPage: React.FC = () => {
             />
           ) : null}
 
-          {isPreview && contextReady ? (
+          {isPreview && contextReady && !partnerLocked ? (
             <Alert
               type="info"
               showIcon
               title="Admin preview mode"
-              description="Issuing tokens on behalf of the selected partner. Pause/unlock follow token status; revoke is only before use; revert to sold is developer-only."
+              description={
+                resellerId
+                  ? "Issuing tokens on behalf of the selected partner. Clear the Partner filter to list all org tokens. Pause/unlock follow token status; revoke is only before use; revert to sold is developer-only."
+                  : "Showing all partners’ tokens. Select a partner in Filters to narrow the list or issue tokens."
+              }
             />
           ) : null}
 
@@ -298,6 +282,10 @@ const CommerceAccessTokensPage: React.FC = () => {
                   status={(params.status as CredentialStatus) ?? null}
                   planId={(params.planId as string) ?? null}
                   stationId={(params.stationId as string) ?? null}
+                  resellerId={resellerId ?? null}
+                  resellers={resellers}
+                  showPartnerFilter={showPartnerFilter}
+                  partnerLocked={partnerLocked}
                   catalog={activeCatalog}
                   loading={loading}
                   issueDisabled={!canSell}
@@ -309,6 +297,7 @@ const CommerceAccessTokensPage: React.FC = () => {
                   onStationChange={(stationId) =>
                     patchParams({ stationId: stationId ?? undefined, page: 1 })
                   }
+                  onPartnerChange={selectReseller}
                   onRefresh={refresh}
                   onIssue={openIssue}
                 />
@@ -331,12 +320,12 @@ const CommerceAccessTokensPage: React.FC = () => {
                 />
               </Card>
             </>
-          ) : initDone && !loading && !needsOrg && !needsPartner && !error ? (
+          ) : initDone && !loading && !needsOrg && !error ? (
             <Alert
               type="warning"
               showIcon
-              title="No partner context"
-              description="Link your account to a reseller or select a partner to issue tokens."
+              title="No organization context"
+              description="Select an organization to view access tokens."
             />
           ) : null}
         </div>

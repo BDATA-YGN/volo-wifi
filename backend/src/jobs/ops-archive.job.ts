@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import PrismaDBConnection from '@/prisma/prisma-client';
 import { logger } from '@/logging/logger';
+import { APP_TIMEZONE } from '@/utils/app-time';
 import {
   archiveCredentials,
   purgeExpiredCredentialArchives,
@@ -116,7 +117,7 @@ export const startOpsArchiveJob = async (): Promise<ScheduledTask | null> => {
   }
 
   scheduled = cron.schedule(cfg.cron, () => void runOpsArchiveTick(), {
-    timezone: process.env.TZ || 'Asia/Yangon',
+    timezone: process.env.TZ || APP_TIMEZONE,
   });
   activeCron = cfg.cron;
 
@@ -129,7 +130,7 @@ export const startOpsArchiveJob = async (): Promise<ScheduledTask | null> => {
       if (!cron.validate(next.cron)) return;
       scheduled?.stop();
       scheduled = cron.schedule(next.cron, () => void runOpsArchiveTick(), {
-        timezone: process.env.TZ || 'Asia/Yangon',
+        timezone: process.env.TZ || APP_TIMEZONE,
       });
       activeCron = next.cron;
       logger.info(`[ops-archive] Re-scheduled with "${next.cron}"`);

@@ -1,21 +1,17 @@
 import { Pool, QueryConfig } from 'pg';
 import { logger } from '@/logging/logger';
 import { DATABASE_URL, NODE_ENV } from '@/config';
-import { resolvePgSsl } from '@/lib/pg-ssl';
+import { buildPgPoolConfig } from '@/lib/pg-ssl';
 
-const poolConfig: ConstructorParameters<typeof Pool>[0] = {
-  connectionString: DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-};
-
-const ssl = resolvePgSsl();
-if (ssl) {
-  poolConfig.ssl = ssl;
-}
+const poolConfig = buildPgPoolConfig(DATABASE_URL);
+// Legacy raw-SQL pool — keep timeouts aligned with Prisma (remote DO).
+poolConfig.application_name = process.env.DATABASE_APPLICATION_NAME || 'volo-wifi-raw-sql';
 
 const pool = new Pool(poolConfig);
+
+pool.on('error', (err) => {
+  logger.error(`PostgreSQL raw pool idle client error: ${err.message}`);
+});
 
 pool
   .connect()

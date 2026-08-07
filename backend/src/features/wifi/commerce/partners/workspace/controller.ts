@@ -14,6 +14,13 @@ import {
   resolveResellerContext,
   type ResellerContext,
 } from '@/features/wifi/commerce/shared/resolve-reseller';
+import { startOfAppDay, APP_TIMEZONE } from '@/utils/app-time';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const stationBriefSelect = {
   id: true,
@@ -31,12 +38,11 @@ const planBriefSelect = {
   isActive: true,
 } satisfies Prisma.PlanSelect;
 
-function startOfUtcDay(date = new Date()): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
-function startOfUtcMonth(date = new Date()): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+function startOfAppMonth(date = new Date()): Date {
+  return dayjs(date)
+    .tz(process.env.TZ || APP_TIMEZONE)
+    .startOf('month')
+    .toDate();
 }
 
 async function loadPricingReadiness(
@@ -124,8 +130,8 @@ async function buildDashboard(
   context: ResellerContext
 ) {
   const { resellerId, orgId, mode } = context;
-  const todayStart = startOfUtcDay();
-  const monthStart = startOfUtcMonth();
+  const todayStart = startOfAppDay(new Date());
+  const monthStart = startOfAppMonth();
 
   const reseller = await prisma.reseller.findFirst({
     where: { id: resellerId, orgId, deletedAt: null },
@@ -168,7 +174,6 @@ async function buildDashboard(
   const mappedStationIds = reseller.resellerStations.map((rs) => rs.station.id);
 
   const [
-    credentialsNew,
     credentialsSold,
     credentialsActive,
     ordersToday,
@@ -179,13 +184,10 @@ async function buildDashboard(
     pricing,
   ] = await Promise.all([
     prisma.credential.count({
-      where: { orgId, resellerId, deletedAt: null, status: 'NEW' },
-    }),
-    prisma.credential.count({
       where: { orgId, resellerId, deletedAt: null, status: 'SOLD' },
     }),
     prisma.credential.count({
-      where: { orgId, resellerId, deletedAt: null, status: 'ACTIVE' },
+      where: { orgId, resellerId, deletedAt: null, status: 'ACTIVATED' },
     }),
     prisma.saleOrder.count({
       where: {
@@ -272,10 +274,9 @@ async function buildDashboard(
     stats: {
       stationCount,
       planCount,
-      credentialsNew,
       credentialsSold,
       credentialsActive,
-      credentialsIssued: credentialsNew + credentialsSold + credentialsActive,
+      credentialsIssued: credentialsSold + credentialsActive,
       ordersToday,
       revenueToday: Number(revenueTodayAgg._sum.total ?? 0),
       ordersMonth,

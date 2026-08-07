@@ -7,11 +7,14 @@ import { AuthenticatedRequest } from '@/interfaces/express.interface';
 import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import { isUndefinedOrUndefinedString } from '@/utils/string-utils';
-import { isDeveloperAdmin } from '@/features/wifi/shared/resolve-org';
+import { appDayKey, startOfAppDay } from '@/utils/app-time';
+import { isDeveloperAdmin, resolveOrgIdForAdmin } from '@/features/wifi/shared/resolve-org';
 import {
   loadOrgMembershipsForAdmin,
   loadResellerPicker,
+  resolveDirectReseller,
   resolveResellerContext,
+  resolveRoleScopedReseller,
 } from '@/features/wifi/commerce/shared/resolve-reseller';
 import {
   CAPTIVE_SESSION_PREVIEW_LIMIT,
@@ -106,7 +109,7 @@ function parsePagination(query: AuthenticatedRequest['query']) {
 }
 
 function startOfUtcDay(date = new Date()): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  return startOfAppDay(date);
 }
 
 function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
@@ -117,7 +120,8 @@ function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
 function serializeCredential(
   row: CredentialRow,
   permissionCtx: CredentialPermissionContext,
-  revokeWindowMinutes: number
+  revokeWindowMinutes: number,
+  firstLoginAt?: Date | null
 ) {
   const saleItem = row.salesItems[0];
   const actions = resolveCredentialActions(
@@ -125,6 +129,7 @@ function serializeCredential(
     { status: row.status, soldAt: row.soldAt },
     revokeWindowMinutes
   );
+  const resolvedFirstLogin = firstLoginAt ?? row.activatedAt;
   return {
     id: row.id,
     orgId: row.orgId,
@@ -139,6 +144,7 @@ function serializeCredential(
     reseller: row.reseller,
     soldAt: row.soldAt?.toISOString() ?? null,
     activatedAt: row.activatedAt?.toISOString() ?? null,
+    firstLoginAt: resolvedFirstLogin?.toISOString() ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     revokedAt: row.revokedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -158,6 +164,100 @@ function serializeCredential(
         }
       : null,
   };
+}
+
+function takeEarlier(map: Map<string, Date>, id: string, at: Date | null | undefined) {
+  if (!at) return;
+  const prev = map.get(id);
+  if (!prev || at.getTime() < prev.getTime()) {
+    map.set(id, at);
+  }
+}
+
+/**
+ * Earliest login time from captive portal and/or RADIUS sessions (hot + archive).
+ * Falls back to credential.activatedAt when session rows were purged.
+ */
+async function loadFirstLoginAtMap(
+  prisma: PrismaClient,
+  orgId: string,
+  credentials: Array<{
+    id: string;
+    token: string | null;
+    username: string | null;
+    activatedAt: Date | null;
+  }>
+): Promise<Map<string, Date>> {
+  const map = new Map<string, Date>();
+  if (credentials.length === 0) return map;
+
+  for (const c of credentials) {
+    takeEarlier(map, c.id, c.activatedAt);
+  }
+
+  const ids = credentials.map((c) => c.id);
+  const userNameToCredentialId = new Map<string, string>();
+  for (const c of credentials) {
+    for (const variant of radiusUserNameVariants(c)) {
+      userNameToCredentialId.set(variant, c.id);
+    }
+  }
+  const userNames = [...userNameToCredentialId.keys()];
+
+  const [captiveMins, radiusByCredHot, radiusByCredArchive, radiusByUserHot, radiusByUserArchive] =
+    await Promise.all([
+      prisma.captivePortalSession.groupBy({
+        by: ['credentialId'],
+        where: { orgId, credentialId: { in: ids } },
+        _min: { createdAt: true },
+      }),
+      prisma.radiusSession.groupBy({
+        by: ['credentialId'],
+        where: { credentialId: { in: ids } },
+        _min: { startedAt: true },
+      }),
+      prisma.radiusSessionArchive.groupBy({
+        by: ['credentialId'],
+        where: { credentialId: { in: ids } },
+        _min: { startedAt: true },
+      }),
+      userNames.length > 0
+        ? prisma.radiusSession.groupBy({
+            by: ['userName'],
+            where: { userName: { in: userNames } },
+            _min: { startedAt: true },
+          })
+        : Promise.resolve([]),
+      userNames.length > 0
+        ? prisma.radiusSessionArchive.groupBy({
+            by: ['userName'],
+            where: { userName: { in: userNames } },
+            _min: { startedAt: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+  for (const row of captiveMins) {
+    takeEarlier(map, row.credentialId, row._min.createdAt);
+  }
+  for (const row of radiusByCredHot) {
+    if (row.credentialId) takeEarlier(map, row.credentialId, row._min.startedAt);
+  }
+  for (const row of radiusByCredArchive) {
+    if (row.credentialId) takeEarlier(map, row.credentialId, row._min.startedAt);
+  }
+  for (const row of radiusByUserHot) {
+    if (!row.userName) continue;
+    const credentialId = userNameToCredentialId.get(row.userName);
+    if (credentialId) takeEarlier(map, credentialId, row._min.startedAt);
+  }
+  for (const row of radiusByUserArchive) {
+    if (!row.userName) continue;
+    const credentialId = userNameToCredentialId.get(row.userName);
+    if (credentialId) takeEarlier(map, credentialId, row._min.startedAt);
+  }
+
+  return map;
 }
 
 function revokeSuccessMessage(result: Awaited<ReturnType<typeof revokeAccessToken>>): string {
@@ -343,7 +443,7 @@ async function loadTokenSessionHistory(
   const radiusSessionsTotal = hotTotal + archiveTotal;
   const wasUsed =
     Boolean(credential.activatedAt) ||
-    ['ACTIVATED', 'IN_USE', 'ACTIVE', 'CONSUMED', 'EXPIRED', 'PAUSED'].includes(credential.status);
+    ['ACTIVATED', 'CONSUMED', 'EXPIRED', 'PAUSED'].includes(credential.status);
 
   return {
     captiveSessions: captiveSessions.map((s) => ({
@@ -375,7 +475,7 @@ async function loadTokenSessionHistory(
 }
 
 function generateOrderNo(): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const date = appDayKey(new Date()).replace(/-/g, '');
   const rand = crypto.randomBytes(2).toString('hex').toUpperCase();
   return `SO-${date}-${rand}`;
 }
@@ -549,17 +649,162 @@ async function loadSellableCatalog(
   };
 }
 
+/** Org-wide plan/site filters when no partner is selected (admin list-all view). */
+async function loadOrgFilterCatalog(prisma: PrismaClient, orgId: string) {
+  const [stations, plans, org] = await Promise.all([
+    prisma.wifiStation.findMany({
+      where: { orgId, deletedAt: null, status: { not: 'DISABLED' } },
+      select: { id: true, code: true, name: true, status: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.plan.findMany({
+      where: { orgId, deletedAt: null, isActive: true },
+      select: { id: true, code: true, name: true, quotaType: true, isActive: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.org.findUnique({
+      where: { id: orgId },
+      select: { currency: true },
+    }),
+  ]);
+
+  return {
+    currency: org?.currency ?? 'MMK',
+    stations,
+    plans: plans.map((p) => ({
+      ...p,
+      unitPrice: null as number | null,
+      hasPricing: false,
+      pricesByStation: {} as Record<string, number>,
+    })),
+    canSell: false,
+  };
+}
+
+type AccessTokensListScope =
+  | {
+      orgId: string;
+      resellerId: string | null;
+      mode: 'partner' | 'preview';
+      partnerLocked: boolean;
+      resellers?: Awaited<ReturnType<typeof loadResellerPicker>>;
+      memberships?: Awaited<ReturnType<typeof loadOrgMembershipsForAdmin>>;
+    }
+  | { requiresOrgSelection: true; memberships: Awaited<ReturnType<typeof loadOrgMembershipsForAdmin>> };
+
+/**
+ * List/filter scope for Access Tokens.
+ * Partner logins are locked to their reseller; admins may omit partner to see all org tokens.
+ */
+async function resolveAccessTokensListScope(
+  prisma: PrismaClient,
+  adminId: string,
+  user: AuthenticatedRequest['user'],
+  query: { orgId?: string; resellerId?: string },
+): Promise<AccessTokensListScope> {
+  const requestedResellerId = query.resellerId?.trim() ?? '';
+  const requestedOrgId = query.orgId?.trim() ?? '';
+
+  const direct = await resolveDirectReseller(prisma, adminId);
+  if (direct) {
+    if (requestedResellerId && requestedResellerId !== direct.resellerId) {
+      throw Object.assign(new Error('You do not have access to this partner account.'), {
+        status: 403,
+        code: 'FORBIDDEN_RESELLER',
+      });
+    }
+    return {
+      orgId: direct.orgId,
+      resellerId: direct.resellerId,
+      mode: 'partner',
+      partnerLocked: true,
+    };
+  }
+
+  const scoped = await resolveRoleScopedReseller(prisma, adminId);
+  if (scoped) {
+    if (requestedResellerId && requestedResellerId !== scoped.resellerId) {
+      throw Object.assign(new Error('You do not have access to this partner account.'), {
+        status: 403,
+        code: 'FORBIDDEN_RESELLER',
+      });
+    }
+    return {
+      orgId: scoped.orgId,
+      resellerId: scoped.resellerId,
+      mode: 'partner',
+      partnerLocked: true,
+    };
+  }
+
+  let orgId = requestedOrgId;
+  if (!orgId) {
+    const resolved = await resolveOrgIdForAdmin(prisma, adminId, user, undefined);
+    if ('requiresSelection' in resolved) {
+      return {
+        requiresOrgSelection: true,
+        memberships: resolved.memberships,
+      };
+    }
+    orgId = resolved.orgId;
+  } else {
+    const allowed = await resolveOrgIdForAdmin(prisma, adminId, user, orgId);
+    if ('requiresSelection' in allowed) {
+      throw Object.assign(new Error('You do not have access to this organization.'), {
+        status: 403,
+        code: 'FORBIDDEN_ORG',
+      });
+    }
+    orgId = allowed.orgId;
+  }
+
+  const [resellers, memberships] = await Promise.all([
+    loadResellerPicker(prisma, orgId),
+    loadOrgMembershipsForAdmin(prisma, adminId, user!),
+  ]);
+
+  if (requestedResellerId) {
+    const reseller = resellers.find((r) => r.id === requestedResellerId);
+    if (!reseller) {
+      throw Object.assign(new Error('Partner not found for this organization.'), {
+        status: 404,
+        code: 'NOT_FOUND',
+      });
+    }
+    return {
+      orgId,
+      resellerId: requestedResellerId,
+      mode: 'preview',
+      partnerLocked: false,
+      resellers,
+      memberships,
+    };
+  }
+
+  return {
+    orgId,
+    resellerId: null,
+    mode: 'preview',
+    partnerLocked: false,
+    resellers,
+    memberships,
+  };
+}
+
 function buildListWhere(
   orgId: string,
-  resellerId: string,
+  resellerId: string | null,
   query: AuthenticatedRequest['query']
 ): Prisma.CredentialWhereInput {
   const where: Prisma.CredentialWhereInput = {
     orgId,
-    resellerId,
     deletedAt: null,
     type: 'VOUCHER_TOKEN',
   };
+
+  if (resellerId) {
+    where.resellerId = resellerId;
+  }
 
   const search = typeof query.search === 'string' ? query.search.trim() : '';
   const status = typeof query.status === 'string' ? query.status.trim().toUpperCase() : '';
@@ -579,6 +824,8 @@ function buildListWhere(
       { plan: { name: { contains: search, mode: 'insensitive' } } },
       { station: { code: { contains: search, mode: 'insensitive' } } },
       { station: { name: { contains: search, mode: 'insensitive' } } },
+      { reseller: { code: { contains: search, mode: 'insensitive' } } },
+      { reseller: { name: { contains: search, mode: 'insensitive' } } },
     ];
   }
 
@@ -598,87 +845,72 @@ export class CommerceAccessTokensController {
       const q = queryResellerParams(req.query);
 
       if (req.query.formOptions === 'true') {
-        let orgId = q.orgId;
-        let resellerId = q.resellerId;
-        let mode: 'partner' | 'preview' | undefined;
-        let requiresOrgSelection = false;
-        let requiresResellerSelection = false;
-
         try {
-          const ctx = await resolveResellerContext(this.prisma, adminId, req.user, q);
-          if ('requiresOrgSelection' in ctx) {
-            requiresOrgSelection = true;
-          } else if ('requiresResellerSelection' in ctx) {
-            orgId = orgId ?? ctx.orgId;
-            requiresResellerSelection = true;
-          } else {
-            orgId = ctx.orgId;
-            resellerId = ctx.resellerId;
-            mode = ctx.mode;
+          const scope = await resolveAccessTokensListScope(this.prisma, adminId, req.user, q);
+          if ('requiresOrgSelection' in scope) {
+            return responseSuccess(res, {
+              message: 'Success',
+              data: { memberships: scope.memberships, resellers: [], catalog: null },
+              meta: {
+                requiresOrgSelection: true,
+                memberships: scope.memberships,
+                partnerLocked: false,
+              },
+            });
           }
-        } catch {
-          orgId = orgId ?? undefined;
-          resellerId = resellerId ?? undefined;
+
+          const catalog = scope.resellerId
+            ? await loadSellableCatalog(this.prisma, scope.orgId, scope.resellerId)
+            : await loadOrgFilterCatalog(this.prisma, scope.orgId);
+
+          const memberships =
+            scope.memberships ??
+            (await loadOrgMembershipsForAdmin(this.prisma, adminId, req.user!));
+          const resellers =
+            scope.resellers ?? (await loadResellerPicker(this.prisma, scope.orgId));
+
+          return responseSuccess(res, {
+            message: 'Success',
+            data: { memberships, resellers, catalog },
+            meta: {
+              mode: scope.mode,
+              orgId: scope.orgId,
+              resellerId: scope.resellerId,
+              partnerLocked: scope.partnerLocked,
+              requiresOrgSelection: false,
+              requiresResellerSelection: false,
+            },
+          });
+        } catch (err: unknown) {
+          const status =
+            err && typeof err === 'object' && 'status' in err
+              ? Number((err as { status: number }).status)
+              : 400;
+          const code =
+            err && typeof err === 'object' && 'code' in err
+              ? String((err as { code: string }).code)
+              : 'ACCESS_TOKENS_ERROR';
+          const message = err instanceof Error ? err.message : 'Failed to load form options.';
+          return responseError(res, status, { code, message });
         }
-
-        const [memberships, resellers] = await Promise.all([
-          loadOrgMembershipsForAdmin(this.prisma, adminId, req.user!),
-          orgId ? loadResellerPicker(this.prisma, orgId) : Promise.resolve([]),
-        ]);
-
-        let catalog = null;
-        if (orgId && resellerId) {
-          catalog = await loadSellableCatalog(this.prisma, orgId, resellerId);
-        }
-
-        return responseSuccess(res, {
-          message: 'Success',
-          data: { memberships, resellers, catalog },
-          meta: {
-            mode,
-            orgId,
-            resellerId,
-            requiresOrgSelection,
-            requiresResellerSelection,
-            resellers: requiresResellerSelection ? resellers : undefined,
-            memberships: requiresOrgSelection || requiresResellerSelection ? memberships : undefined,
-          },
-        });
       }
 
       try {
-        const context = await resolveResellerContext(this.prisma, adminId, req.user, q);
+        const scope = await resolveAccessTokensListScope(this.prisma, adminId, req.user, q);
 
-        if ('requiresOrgSelection' in context) {
+        if ('requiresOrgSelection' in scope) {
           return responseSuccess(res, {
             message: 'Success',
             data: [],
             meta: {
               requiresOrgSelection: true,
-              memberships: context.memberships,
+              memberships: scope.memberships,
+              partnerLocked: false,
             },
           });
         }
 
-        if ('requiresResellerSelection' in context) {
-          const memberships = await loadOrgMembershipsForAdmin(
-            this.prisma,
-            adminId,
-            req.user!
-          );
-          return responseSuccess(res, {
-            message: 'Success',
-            data: [],
-            meta: {
-              requiresResellerSelection: true,
-              orgId: context.orgId,
-              resellers: context.resellers,
-              memberships,
-            },
-          });
-        }
-
-        const { orgId, resellerId, mode } = context;
+        const { orgId, resellerId, mode, partnerLocked } = scope;
         const permissionCtx: CredentialPermissionContext = { mode, isDeveloper };
         const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
 
@@ -687,7 +919,12 @@ export class CommerceAccessTokensController {
           const id = Array.isArray(idParam) ? idParam[0] : idParam;
 
           const row = await this.prisma.credential.findFirst({
-            where: { id, orgId, resellerId, deletedAt: null },
+            where: {
+              id,
+              orgId,
+              deletedAt: null,
+              ...(resellerId ? { resellerId } : {}),
+            },
             select: credentialSelect,
           });
 
@@ -705,11 +942,17 @@ export class CommerceAccessTokensController {
             status: row.status,
             activatedAt: row.activatedAt,
           });
+          const firstLoginMap = await loadFirstLoginAtMap(this.prisma, orgId, [row]);
 
           return responseSuccess(res, {
             message: 'Success',
             data: {
-              ...serializeCredential(row, permissionCtx, revokeWindowMinutes),
+              ...serializeCredential(
+                row,
+                permissionCtx,
+                revokeWindowMinutes,
+                firstLoginMap.get(row.id) ?? null
+              ),
               ...sessions,
             },
           });
@@ -718,6 +961,18 @@ export class CommerceAccessTokensController {
         const where = buildListWhere(orgId, resellerId, req.query);
         const { page, limit, skip, take } = parsePagination(req.query);
         const todayStart = startOfUtcDay();
+        const saleWhere = {
+          orgId,
+          ...(resellerId ? { resellerId } : {}),
+          soldAt: { gte: todayStart },
+          status: 'PAID' as const,
+        };
+        const statusWhere: Prisma.CredentialWhereInput = {
+          orgId,
+          deletedAt: null,
+          type: 'VOUCHER_TOKEN',
+          ...(resellerId ? { resellerId } : {}),
+        };
 
         const [
           rows,
@@ -739,42 +994,43 @@ export class CommerceAccessTokensController {
           this.prisma.credential.count({ where }),
           this.prisma.credential.groupBy({
             by: ['status'],
-            where: { orgId, resellerId, deletedAt: null, type: 'VOUCHER_TOKEN' },
+            where: statusWhere,
             _count: { _all: true },
           }),
-          this.prisma.saleOrder.count({
-            where: {
-              orgId,
-              resellerId,
-              soldAt: { gte: todayStart },
-              status: 'PAID',
-            },
-          }),
+          this.prisma.saleOrder.count({ where: saleWhere }),
           this.prisma.saleOrder.aggregate({
-            where: {
-              orgId,
-              resellerId,
-              soldAt: { gte: todayStart },
-              status: 'PAID',
-            },
+            where: saleWhere,
             _sum: { total: true },
           }),
-          loadSellableCatalog(this.prisma, orgId, resellerId),
-          mode === 'preview'
-            ? loadOrgMembershipsForAdmin(this.prisma, adminId, req.user!)
-            : Promise.resolve(undefined),
-          mode === 'preview'
-            ? loadResellerPicker(this.prisma, orgId)
-            : Promise.resolve(undefined),
+          resellerId
+            ? loadSellableCatalog(this.prisma, orgId, resellerId)
+            : loadOrgFilterCatalog(this.prisma, orgId),
+          scope.memberships ??
+            (mode === 'preview'
+              ? loadOrgMembershipsForAdmin(this.prisma, adminId, req.user!)
+              : Promise.resolve(undefined)),
+          scope.resellers ??
+            (mode === 'preview'
+              ? loadResellerPicker(this.prisma, orgId)
+              : Promise.resolve(undefined)),
         ]);
 
         const statusCounts = Object.fromEntries(
           statusGroups.map((g) => [g.status, g._count._all])
         );
 
+        const firstLoginMap = await loadFirstLoginAtMap(this.prisma, orgId, rows);
+
         responseSuccess(res, {
           message: 'Success',
-          data: rows.map((row) => serializeCredential(row, permissionCtx, revokeWindowMinutes)),
+          data: rows.map((row) =>
+            serializeCredential(
+              row,
+              permissionCtx,
+              revokeWindowMinutes,
+              firstLoginMap.get(row.id) ?? null
+            )
+          ),
           meta: {
             page,
             limit,
@@ -783,6 +1039,7 @@ export class CommerceAccessTokensController {
             mode,
             orgId,
             resellerId,
+            partnerLocked,
             revokeWindowMinutes,
             statusCounts,
             todayOrders,

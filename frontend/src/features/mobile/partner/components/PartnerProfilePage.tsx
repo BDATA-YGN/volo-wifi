@@ -163,12 +163,12 @@ function PartnerProfilePageInner() {
               <span className={styles.profileStatLabel}>Plans</span>
             </div>
             <div className={styles.profileStat}>
-              <span className={styles.profileStatValue}>{partner.credentialsNew}</span>
-              <span className={styles.profileStatLabel}>New stock</span>
+              <span className={styles.profileStatValue}>{partner.credentialsSold}</span>
+              <span className={styles.profileStatLabel}>Sold</span>
             </div>
             <div className={styles.profileStat}>
               <span className={styles.profileStatValue}>{partner.credentialsActive}</span>
-              <span className={styles.profileStatLabel}>Active</span>
+              <span className={styles.profileStatLabel}>Activated</span>
             </div>
           </div>
         </section>

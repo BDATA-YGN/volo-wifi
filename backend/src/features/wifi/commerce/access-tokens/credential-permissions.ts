@@ -6,11 +6,11 @@ export type CredentialActions = {
   revokeBlockedReason?: string;
 };
 
-/** Revoke is only allowed before the token has been used (sold / unused inventory). */
-const REVOKABLE = new Set(['SOLD', 'NEW']);
-const PAUSABLE = new Set(['ACTIVATED', 'IN_USE', 'ACTIVE']);
+/** Revoke is only allowed before the token has been used (sold, not yet activated). */
+const REVOKABLE = new Set(['SOLD']);
+const PAUSABLE = new Set(['ACTIVATED']);
 const UNLOCKABLE = new Set(['PAUSED']);
-const REVERTABLE = new Set(['ACTIVATED', 'PAUSED', 'IN_USE', 'ACTIVE']);
+const REVERTABLE = new Set(['ACTIVATED', 'PAUSED']);
 
 export type CredentialPermissionContext = {
   mode: 'partner' | 'preview';

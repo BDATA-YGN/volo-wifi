@@ -1,5 +1,6 @@
 // app/layout.tsx
 import "./globals.css";
+import "@/lib/timezone";
 import BaseComponent from "./base";
 import Providers from "@/common/provider/queryProvider";
 import { getUserLocale } from "../i18n/locale";

@@ -1,5 +1,11 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { normalizeMemberRoleCode } from '@/features/wifi/tenant/access-control/constants';
+import {
+  addAppDays,
+  appDayKey as utcDayKey,
+  eachAppDay,
+  startOfAppDay,
+} from '@/utils/app-time';
 import { STALLED_SESSION_MINUTES, TREND_DAYS } from './constants';
 
 export type OverviewSummary = {
@@ -86,16 +92,6 @@ function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
   return Number(value ?? 0);
 }
 
-function startOfUtcDay(date: Date): Date {
-  const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-function utcDayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 function isSessionStalled(
   startedAt: Date,
   lastInterimAt: Date | null,
@@ -163,9 +159,8 @@ export async function buildOverviewDashboard(
   consoleRole: string
 ): Promise<OverviewDashboardPayload> {
   const now = new Date();
-  const today = startOfUtcDay(now);
-  const trendFrom = new Date(today);
-  trendFrom.setUTCDate(trendFrom.getUTCDate() - (TREND_DAYS - 1));
+  const today = startOfAppDay(now);
+  const trendFrom = addAppDays(today, -(TREND_DAYS - 1));
 
   const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -335,8 +330,7 @@ export async function buildOverviewDashboard(
   }
 
   const trend7d: OverviewTrendPoint[] = [];
-  const cursor = new Date(trendFrom);
-  while (cursor <= today) {
+  for (const cursor of eachAppDay(trendFrom, today)) {
     const key = utcDayKey(cursor);
     const sales = salesByDay.get(key) ?? { revenue: 0, orders: 0 };
     const usage = usageByDay.get(key) ?? { sessions: 0, totalBytes: 0 };
@@ -347,7 +341,6 @@ export async function buildOverviewDashboard(
       sessions: usage.sessions,
       totalBytes: usage.totalBytes,
     });
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   const stationMap = new Map(stations.map((s) => [s.id, s]));

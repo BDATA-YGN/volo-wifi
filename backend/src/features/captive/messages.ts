@@ -58,15 +58,12 @@ const planTypeLabels: Record<string, string> = {
 };
 
 const credentialStatusLabels: Record<string, string> = {
-  ACTIVE: 'အသုံးပြုနီပါရေ',
   ACTIVATED: 'အသုံးပြုရန် ဖွင့်ထားပြီး',
   SOLD: 'ရောင်းပြီး',
-  IN_USE: 'အသုံးပြုနီပါရေ',
   EXPIRED: 'သက်တမ်းကုန်ပြီး',
   CONSUMED: 'အသုံးပြုပြီး',
   PAUSED: 'ယာယီရပ်ထားပြီး (reseller)',
   REVOKED: 'ပိတ်သိမ်းထားပြီး',
-  NEW: 'အသစ်',
 };
 
 export function captivePlanQuotaTypeLabel(quotaType: string): string {

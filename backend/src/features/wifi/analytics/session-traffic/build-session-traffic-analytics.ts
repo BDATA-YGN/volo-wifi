@@ -1,4 +1,10 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
+import {
+  appDayKey as utcDayKey,
+  eachAppDay,
+  previousAppPeriod,
+  resolvePeriodFromPresetDays,
+} from '@/utils/app-time';
 
 export type SessionTrafficSummary = {
   sessionsCount: number;
@@ -88,10 +94,6 @@ function bigintToNumber(value: bigint | null | undefined): number {
   return Number.isSafeInteger(n) ? n : 0;
 }
 
-function utcDayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 function emptySummary(): SessionTrafficSummary {
   return {
     sessionsCount: 0,
@@ -145,12 +147,7 @@ function mergeDailyTrend(
   periodTo: Date
 ): SessionTrafficDailyPoint[] {
   const points: SessionTrafficDailyPoint[] = [];
-  const cursor = new Date(periodFrom);
-  cursor.setUTCHours(0, 0, 0, 0);
-  const end = new Date(periodTo);
-  end.setUTCHours(0, 0, 0, 0);
-
-  while (cursor <= end) {
+  for (const cursor of eachAppDay(periodFrom, periodTo)) {
     const key = utcDayKey(cursor);
     const day = usageByDay.get(key) ?? {
       sessionsCount: 0,
@@ -160,7 +157,6 @@ function mergeDailyTrend(
       uniqueCredentials: 0,
     };
     points.push({ date: key, ...day });
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return points;
@@ -170,21 +166,12 @@ export function resolvePeriodFromPreset(
   preset: string,
   periodTo: Date = new Date()
 ): { periodFrom: Date; periodTo: Date } {
-  const end = new Date(periodTo);
-  end.setUTCHours(23, 59, 59, 999);
-  const start = new Date(end);
   const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
-  start.setUTCDate(start.getUTCDate() - (days - 1));
-  start.setUTCHours(0, 0, 0, 0);
-  return { periodFrom: start, periodTo: end };
+  return resolvePeriodFromPresetDays(days, periodTo);
 }
 
 export function previousPeriod(periodFrom: Date, periodTo: Date): { from: Date; to: Date } {
-  const ms = periodTo.getTime() - periodFrom.getTime();
-  const to = new Date(periodFrom.getTime() - 1);
-  const from = new Date(to.getTime() - ms);
-  from.setUTCHours(0, 0, 0, 0);
-  return { from, to };
+  return previousAppPeriod(periodFrom, periodTo);
 }
 
 async function loadStationMeta(

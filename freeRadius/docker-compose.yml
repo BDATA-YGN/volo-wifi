@@ -18,6 +18,8 @@ services:
     container_name: freeradius
     restart: unless-stopped
     network_mode: "host"
+    environment:
+      TZ: Asia/Yangon
     ports:
       - "1812:1812/udp"   # Authentication
       - "1813:1813/udp"   # Accounting

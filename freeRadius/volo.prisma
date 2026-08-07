@@ -30,13 +30,12 @@ enum CredentialType {
 }
 
 enum CredentialStatus {
-  NEW
   SOLD
-  ACTIVE
-  EXPIRED
-  REVOKED
-  CONSUMED
   ACTIVATED
+  CONSUMED
+  PAUSED
+  REVOKED
+  EXPIRED
 }
 
 enum PlanQuotaType {
@@ -425,7 +424,7 @@ model Credential {
   org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
 
   type   CredentialType   @default(VOUCHER_TOKEN)
-  status CredentialStatus @default(NEW)
+  status CredentialStatus @default(SOLD)
 
   planId String
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)

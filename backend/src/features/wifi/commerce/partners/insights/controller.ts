@@ -16,23 +16,12 @@ import {
   resolvePeriodFromPreset,
   type PartnerInsightsPayload,
 } from './build-insights';
+import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
 
 function parseDateParam(value: unknown): Date | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function endOfUtcDay(date: Date): Date {
-  const d = new Date(date);
-  d.setUTCHours(23, 59, 59, 999);
-  return d;
-}
-
-function startOfUtcDay(date: Date): Date {
-  const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
 }
 
 function resolvePeriod(query: AuthenticatedRequest['query']): {

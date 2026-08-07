@@ -532,6 +532,22 @@ function normalizeUserStatus(value: string | null): 'ACTIVE' | 'SUSPENDED' | 'DI
   return 'ACTIVE';
 }
 
+function normalizeCredentialStatus(value: string | null): string {
+  if (value === 'NEW') return 'SOLD';
+  if (value === 'ACTIVE' || value === 'IN_USE') return 'ACTIVATED';
+  if (
+    value === 'SOLD' ||
+    value === 'ACTIVATED' ||
+    value === 'CONSUMED' ||
+    value === 'PAUSED' ||
+    value === 'REVOKED' ||
+    value === 'EXPIRED'
+  ) {
+    return value;
+  }
+  return 'SOLD';
+}
+
 function normalizeBillingCycle(_value: string | null): 'MONTHLY' {
   // NEW schema currently only defines MONTHLY
   return 'MONTHLY';
@@ -1882,7 +1898,7 @@ async function importCredentials(ctx: Ctx): Promise<void> {
       String(row.id),
       String(row.orgId),
       asString(row.type) ?? 'VOUCHER_TOKEN',
-      asString(row.status) ?? 'NEW',
+      normalizeCredentialStatus(asString(row.status)),
       String(row.planId),
       asString(row.token),
       asString(row.username),

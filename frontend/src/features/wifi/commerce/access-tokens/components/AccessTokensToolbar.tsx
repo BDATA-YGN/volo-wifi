@@ -4,6 +4,7 @@ import React from "react";
 import { Button, Input, Select, Space } from "antd";
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import type { CredentialStatus, SellableCatalog } from "../types";
+import type { ResellerPickerOption } from "@/features/wifi/commerce/partners/workspace/types";
 import { STATUS_OPTIONS } from "../constant";
 
 type Props = {
@@ -11,6 +12,10 @@ type Props = {
   status: CredentialStatus | null;
   planId: string | null;
   stationId: string | null;
+  resellerId: string | null;
+  resellers?: ResellerPickerOption[];
+  showPartnerFilter?: boolean;
+  partnerLocked?: boolean;
   catalog?: SellableCatalog | null;
   loading?: boolean;
   issueDisabled?: boolean;
@@ -18,6 +23,7 @@ type Props = {
   onStatusChange: (status: CredentialStatus | null) => void;
   onPlanChange: (planId: string | null) => void;
   onStationChange: (stationId: string | null) => void;
+  onPartnerChange: (resellerId: string | null) => void;
   onRefresh: () => void;
   onIssue: () => void;
 };
@@ -27,6 +33,10 @@ const AccessTokensToolbar: React.FC<Props> = ({
   status,
   planId,
   stationId,
+  resellerId,
+  resellers = [],
+  showPartnerFilter,
+  partnerLocked,
   catalog,
   loading,
   issueDisabled,
@@ -34,6 +44,7 @@ const AccessTokensToolbar: React.FC<Props> = ({
   onStatusChange,
   onPlanChange,
   onStationChange,
+  onPartnerChange,
   onRefresh,
   onIssue,
 }) => (
@@ -45,8 +56,24 @@ const AccessTokensToolbar: React.FC<Props> = ({
         placeholder="Search token, plan, site…"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
-        style={{ width: 260 }}
+        style={{ width: 240 }}
       />
+      {showPartnerFilter ? (
+        <Select
+          allowClear={!partnerLocked}
+          disabled={partnerLocked}
+          showSearch
+          placeholder="Partner"
+          value={resellerId}
+          onChange={(value) => onPartnerChange(value ?? null)}
+          optionFilterProp="label"
+          style={{ width: 200 }}
+          options={resellers.map((r) => ({
+            value: r.id,
+            label: `${r.name} (${r.code})`,
+          }))}
+        />
+      ) : null}
       <Select
         allowClear
         placeholder="Status"

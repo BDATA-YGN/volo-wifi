@@ -8,14 +8,14 @@
 CREATE INDEX IF NOT EXISTS wf_credential_token_active_idx
 	ON wf_credential (token)
 	WHERE token IS NOT NULL
-		AND status IN ('SOLD', 'ACTIVE', 'ACTIVATED', 'IN_USE')
+		AND status IN ('SOLD', 'ACTIVATED')
 		AND revoked_at IS NULL
 		AND deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS wf_credential_username_active_idx
 	ON wf_credential (username)
 	WHERE username IS NOT NULL
-		AND status IN ('SOLD', 'ACTIVE', 'ACTIVATED', 'IN_USE')
+		AND status IN ('SOLD', 'ACTIVATED')
 		AND revoked_at IS NULL
 		AND deleted_at IS NULL;
 

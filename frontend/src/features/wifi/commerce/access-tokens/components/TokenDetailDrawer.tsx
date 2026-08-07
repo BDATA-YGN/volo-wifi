@@ -301,7 +301,10 @@ const TokenDetailDrawer: React.FC<Props> = ({
               <Descriptions.Item label="Sold at">
                 {row.soldAt ? formatWifiDateTime(row.soldAt) : "—"}
               </Descriptions.Item>
-              <Descriptions.Item label="Activated">
+              <Descriptions.Item label="First login">
+                {row.firstLoginAt ? formatWifiDateTime(row.firstLoginAt) : "—"}
+              </Descriptions.Item>
+              <Descriptions.Item label="Activated at">
                 {row.activatedAt ? formatWifiDateTime(row.activatedAt) : "—"}
               </Descriptions.Item>
               <Descriptions.Item label="Expires">
@@ -384,7 +387,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
                   "No portal or network sessions recorded yet."
                 }
                 description={
-                  sessionsMeta && row.activatedAt
+                  sessionsMeta && row.firstLoginAt
                     ? `Retention: captive ${sessionsMeta.captiveRetentionDays}d · RADIUS hot ${sessionsMeta.radiusHotRetentionDays}d · archive ${sessionsMeta.radiusArchiveRetentionDays}d.`
                     : undefined
                 }

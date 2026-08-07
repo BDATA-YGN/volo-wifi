@@ -70,9 +70,17 @@ export function resolvePgSsl(): ConnectionOptions | undefined {
 export function buildPgPoolConfig(connectionString: string): PoolConfig {
   const config: PoolConfig = {
     connectionString,
-    max: 10,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
+    // Keep headroom for FreeRADIUS + tools on DigitalOcean managed Postgres.
+    max: Number(process.env.DATABASE_POOL_MAX || 8),
+    // Recycle idle clients before cloud/LB silent drops (common cause of
+    // "Connection terminated unexpectedly").
+    idleTimeoutMillis: Number(process.env.DATABASE_POOL_IDLE_MS || 20_000),
+    // Remote DO latency from local/dev often ~1s; spikes need more than 10s.
+    connectionTimeoutMillis: Number(process.env.DATABASE_POOL_CONNECT_MS || 30_000),
+    allowExitOnIdle: true,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+    application_name: process.env.DATABASE_APPLICATION_NAME || 'volo-wifi-backend',
   };
   const ssl = resolvePgSsl();
   if (ssl) {

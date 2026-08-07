@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import PrismaDBConnection from '@/prisma/prisma-client';
 import { logger } from '@/logging/logger';
+import { APP_TIMEZONE } from '@/utils/app-time';
 
 const prisma = PrismaDBConnection.getConnection();
 
@@ -175,7 +176,7 @@ export const startLogCleanupJob = async (): Promise<ScheduledTask | null> => {
   }
 
   scheduled = cron.schedule(cfg.cron, runOnce, {
-    timezone: process.env.TZ || 'Asia/Yangon',
+    timezone: process.env.TZ || APP_TIMEZONE,
   });
   activeCron = cfg.cron;
   logger.info(
@@ -200,7 +201,7 @@ const rescheduleIfChanged = async () => {
     }
     scheduled?.stop();
     scheduled = cron.schedule(cfg.cron, runOnce, {
-      timezone: process.env.TZ || 'Asia/Yangon',
+      timezone: process.env.TZ || APP_TIMEZONE,
     });
     activeCron = cfg.cron;
     logger.info(`[log-cleanup] Re-scheduled with new expression "${cfg.cron}"`);

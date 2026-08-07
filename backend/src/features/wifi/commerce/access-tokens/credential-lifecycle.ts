@@ -1,6 +1,6 @@
 import type { Prisma } from '@/generated/prisma/client';
 
-const PAUSABLE = new Set(['ACTIVATED', 'IN_USE', 'ACTIVE']);
+const PAUSABLE = new Set(['ACTIVATED']);
 
 export async function pauseAccessToken(
   tx: Prisma.TransactionClient,
@@ -72,7 +72,7 @@ export async function revertAccessTokenToSold(
     throw Object.assign(new Error('Access token not found.'), { status: 404, code: 'NOT_FOUND' });
   }
 
-  const revertable = new Set(['ACTIVATED', 'PAUSED', 'IN_USE', 'ACTIVE']);
+  const revertable = new Set(['ACTIVATED', 'PAUSED']);
   if (!revertable.has(existing.status)) {
     throw Object.assign(new Error(`Tokens in status ${existing.status} cannot be reverted to sold.`), {
       status: 409,

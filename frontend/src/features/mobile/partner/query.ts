@@ -169,7 +169,7 @@ export type PartnerProfile = {
     planCount: number;
     canSellTokens: boolean;
     credentialsActive: number;
-    credentialsNew: number;
+    credentialsSold: number;
   } | null;
 };
 
@@ -204,7 +204,7 @@ export async function partnerFetchProfile(): Promise<PartnerProfile> {
           planCount: Number(dash.stats?.planCount ?? 0),
           canSellTokens: Boolean(dash.readiness?.canSellTokens),
           credentialsActive: Number(dash.stats?.credentialsActive ?? 0),
-          credentialsNew: Number(dash.stats?.credentialsNew ?? 0),
+          credentialsSold: Number(dash.stats?.credentialsSold ?? 0),
         };
       }
     } catch {

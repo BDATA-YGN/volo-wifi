@@ -1,5 +1,16 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import { APP_TIMEZONE, startOfAppDay } from '@/utils/app-time';
 import { STALLED_SESSION_MINUTES, type WindowHours } from './constants';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+function appTz(date: Date = new Date()) {
+  return dayjs(date).tz(process.env.TZ || APP_TIMEZONE);
+}
 
 export type LiveOpsSummary = {
   activeSessions: number;
@@ -107,16 +118,8 @@ function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
   return Number(value ?? 0);
 }
 
-function startOfUtcDay(date: Date): Date {
-  const d = new Date(date);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
 function hourKey(date: Date): string {
-  const d = new Date(date);
-  d.setUTCMinutes(0, 0, 0);
-  return d.toISOString();
+  return appTz(date).startOf('hour').toISOString();
 }
 
 function resolveWindow(windowHours: WindowHours): { windowFrom: Date; windowTo: Date } {
@@ -142,14 +145,11 @@ function buildHourlySeries(
   orderBuckets: Map<string, { count: number; revenue: number }>
 ): LiveOpsHourlyPoint[] {
   const points: LiveOpsHourlyPoint[] = [];
-  const cursor = new Date(windowFrom);
-  cursor.setUTCMinutes(0, 0, 0);
+  let cursor = appTz(windowFrom).startOf('hour');
+  const end = appTz(windowTo).startOf('hour');
 
-  const end = new Date(windowTo);
-  end.setUTCMinutes(0, 0, 0);
-
-  while (cursor <= end) {
-    const key = hourKey(cursor);
+  while (cursor.isBefore(end) || cursor.isSame(end)) {
+    const key = cursor.toISOString();
     const sessions = sessionBuckets.get(key) ?? { count: 0, bytes: 0 };
     const orders = orderBuckets.get(key) ?? { count: 0, revenue: 0 };
     points.push({
@@ -159,7 +159,7 @@ function buildHourlySeries(
       revenue: orders.revenue,
       totalBytes: sessions.bytes,
     });
-    cursor.setUTCHours(cursor.getUTCHours() + 1);
+    cursor = cursor.add(1, 'hour');
   }
 
   // Trim to window hours if we have extra buckets
@@ -183,7 +183,7 @@ export async function buildLiveOpsAnalytics(
   filters?: LiveOpsFilters
 ): Promise<LiveOpsAnalyticsPayload> {
   const { windowFrom, windowTo } = resolveWindow(windowHours);
-  const today = startOfUtcDay(new Date());
+  const today = startOfAppDay(new Date());
   const now = new Date();
 
   const sessionWhere: Prisma.RadiusSessionWhereInput = {

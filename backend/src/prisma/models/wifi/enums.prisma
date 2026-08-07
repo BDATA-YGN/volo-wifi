@@ -24,17 +24,18 @@ enum CredentialType {
 }
 
 enum CredentialStatus {
-  NEW
+  /// Issued / sold, not yet used for captive or RADIUS login.
   SOLD
-  ACTIVE
-  EXPIRED
-  REVOKED
-  CONSUMED
+  /// First successful login completed; package is in use.
   ACTIVATED
-  /// Captive login succeeded and the package includes time — both cumulative and single-session plans (RADIUS may be active).
-  IN_USE
-  /// Time plan: RADIUS session ended with quota left; login disabled until reseller unlocks (see singleSessionResellerUnlockAt). Name is generic; only SINGLE_SESSION plans set this today.
+  /// Quota fully used (time and/or data).
+  CONSUMED
+  /// Temporarily locked (e.g. single-session plan awaiting reseller unlock).
   PAUSED
+  /// Manually revoked; cannot login.
+  REVOKED
+  /// Past expiresAt or marked expired by jobs.
+  EXPIRED
 }
 
 enum PlanQuotaType {

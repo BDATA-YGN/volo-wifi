@@ -6,6 +6,7 @@ import { AuthenticatedRequest } from '@/interfaces/express.interface';
 import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import { isUndefinedOrUndefinedString } from '@/utils/string-utils';
+import { endOfAppDay, startOfAppDay } from '@/utils/app-time';
 import { commissionPayoutPeriodOverlapMessage } from '@/features/wifi/shared/conflict-messages';
 import {
   isDeveloperAdmin,
@@ -61,15 +62,11 @@ function parseDateParam(value: unknown): Date | null {
 }
 
 function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  return endOfAppDay(date);
 }
 
 function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return startOfAppDay(date);
 }
 
 async function resolveOrgFromRequest(

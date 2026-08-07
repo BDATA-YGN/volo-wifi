@@ -2,15 +2,12 @@ import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/
 import type { ResellerPickerOption } from "@/features/wifi/commerce/partners/workspace/types";
 
 export type CredentialStatus =
-  | "NEW"
   | "SOLD"
-  | "ACTIVE"
-  | "EXPIRED"
-  | "REVOKED"
-  | "CONSUMED"
   | "ACTIVATED"
-  | "IN_USE"
-  | "PAUSED";
+  | "CONSUMED"
+  | "PAUSED"
+  | "REVOKED"
+  | "EXPIRED";
 
 export type CredentialLifecycleAction = "pause" | "unlock" | "revertToSold";
 
@@ -96,6 +93,8 @@ export type AccessTokenRecord = {
   } | null;
   soldAt: string | null;
   activatedAt: string | null;
+  /** Earliest captive portal or RADIUS session (falls back to activatedAt). */
+  firstLoginAt: string | null;
   expiresAt: string | null;
   revokedAt: string | null;
   createdAt: string;
@@ -186,7 +185,8 @@ export type AccessTokensMeta = {
   totalPages?: number;
   mode?: WorkspaceMode;
   orgId?: string;
-  resellerId?: string;
+  resellerId?: string | null;
+  partnerLocked?: boolean;
   requiresOrgSelection?: boolean;
   requiresResellerSelection?: boolean;
   statusCounts?: Record<string, number>;

@@ -69,11 +69,28 @@ const AccessTokensTable: React.FC<Props> = ({
     {
       title: "Site",
       key: "station",
-      width: 180,
+      width: 150,
       ellipsis: true,
       render: (_, row) =>
         row.station ? (
           <Tag style={{ fontFamily: "monospace" }}>{row.station.code}</Tag>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      title: "Partner",
+      key: "reseller",
+      width: 160,
+      ellipsis: true,
+      render: (_, row) =>
+        row.reseller ? (
+          <div>
+            <Text style={{ fontSize: 12 }}>{row.reseller.name}</Text>
+            <div>
+              <Tag style={{ fontFamily: "monospace", marginTop: 2 }}>{row.reseller.code}</Tag>
+            </div>
+          </div>
         ) : (
           "—"
         ),
@@ -102,6 +119,19 @@ const AccessTokensTable: React.FC<Props> = ({
         row.soldAt ? (
           <Text type="secondary" style={{ fontSize: 12 }}>
             {formatWifiDateTime(row.soldAt)}
+          </Text>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      title: "First login",
+      key: "firstLoginAt",
+      width: 150,
+      render: (_, row) =>
+        row.firstLoginAt ? (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {formatWifiDateTime(row.firstLoginAt)}
           </Text>
         ) : (
           "—"

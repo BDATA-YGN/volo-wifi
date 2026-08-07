@@ -1,7 +1,9 @@
 import { config as dotenvConfig } from 'dotenv';
 import { bool, cleanEnv, num, port, str } from 'envalid';
+import { APP_TIMEZONE, applyAppTimezone } from '../utils/app-time';
 
 dotenvConfig({ path: '.env' });
+applyAppTimezone(process.env.TZ || APP_TIMEZONE);
 
 /**
  * Single place to parse/validate environment variables.
@@ -15,10 +17,14 @@ export const env = cleanEnv(process.env, {
   API_PORT: port({ default: null }),
   SOCKET_PORT: port({ default: null }),
 
-  TZ: str({ default: 'UTC' }),
+  TZ: str({ default: APP_TIMEZONE }),
 
   // Database — single source; DB_* below are optional overrides only
-  DATABASE_URL: str({ default: 'postgresql://postgres:password@localhost:5432/db?options=-c%20timezone=UTC' }),
+  // Session TimeZone=Asia/Yangon (URL-encoded slash: Asia%2FYangon)
+  DATABASE_URL: str({
+    default:
+      'postgresql://postgres:password@localhost:5432/db?options=-c%20timezone%3DAsia%2FYangon',
+  }),
   DATABASE_SSL_MODE: str({ default: '' }),
   DATABASE_SSL_ROOT_CERT: str({ default: '' }),
   DB_HOST: str({ default: '' }),
@@ -66,3 +72,5 @@ export const env = cleanEnv(process.env, {
   FIREBASE_SERVICE_ACCOUNT_JSON: str({ default: '' }),
   FIREBASE_SERVICE_ACCOUNT_PATH: str({ default: '' }),
 });
+
+applyAppTimezone(env.TZ);

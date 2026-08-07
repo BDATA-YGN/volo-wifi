@@ -19,8 +19,7 @@ type Props = {
 
 const AccessTokensStats: React.FC<Props> = ({ meta, currency = "MMK", loading }) => {
   const counts = meta?.statusCounts ?? {};
-  const soldOrActive =
-    (counts.SOLD ?? 0) + (counts.ACTIVE ?? 0) + (counts.IN_USE ?? 0) + (counts.ACTIVATED ?? 0);
+  const soldOrActive = (counts.SOLD ?? 0) + (counts.ACTIVATED ?? 0);
 
   return (
     <Row gutter={[16, 16]}>

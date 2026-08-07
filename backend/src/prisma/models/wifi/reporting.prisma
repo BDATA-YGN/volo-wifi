@@ -4,7 +4,7 @@ model DailySalesStat {
   orgId String @map("org_id")
   org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
 
-  /// Store as date bucket (00:00 UTC), handle timezone in app/UI
+  /// Store as date bucket (00:00 Asia/Yangon (app timezone)), handle timezone in app/UI
   date      DateTime @map("date")
   stationId String? @map("station_id")
   station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
@@ -102,7 +102,7 @@ model DailyRadiusUsageStat {
   orgId String @map("org_id")
   org   Org    @relation(fields: [orgId], references: [id], onDelete: Restrict)
 
-  /// Store as date bucket (00:00 UTC), handle timezone in app/UI
+  /// Store as date bucket (00:00 Asia/Yangon (app timezone)), handle timezone in app/UI
   date      DateTime @map("date")
   stationId String? @map("station_id")
   station   WifiStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)

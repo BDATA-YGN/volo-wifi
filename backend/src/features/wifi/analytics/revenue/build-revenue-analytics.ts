@@ -1,5 +1,23 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import {
+  APP_TIMEZONE,
+  appDayKey as utcDayKey,
+  eachAppDay,
+  endOfAppDay,
+  previousAppPeriod,
+  resolvePeriodFromPresetDays,
+} from '@/utils/app-time';
 import type { TrendGranularity } from './constants';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+function appTz(date: Date = new Date()) {
+  return dayjs(date).tz(process.env.TZ || APP_TIMEZONE);
+}
 
 export type RevenueAnalyticsSummary = {
   revenue: number;
@@ -89,29 +107,18 @@ export function resolvePeriodFromPreset(
   preset: string,
   periodTo: Date = new Date()
 ): { periodFrom: Date; periodTo: Date } {
-  const end = new Date(periodTo);
-  end.setUTCHours(23, 59, 59, 999);
-  const start = new Date(end);
-
   if (preset === '12m') {
-    start.setUTCMonth(start.getUTCMonth() - 11);
-    start.setUTCDate(1);
-    start.setUTCHours(0, 0, 0, 0);
+    const end = endOfAppDay(periodTo);
+    const start = appTz(periodTo).subtract(11, 'month').startOf('month').toDate();
     return { periodFrom: start, periodTo: end };
   }
 
   const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
-  start.setUTCDate(start.getUTCDate() - (days - 1));
-  start.setUTCHours(0, 0, 0, 0);
-  return { periodFrom: start, periodTo: end };
+  return resolvePeriodFromPresetDays(days, periodTo);
 }
 
 export function previousPeriod(periodFrom: Date, periodTo: Date): { from: Date; to: Date } {
-  const ms = periodTo.getTime() - periodFrom.getTime();
-  const to = new Date(periodFrom.getTime() - 1);
-  const from = new Date(to.getTime() - ms);
-  from.setUTCHours(0, 0, 0, 0);
-  return { from, to };
+  return previousAppPeriod(periodFrom, periodTo);
 }
 
 export function resolveTrendGranularity(periodFrom: Date, periodTo: Date): TrendGranularity {
@@ -119,10 +126,6 @@ export function resolveTrendGranularity(periodFrom: Date, periodTo: Date): Trend
   if (days > 366) return 'yearly';
   if (days > 93) return 'monthly';
   return 'daily';
-}
-
-function utcDayKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }
 
 function monthKey(year: number, month: number): string {
@@ -135,12 +138,7 @@ function buildDailySeries(
   periodTo: Date
 ): RevenueTrendPoint[] {
   const points: RevenueTrendPoint[] = [];
-  const cursor = new Date(periodFrom);
-  cursor.setUTCHours(0, 0, 0, 0);
-  const end = new Date(periodTo);
-  end.setUTCHours(0, 0, 0, 0);
-
-  while (cursor <= end) {
+  for (const cursor of eachAppDay(periodFrom, periodTo)) {
     const key = utcDayKey(cursor);
     const bucket = buckets.get(key) ?? {
       ordersCount: 0,
@@ -158,7 +156,6 @@ function buildDailySeries(
       commission: roundMoney(bucket.commission),
       netRevenue: roundMoney(bucket.netRevenue),
     });
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return points;
@@ -170,11 +167,11 @@ function buildMonthlySeries(
   periodTo: Date
 ): RevenueTrendPoint[] {
   const points: RevenueTrendPoint[] = [];
-  const cursor = new Date(Date.UTC(periodFrom.getUTCFullYear(), periodFrom.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(periodTo.getUTCFullYear(), periodTo.getUTCMonth(), 1));
+  let cursor = appTz(periodFrom).startOf('month');
+  const end = appTz(periodTo).startOf('month');
 
-  while (cursor <= end) {
-    const key = monthKey(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1);
+  while (cursor.isBefore(end) || cursor.isSame(end, 'month')) {
+    const key = monthKey(cursor.year(), cursor.month() + 1);
     const bucket = buckets.get(key) ?? {
       ordersCount: 0,
       itemsCount: 0,
@@ -191,7 +188,7 @@ function buildMonthlySeries(
       commission: roundMoney(bucket.commission),
       netRevenue: roundMoney(bucket.netRevenue),
     });
-    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    cursor = cursor.add(1, 'month');
   }
 
   return points;
@@ -203,7 +200,7 @@ function buildYearlySeries(
   periodTo: Date
 ): RevenueTrendPoint[] {
   const points: RevenueTrendPoint[] = [];
-  for (let year = periodFrom.getUTCFullYear(); year <= periodTo.getUTCFullYear(); year += 1) {
+  for (let year = appTz(periodFrom).year(); year <= appTz(periodTo).year(); year += 1) {
     const key = String(year);
     const bucket = buckets.get(key) ?? {
       ordersCount: 0,
@@ -364,8 +361,10 @@ async function aggregateFromStats(
       buckets.set(key, bucket);
     }
   } else if (granularity === 'monthly') {
-    const fromKey = periodFrom.getUTCFullYear() * 100 + (periodFrom.getUTCMonth() + 1);
-    const toKey = periodTo.getUTCFullYear() * 100 + (periodTo.getUTCMonth() + 1);
+    const fromYear = appTz(periodFrom).year();
+    const toYear = appTz(periodTo).year();
+    const fromKey = fromYear * 100 + (appTz(periodFrom).month() + 1);
+    const toKey = toYear * 100 + (appTz(periodTo).month() + 1);
 
     const rows = (
       await prisma.monthlySalesStat.findMany({
@@ -373,8 +372,8 @@ async function aggregateFromStats(
           orgId,
           deletedAt: null,
           year: {
-            gte: periodFrom.getUTCFullYear(),
-            lte: periodTo.getUTCFullYear(),
+            gte: fromYear,
+            lte: toYear,
           },
         },
         select: {
@@ -414,7 +413,7 @@ async function aggregateFromStats(
       where: {
         orgId,
         deletedAt: null,
-        year: { gte: periodFrom.getUTCFullYear(), lte: periodTo.getUTCFullYear() },
+        year: { gte: appTz(periodFrom).year(), lte: appTz(periodTo).year() },
       },
       select: {
         year: true,
@@ -480,9 +479,10 @@ async function aggregateFromLiveOrders(
 
     let key: string;
     if (granularity === 'yearly') {
-      key = String(order.soldAt.getUTCFullYear());
+      key = String(appTz(order.soldAt).year());
     } else if (granularity === 'monthly') {
-      key = monthKey(order.soldAt.getUTCFullYear(), order.soldAt.getUTCMonth() + 1);
+      const d = appTz(order.soldAt);
+      key = monthKey(d.year(), d.month() + 1);
     } else {
       key = utcDayKey(order.soldAt);
     }

@@ -15,19 +15,9 @@ export const STATUS_OPTIONS: { value: CredentialStatus; label: string }[] = [
   { value: "CONSUMED", label: "Consumed" },
 ];
 
-/** Labels for legacy / internal statuses still stored on credentials. */
-export const STATUS_LABELS: Partial<Record<CredentialStatus, string>> = {
-  NEW: "New",
-  ACTIVE: "Active",
-  IN_USE: "In use",
-};
-
 export const STATUS_COLOR: Record<CredentialStatus, string> = {
-  NEW: "default",
   SOLD: "blue",
-  ACTIVE: "success",
   ACTIVATED: "success",
-  IN_USE: "processing",
   PAUSED: "warning",
   EXPIRED: "default",
   REVOKED: "error",

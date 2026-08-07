@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import PrismaDBConnection from '@/prisma/prisma-client';
 import { logger } from '@/logging/logger';
+import { APP_TIMEZONE } from '@/utils/app-time';
 import { aggregateDailyRadiusForDate } from './reporting/lib/aggregate-daily-radius';
 import { aggregateDailySalesForDate } from './reporting/lib/aggregate-daily-sales';
 import { addUtcDays, eachUtcDay, startOfUtcDay } from './reporting/lib/dates';
@@ -90,7 +91,7 @@ const scheduleAggregate = (expression: string) => {
   }
   scheduled?.stop();
   scheduled = cron.schedule(expression, () => void runReportingAggregateTick(), {
-    timezone: process.env.TZ || 'Asia/Yangon',
+    timezone: process.env.TZ || APP_TIMEZONE,
   });
   activeCron = expression;
 };
@@ -104,7 +105,7 @@ const scheduleRollup = (expression: string) => {
   }
   rollupScheduled?.stop();
   rollupScheduled = cron.schedule(expression, () => void runReportingRollupTick(), {
-    timezone: process.env.TZ || 'Asia/Yangon',
+    timezone: process.env.TZ || APP_TIMEZONE,
   });
   activeRollupCron = expression;
 };

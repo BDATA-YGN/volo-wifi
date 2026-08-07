@@ -6,6 +6,7 @@ import { AuthenticatedRequest } from '@/interfaces/express.interface';
 import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import { isUndefinedOrUndefinedString } from '@/utils/string-utils';
+import { startOfAppDay, startOfAppMonth } from '@/utils/app-time';
 import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
@@ -93,11 +94,11 @@ function parsePagination(query: AuthenticatedRequest['query']) {
 }
 
 function startOfUtcDay(date = new Date()): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  return startOfAppDay(date);
 }
 
 function startOfUtcMonth(date = new Date()): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  return startOfAppMonth(date);
 }
 
 function decimalToNumber(value: Prisma.Decimal | null | undefined): number {

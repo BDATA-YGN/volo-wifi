@@ -78,10 +78,10 @@ export function useCommerceAccessTokens() {
   );
 
   const selectReseller = useCallback(
-    (id: string) => {
-      setResellerId(id);
+    (id: string | null | undefined) => {
+      setResellerId(id || undefined);
       setParams((prev) => ({ ...prev, page: 1 }));
-      if (orgId) void loadFormOptions(orgId, id);
+      if (orgId) void loadFormOptions(orgId, id || undefined);
     },
     [loadFormOptions, orgId, setParams]
   );
