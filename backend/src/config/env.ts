@@ -20,11 +20,11 @@ export const env = cleanEnv(process.env, {
   TZ: str({ default: APP_TIMEZONE }),
 
   // Database — single source; DB_* below are optional overrides only.
-  // DO Managed PG + Prisma DateTime use timestamptz (absolute instants).
-  // Session TimeZone=Asia/Yangon is enforced in buildPgPoolConfig for NOW()/display.
+  // Prisma DateTime = timestamptz. Backend pg pools use session UTC (adapter-pg bug with non-UTC).
+  // Display/calendar = Asia/Yangon via TZ + app-time + frontend. FreeRADIUS may use Asia/Yangon session.
   DATABASE_URL: str({
     default:
-      'postgresql://postgres:password@localhost:5432/db?options=-c%20timezone%3DAsia%2FYangon',
+      'postgresql://postgres:password@localhost:5432/db?options=-c%20timezone%3DUTC',
   }),
   DATABASE_SSL_MODE: str({ default: '' }),
   DATABASE_SSL_ROOT_CERT: str({ default: '' }),

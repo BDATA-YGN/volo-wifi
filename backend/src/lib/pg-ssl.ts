@@ -76,7 +76,7 @@ export function probePgSessionTimezone(
         const row = result.rows[0] as Record<string, string> | undefined;
         const value =
           row?.TimeZone ?? row?.timezone ?? (Object.values(row || {})[0] || '?');
-        log(`PostgreSQL session timezone: ${value} (expected ${resolvePgSessionTimezone()})`);
+        log(`PostgreSQL session timezone: ${value} (expected UTC for Prisma adapter-pg)`);
       } finally {
         client.release();
       }
@@ -150,12 +150,19 @@ export function resolvePgSsl(): ConnectionOptions | undefined {
 /**
  * Build pg Pool config with optional SSL from env.
  *
- * Always applies Asia/Yangon (or TZ) as the PG session timezone via libpq
- * `options`, even when DigitalOcean Managed URLs omit `options=` (cluster
- * storage stays UTC; Prisma DateTime remains absolute UTC instants).
+ * Session timezone defaults to **UTC** for backend Prisma/`pg` pools.
+ * `@prisma/adapter-pg` mis-parses `@db.Timestamptz` when the session is not UTC
+ * (relabels offset without converting — +06:30 for Asia/Yangon). See prisma#26786.
+ * Business timezone for display/calendar remains Asia/Yangon via `app-time` + frontend.
+ * FreeRADIUS uses its own connection with Asia/Yangon (fine for timestamptz writes).
  */
-export function buildPgPoolConfig(connectionString: string): PoolConfig {
-  const { connectionString: cs, options } = applyPgSessionTimezone(connectionString);
+export function buildPgPoolConfig(
+  connectionString: string,
+  opts?: { sessionTimezone?: string },
+): PoolConfig {
+  // Prisma adapter requires UTC until adapter-pg timestamptz fix is deployed.
+  const sessionTz = opts?.sessionTimezone ?? 'UTC';
+  const { connectionString: cs, options } = applyPgSessionTimezone(connectionString, sessionTz);
   const config: PoolConfig = {
     connectionString: cs,
     // Prefer PoolConfig.options so session TZ applies even if a driver strips URL options.
