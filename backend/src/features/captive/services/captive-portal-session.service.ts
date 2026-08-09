@@ -31,10 +31,11 @@ export function resolveCaptivePortalSessionIp(
   builtNasParams?: CaptivePortalNasParams,
 ): string | null {
   const body = readBodyNasParams(bodyNasParams);
+  // Prefer raw NAS redirect fields before request headers (server/edge public IP).
   return (
-    resolveCaptiveClientIp(req, body) ??
+    readNasString(body, IP_NAS_KEYS) ??
     (builtNasParams ? readNasString(builtNasParams, IP_NAS_KEYS) : null) ??
-    readNasString(body, IP_NAS_KEYS)
+    resolveCaptiveClientIp(req, body)
   );
 }
 

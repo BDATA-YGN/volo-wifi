@@ -37,9 +37,28 @@ const WorkspaceReadinessCard: React.FC<Props> = ({ dashboard, mode }) => {
     {
       title: "Retail pricing",
       status: readiness.hasPricing ? ("finish" as const) : ("error" as const),
-      content: readiness.hasPricing
-        ? `${readiness.pricedPlanCount} priced`
-        : "Reseller or default price book required",
+      content: (() => {
+        const scopeLabel =
+          readiness.priceScope === "RESELLER"
+            ? "reseller book"
+            : readiness.priceScope === "STATION"
+              ? "site book"
+              : readiness.priceScope === "STATION_SIZE"
+                ? "station-size book"
+                : readiness.priceScope === "DEFAULT"
+                  ? "org default book"
+                  : "price book";
+        if (readiness.hasPricing) {
+          if (readiness.planCount != null && readiness.pricedPlanCount < readiness.planCount) {
+            return `${readiness.pricedPlanCount} of ${readiness.planCount} plans priced (${scopeLabel})`;
+          }
+          return `${readiness.pricedPlanCount} plan${readiness.pricedPlanCount === 1 ? "" : "s"} priced (${scopeLabel})`;
+        }
+        if (readiness.hasDefaultBook) {
+          return "Add active prices on the winning book (reseller → site → org default)";
+        }
+        return "Organization default, reseller, or site price book required";
+      })(),
     },
     {
       title: "Ready to sell",

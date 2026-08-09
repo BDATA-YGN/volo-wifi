@@ -5,14 +5,20 @@ import { handleApiError, parseApiError } from "@/common/exceptions/handleApiErro
 import { AxiosResponse } from "axios";
 import { AUTH_COOKIE_NAMES } from "@/lib/auth/cookies";
 import { apiClient, sessionBootstrapApiClient } from "@/lib/restapi/apiClient";
+import { resolveServerActionClientIp } from "@/lib/restapi/server-actions";
 import { AUTH_API_ROUTES } from "./constant";
 import { cookies } from "next/headers";
 
 const login = async (data: LoginInput): Promise<LoginActionResult> => {
   try {
+    const clientIp = data.clientIp ?? (await resolveServerActionClientIp());
     const res = await sessionBootstrapApiClient.post<LoginResponse>(
       AUTH_API_ROUTES.login(data.username, data.password),
-      data,
+      {
+        username: data.username,
+        password: data.password,
+        ...(clientIp ? { clientIp } : {}),
+      },
     );
 
     return { success: true, data: res.data };

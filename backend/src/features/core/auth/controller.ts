@@ -25,7 +25,7 @@ import {
   loadLoginLockPolicy,
   recordFailedLoginAttempt,
 } from '@/features/core/auth/login-lockout.service';
-import { resolveClientIp, resolveUserAgent } from '@/utils/request-ip';
+import { resolveClientIp, resolveRequestClientIp, resolveUserAgent } from '@/utils/request-ip';
 import { assertOrgMembershipAllowsConsoleAccess } from '@/features/wifi/shared/org-membership-auth';
 import {
   cookieNamesForProfile,
@@ -90,9 +90,20 @@ export class Controller {
       const lockPolicy = await loadLoginLockPolicy();
       await assertLoginNotLocked(checkUser.id, lockPolicy);
 
+      const clientIp = resolveRequestClientIp(
+        req,
+        typeof request.clientIp === 'string' ? request.clientIp : null,
+      );
+
       const isMatch = await comparePassword(request.password, checkUser.password);
       if (!isMatch) {
-        await recordFailedLoginAttempt(checkUser.id, checkUser.username, req, lockPolicy);
+        await recordFailedLoginAttempt(
+          checkUser.id,
+          checkUser.username,
+          req,
+          lockPolicy,
+          clientIp,
+        );
       }
 
       const adminWithRole = await prisma.admin.findFirst({
@@ -100,8 +111,6 @@ export class Controller {
         include: { role: true },
       });
       await assertOrgMembershipAllowsConsoleAccess(prisma, checkUser.id, adminWithRole);
-
-      const clientIp = resolveClientIp(req);
       const userAgent = resolveUserAgent(req);
 
       const { token, refreshToken } = await this.createToken(checkUser.id);
@@ -133,6 +142,7 @@ export class Controller {
         userEmail: checkUser.username,
         type: 'LOGIN',
         req,
+        ipAddress: clientIp,
       });
       void createAuditLog({
         type: 'LOGIN',

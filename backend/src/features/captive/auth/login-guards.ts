@@ -4,6 +4,7 @@ import {
   Plan,
   PlanTimeUsageMode,
   RadiusAcctStatus,
+  StationTokenUsageScope,
 } from '@/generated/prisma/client';
 import {
   aggregateRadiusUsedSeconds,
@@ -13,6 +14,7 @@ import {
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
 import { normalizeCaptiveMac } from '@/features/captive/utils/captive-client-ip';
+import { resolveRequestStationFromNasParams } from './resolve-request-station';
 
 const prisma = PrismaDBConnection.getConnection();
 
@@ -34,6 +36,22 @@ export const captiveLoginCredentialInclude = {
       timeUsageMode: true,
       isActive: true,
       validityDays: true,
+    },
+  },
+  station: {
+    select: {
+      id: true,
+      orgId: true,
+      stationSizeId: true,
+      nasIdentifier: true,
+      radiusClientIp: true,
+      nasMac: true,
+      stationSize: {
+        select: {
+          id: true,
+          tokenUsageScope: true,
+        },
+      },
     },
   },
 } as const;
@@ -202,6 +220,8 @@ export type CaptiveLoginCredential = Awaited<
 export type CaptiveLoginGuardOptions = {
   /** Client MAC from NAS redirect / x-calling-station-id (optional). */
   clientMac?: string | null;
+  /** Gateway redirect query params from the captive portal (site-lock). */
+  nasParams?: Record<string, unknown> | null;
 };
 
 /**
@@ -212,6 +232,7 @@ export type CaptiveLoginGuardOptions = {
  * - Same MAC already occupied → allow (reconnect).
  * - Other devices at maxDevices → DEVICE_LIMIT_REACHED.
  * - No client MAC but someone else online → RADIUS_SESSION_ACTIVE.
+ * - Capacity-tier tokenUsageScope SITE/TIER → request site must match (nasParams OR).
  */
 export async function runCaptiveLoginGuards(
   credential: NonNullable<CaptiveLoginCredential>,
@@ -221,6 +242,8 @@ export async function runCaptiveLoginGuards(
   if (!plan) {
     throw Object.assign(new Error('INVALID_CREDENTIAL'), { code: 'INVALID_CREDENTIAL' });
   }
+
+  await assertCaptiveTokenSiteScope(credential, options.nasParams);
 
   const userNameVariants = radiusUserNameVariants(credential);
   const clientMacNorm = normalizeCaptiveMac(options.clientMac);
@@ -269,6 +292,58 @@ export async function runCaptiveLoginGuards(
         data: { status: CredentialStatus.CONSUMED },
       });
       throw Object.assign(new Error('CREDENTIAL_CONSUMED'), { code: 'CREDENTIAL_CONSUMED' });
+    }
+  }
+}
+
+/**
+ * Enforce capacity-tier tokenUsageScope at captive login (clear portal message).
+ * Issuing site = Credential.stationId. ALL / missing station → no lock.
+ */
+async function assertCaptiveTokenSiteScope(
+  credential: NonNullable<CaptiveLoginCredential>,
+  nasParams: Record<string, unknown> | null | undefined,
+): Promise<void> {
+  if (!credential.stationId || !credential.station) {
+    return;
+  }
+
+  const scope =
+    credential.station.stationSize?.tokenUsageScope ?? StationTokenUsageScope.ALL;
+  if (scope === StationTokenUsageScope.ALL) {
+    return;
+  }
+
+  const resolved = await resolveRequestStationFromNasParams({
+    orgId: credential.orgId,
+    nasParams,
+    preferStationId: credential.stationId,
+  });
+
+  if (resolved.status === 'unknown') {
+    throw Object.assign(new Error('TOKEN_LOCATION_UNKNOWN'), {
+      code: 'TOKEN_LOCATION_UNKNOWN',
+    });
+  }
+  if (resolved.status === 'ambiguous') {
+    throw Object.assign(new Error('TOKEN_LOCATION_AMBIGUOUS'), {
+      code: 'TOKEN_LOCATION_AMBIGUOUS',
+    });
+  }
+
+  const requestStation = resolved.station;
+
+  if (scope === StationTokenUsageScope.SITE) {
+    if (requestStation.id !== credential.stationId) {
+      throw Object.assign(new Error('TOKEN_SITE_MISMATCH'), { code: 'TOKEN_SITE_MISMATCH' });
+    }
+    return;
+  }
+
+  if (scope === StationTokenUsageScope.TIER) {
+    const issuingSizeId = credential.station.stationSizeId;
+    if (!issuingSizeId || requestStation.stationSizeId !== issuingSizeId) {
+      throw Object.assign(new Error('TOKEN_SITE_MISMATCH'), { code: 'TOKEN_SITE_MISMATCH' });
     }
   }
 }

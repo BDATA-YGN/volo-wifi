@@ -146,3 +146,10 @@ enum LicenseChangeType {
   STATUS_CHANGE
   OTHER
 }
+
+/// Where Access Tokens sold under sites of this capacity tier may log in (captive).
+enum StationTokenUsageScope {
+  SITE
+  TIER
+  ALL
+}

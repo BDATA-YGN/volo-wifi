@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { Button, Drawer, Form, Input, InputNumber, Space, Switch, Typography } from "antd";
+import { Button, Drawer, Form, Input, InputNumber, Select, Space, Switch, Typography } from "antd";
 import type { CapacityTierFormValues, CapacityTierRecord } from "../types";
-import { TIER_CODE_PATTERN } from "../constant";
+import { TIER_CODE_PATTERN, TOKEN_USAGE_SCOPE_OPTIONS } from "../constant";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -36,10 +36,11 @@ const CapacityTierFormDrawer: React.FC<Props> = ({
         description: editing.description ?? "",
         sortOrder: editing.sortOrder,
         isActive: editing.isActive,
+        tokenUsageScope: editing.tokenUsageScope ?? "ALL",
       });
     } else {
       form.resetFields();
-      form.setFieldsValue({ sortOrder: 0, isActive: true });
+      form.setFieldsValue({ sortOrder: 0, isActive: true, tokenUsageScope: "ALL" });
     }
   }, [open, editing, form]);
 
@@ -105,6 +106,33 @@ const CapacityTierFormDrawer: React.FC<Props> = ({
 
         <Form.Item name="description" label="Description">
           <TextArea rows={3} placeholder="Low-capacity venue (e.g. café, small office)" maxLength={500} showCount />
+        </Form.Item>
+
+        <Form.Item
+          name="tokenUsageScope"
+          label="Token usage"
+          rules={[{ required: true, message: "Token usage is required" }]}
+          extra="SITE/TIER need each site’s Network tab to have at least one match field (NAS-Identifier, NAS IP, or NAS MAC). Any one redirect hit is enough."
+        >
+          <Select
+            options={TOKEN_USAGE_SCOPE_OPTIONS.map((o) => ({
+              value: o.value,
+              label: o.label,
+            }))}
+            optionRender={(option) => {
+              const meta = TOKEN_USAGE_SCOPE_OPTIONS.find((o) => o.value === option.value);
+              return (
+                <div>
+                  <div>{meta?.label ?? option.label}</div>
+                  {meta ? (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {meta.description}
+                    </Text>
+                  ) : null}
+                </div>
+              );
+            }}
+          />
         </Form.Item>
 
         <Form.Item

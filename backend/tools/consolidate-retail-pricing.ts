@@ -2,8 +2,9 @@
 /**
  * Backup + consolidate per-site retail price books into:
  *   - 1 org DEFAULT price book (modal prices)
- *   - wf_station_plan_offer rows (site sellable plans)
  *   - keep site override books only when prices differ from default
+ *
+ * Sellability is partner entitlements + resolvable price books (no station offer table).
  *
  * Usage (from backend/):
  *   yarn data:retail-pricing:backup -- --org=AA
@@ -86,17 +87,6 @@ async function consolidate(pool: Pool, orgId: string, orgCode: string, apply: bo
     [orgId]
   );
 
-  const stationLinks = await pool.query<{
-    price_book_id: string;
-    station_id: string;
-  }>(
-    `SELECT link.price_book_id, link.station_id
-     FROM wf_plan_price_book_station link
-     JOIN wf_plan_price_book b ON b.id = link.price_book_id
-     WHERE b.org_id = $1 AND b.deleted_at IS NULL`,
-    [orgId]
-  );
-
   const priceRows = await pool.query<{
     price_book_id: string;
     plan_id: string;
@@ -147,26 +137,12 @@ async function consolidate(pool: Pool, orgId: string, orgCode: string, apply: bo
   }
 
   const defaultByPlanId = new Map(defaultPrices.map((p) => [p.planId, p]));
-  const stationsByBook = new Map<string, string[]>();
-  for (const link of stationLinks.rows) {
-    const list = stationsByBook.get(link.price_book_id) ?? [];
-    list.push(link.station_id);
-    stationsByBook.set(link.price_book_id, list);
-  }
-
-  const offers: { stationId: string; planId: string }[] = [];
   const keepOverrideBookIds: string[] = [];
   const softDeleteBookIds: string[] = [];
 
   for (const book of siteBooks.rows) {
     const rows = pricesByBook.get(book.id) ?? [];
-    const stationIds = stationsByBook.get(book.id) ?? [];
-    for (const stationId of stationIds) {
-      for (const row of rows) {
-        offers.push({ stationId, planId: row.plan_id });
-      }
-    }
-    // Keep site book only when retail amounts differ from org default (catalog subset alone → offers).
+    // Keep site book only when retail amounts differ from org default.
     const differs = rows.some((row) => {
       const def = defaultByPlanId.get(row.plan_id);
       if (!def) return true;
@@ -176,19 +152,9 @@ async function consolidate(pool: Pool, orgId: string, orgCode: string, apply: bo
     else softDeleteBookIds.push(book.id);
   }
 
-  // Deduplicate offers
-  const offerKey = new Set<string>();
-  const uniqueOffers = offers.filter((o) => {
-    const k = `${o.stationId}:${o.planId}`;
-    if (offerKey.has(k)) return false;
-    offerKey.add(k);
-    return true;
-  });
-
   console.log(
     `Site books: ${siteBooks.rowCount} → soft-delete ${softDeleteBookIds.length}, keep overrides ${keepOverrideBookIds.length}`
   );
-  console.log(`Station plan offers to upsert: ${uniqueOffers.length}`);
 
   if (!apply) {
     console.log('Dry-run only. Re-run with --apply --i-understand to write.');
@@ -255,15 +221,6 @@ async function consolidate(pool: Pool, orgId: string, orgCode: string, apply: bo
       );
     }
 
-    for (const offer of uniqueOffers) {
-      await client.query(
-        `INSERT INTO wf_station_plan_offer (id, org_id, station_id, plan_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,NOW(),NOW())
-         ON CONFLICT (station_id, plan_id) DO UPDATE SET updated_at = NOW()`,
-        [crypto.randomUUID(), orgId, offer.stationId, offer.planId]
-      );
-    }
-
     if (softDeleteBookIds.length) {
       await client.query(
         `UPDATE wf_plan_price_book SET deleted_at = NOW(), updated_at = NOW(), is_default = false
@@ -309,13 +266,6 @@ async function main() {
   try {
     const org = await resolveOrg(pool, args.orgCode);
     console.log(`Org ${org.code} (${org.name})`);
-
-    // Ensure new tables/columns exist (idempotent migration SQL already applied in deploy)
-    await pool.query(`SELECT 1 FROM wf_station_plan_offer LIMIT 0`).catch(() => {
-      throw new Error(
-        'wf_station_plan_offer missing — apply migration 20260722050000_station_plan_offer_tier_pricebook first'
-      );
-    });
 
     if (args.mode === 'backup') {
       const backup = await exportBackup(pool, org.id, org.code);

@@ -10,15 +10,6 @@ function normalizeIp(ip: string | null | undefined): string | null {
   return value;
 }
 
-function isPrivateOrLoopback(ip: string): boolean {
-  if (ip === '127.0.0.1' || ip === 'localhost') return true;
-  if (ip.startsWith('10.')) return true;
-  if (ip.startsWith('192.168.')) return true;
-  const parts = ip.split('.').map(Number);
-  if (parts.length === 4 && parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  return false;
-}
-
 function readNasString(nasParams: Record<string, unknown> | null | undefined, keys: string[]): string | null {
   if (!nasParams) return null;
   for (const key of keys) {
@@ -29,29 +20,28 @@ function readNasString(nasParams: Record<string, unknown> | null | undefined, ke
 }
 
 /**
- * Resolve the WiFi client IP for captive portal audit/rate-limit logs.
- * Prefers proxy headers; falls back to NAS redirect params when the request
- * arrives via the Next.js `/portal-api` proxy (loopback/private hop).
+ * Resolve the WiFi client IP for captive portal session / audit / rate-limit.
+ *
+ * Prefer NAS redirect params (MikroTik `ip`, Ruijie `wlanuserip`, …) — that is
+ * the station client address. Request/proxy headers often show the portal
+ * server or edge hop (public Droplet IP), which must not win when NAS has a value.
  */
 export function resolveCaptiveClientIp(
   req: Request,
   nasParams?: Record<string, unknown> | null,
 ): string | null {
-  const fromRequest = normalizeIp(resolveClientIp(req));
-  if (fromRequest && !isPrivateOrLoopback(fromRequest)) {
-    return fromRequest;
-  }
-
-  const fromNas = readNasString(nasParams, [
-    'ip',
-    'wlanuserip',
-    'userip',
-    'user_ip',
-    'client_ip',
-  ]);
+  const fromNas = normalizeIp(
+    readNasString(nasParams, [
+      'ip',
+      'wlanuserip',
+      'userip',
+      'user_ip',
+      'client_ip',
+    ]),
+  );
   if (fromNas) return fromNas;
 
-  return fromRequest;
+  return normalizeIp(resolveClientIp(req));
 }
 
 export function resolveCaptiveClientMac(

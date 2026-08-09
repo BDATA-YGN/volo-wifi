@@ -16,7 +16,7 @@ import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 import { usePlaceTowns } from "@/features/system/places/usePlaceTowns";
 
 const { TextArea } = Input;
-const { Paragraph } = Typography;
+const { Paragraph, Text } = Typography;
 
 type Props = {
   open: boolean;
@@ -43,12 +43,10 @@ function buildSiteFormValues(
       address: editing.address ?? undefined,
       stationSizeId: editing.stationSizeId,
       status: editing.status,
-      portalBaseUrl: editing.portalBaseUrl ?? undefined,
       nasIdentifier: editing.nasIdentifier ?? undefined,
       radiusClientIp: editing.radiusClientIp ?? undefined,
-      vlanId: editing.vlanId ?? undefined,
+      nasMac: editing.nasMac ?? undefined,
       radiusVendorProfileId: editing.radiusVendorProfileId,
-      radiusSecret: undefined,
     };
   }
   return {
@@ -87,8 +85,17 @@ const SiteFormDrawer: React.FC<Props> = ({
 
   const handleFinish = async (values: SiteFormValues) => {
     const payload: SiteFormValues = {
-      ...values,
+      code: values.code,
+      name: values.name,
+      location: values.location,
       township: values.township?.trim() || null,
+      address: values.address,
+      stationSizeId: values.stationSizeId,
+      status: values.status,
+      nasIdentifier: values.nasIdentifier,
+      radiusClientIp: values.radiusClientIp,
+      nasMac: values.nasMac,
+      radiusVendorProfileId: values.radiusVendorProfileId,
     };
     if (editing) {
       await onUpdate(editing.id, payload);
@@ -188,12 +195,45 @@ const SiteFormDrawer: React.FC<Props> = ({
   const networkTab = (
     <>
       <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 16 }}>
-        Optional captive portal and RADIUS client hints. NAS devices can also be managed under
-        Network → NAS Devices.
+        Captive site-lock matching uses these fields against the gateway redirect (
+        <Text code>NASID</Text>, <Text code>nas_ip</Text>, <Text code>nas_mac</Text>
+        ). Any one match is enough — NAS-Identifier or NAS MAC alone qualifies. For Ruijie
+        presets without NASID, fill NAS IP and/or NAS MAC.
       </Paragraph>
 
-      <Form.Item name="portalBaseUrl" label="Portal base URL">
-        <Input placeholder="https://portal.example.com" />
+      <Form.Item
+        name="nasIdentifier"
+        label="NAS-Identifier"
+        extra="Optional. Match redirect NASID / nasid when the gateway sends it."
+      >
+        <Input placeholder="e.g. ANNAPC0001" />
+      </Form.Item>
+
+      <Form.Item
+        name="radiusClientIp"
+        label="NAS IP"
+        extra="Ruijie / MikroTik redirect nas_ip — also used as RADIUS client IP."
+      >
+        <Input placeholder="10.0.0.1" />
+      </Form.Item>
+
+      <Form.Item
+        name="nasMac"
+        label="NAS MAC"
+        extra="Ruijie redirect nas_mac (gateway MAC). Accepts aa:bb:… or aabb…."
+        rules={[
+          {
+            validator: async (_, value) => {
+              if (value == null || String(value).trim() === "") return;
+              const hex = String(value).toLowerCase().replace(/[^a-f0-9]/g, "");
+              if (hex.length !== 12) {
+                throw new Error("NAS MAC must be a 12-digit hex address");
+              }
+            },
+          },
+        ]}
+      >
+        <Input placeholder="aa:bb:cc:dd:ee:ff" />
       </Form.Item>
 
       <Form.Item name="radiusVendorProfileId" label="RADIUS vendor profile">
@@ -207,30 +247,6 @@ const SiteFormDrawer: React.FC<Props> = ({
             label: p.model ? `${p.name} (${p.vendor} ${p.model})` : `${p.name} (${p.vendor})`,
           }))}
         />
-      </Form.Item>
-
-      <Form.Item name="nasIdentifier" label="NAS-Identifier">
-        <Input placeholder="Optional RADIUS NAS-Identifier" />
-      </Form.Item>
-
-      <Form.Item name="radiusClientIp" label="RADIUS client IP">
-        <Input placeholder="10.0.0.1" />
-      </Form.Item>
-
-      <Form.Item name="vlanId" label="VLAN ID">
-        <Input placeholder="Optional" />
-      </Form.Item>
-
-      <Form.Item
-        name="radiusSecret"
-        label="RADIUS shared secret"
-        extra={
-          editing?.hasRadiusSecret
-            ? "Leave blank to keep the existing secret."
-            : "Stored encrypted at rest when configured."
-        }
-      >
-        <Input.Password placeholder={editing?.hasRadiusSecret ? "••••••••" : "Optional"} />
       </Form.Item>
     </>
   );

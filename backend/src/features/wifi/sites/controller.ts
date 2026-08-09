@@ -28,6 +28,7 @@ const stationSelect = {
   portalBaseUrl: true,
   nasIdentifier: true,
   radiusClientIp: true,
+  nasMac: true,
   radiusSecret: true,
   vlanId: true,
   radiusVendorProfileId: true,
@@ -122,6 +123,7 @@ function buildListWhere(
       { address: { contains: search, mode: 'insensitive' } },
       { nasIdentifier: { contains: search, mode: 'insensitive' } },
       { radiusClientIp: { contains: search, mode: 'insensitive' } },
+      { nasMac: { contains: search, mode: 'insensitive' } },
       { stationSize: { code: { contains: search, mode: 'insensitive' } } },
       { stationSize: { name: { contains: search, mode: 'insensitive' } } },
     ];
@@ -471,6 +473,7 @@ export class SitesController {
             ...(value.radiusClientIp !== undefined
               ? { radiusClientIp: value.radiusClientIp || null }
               : {}),
+            ...(value.nasMac !== undefined ? { nasMac: value.nasMac || null } : {}),
             ...(value.radiusSecret !== undefined
               ? { radiusSecret: value.radiusSecret || null }
               : {}),
@@ -535,6 +538,7 @@ export class SitesController {
           portalBaseUrl: value.portalBaseUrl || null,
           nasIdentifier: value.nasIdentifier || null,
           radiusClientIp: value.radiusClientIp || null,
+          nasMac: value.nasMac || null,
           radiusSecret: value.radiusSecret || null,
           vlanId: value.vlanId || null,
           radiusVendorProfileId: value.radiusVendorProfileId ?? null,

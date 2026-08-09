@@ -10,7 +10,7 @@ export {
   InvalidPayloadException,
   type InvalidPayloadDetail,
 } from './exception';
-export { resolveClientIp, resolveUserAgent } from './request-ip';
+export { resolveClientIp, resolveRequestClientIp, resolveUserAgent, isValidClientIp } from './request-ip';
 export { isUndefinedOrUndefinedString } from './string-utils';
 export { hashPassword, comparePassword } from './password';
 export { JwtService } from './jwt';

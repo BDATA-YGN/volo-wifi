@@ -31,17 +31,32 @@ const IssueTokenDrawer: React.FC<Props> = ({ open, saving, catalog, onClose, onI
     [catalog?.plans, planId]
   );
 
-  const unitPrice = selectedPlan?.unitPrice ?? null;
-  const lineTotal = calcLineTotal(unitPrice, quantity, discount);
   const currency = catalog?.currency ?? "MMK";
 
-  const pricedPlans = (catalog?.plans ?? []).filter((p) => p.hasPricing);
+  const pricedPlansForSite = useMemo(() => {
+    const plans = catalog?.plans ?? [];
+    if (!stationId) return plans.filter((p) => p.hasPricing);
+    return plans.filter((p) => p.pricesByStation?.[stationId] != null);
+  }, [catalog?.plans, stationId]);
+
+  const unitPrice =
+    stationId && selectedPlan?.pricesByStation?.[stationId] != null
+      ? selectedPlan.pricesByStation[stationId]!
+      : (selectedPlan?.unitPrice ?? null);
+  const lineTotal = calcLineTotal(unitPrice, quantity, discount);
+
   const formValues: IssueTokenFormValues = {
     quantity: 1,
     paymentMethod: "CASH" as PaymentMethod,
     discount: 0,
     stationId: catalog?.stations[0]?.id ?? "",
-    planId: pricedPlans[0]?.id ?? "",
+    planId: (() => {
+      const siteId = catalog?.stations[0]?.id;
+      const first = (catalog?.plans ?? []).find((p) =>
+        siteId ? p.pricesByStation?.[siteId] != null : p.hasPricing
+      );
+      return first?.id ?? "";
+    })(),
   };
   useDrawerFormSync(form, open, formValues, catalog ? `issue-${catalog.stations[0]?.id ?? "x"}` : "issue");
 
@@ -98,6 +113,9 @@ const IssueTokenDrawer: React.FC<Props> = ({ open, saving, catalog, onClose, onI
               value: s.id,
               label: `${s.code} — ${s.name}`,
             }))}
+            onChange={() => {
+              form.setFieldValue("planId", undefined);
+            }}
           />
         </Form.Item>
 
@@ -106,15 +124,17 @@ const IssueTokenDrawer: React.FC<Props> = ({ open, saving, catalog, onClose, onI
           label="Service plan"
           rules={[{ required: true, message: "Plan is required" }]}
           extra={
-            selectedPlan?.unitPrice != null
-              ? `Unit price: ${formatMoney(selectedPlan.unitPrice, currency)}`
-              : "No price configured for this plan"
+            unitPrice != null
+              ? `Unit price: ${formatMoney(unitPrice, currency)}`
+              : pricedPlansForSite.length === 0
+                ? "No priced plans for this site on the winning price book (reseller → site → org default)"
+                : "No price configured for this plan"
           }
         >
           <Select
             showSearch
             optionFilterProp="label"
-            options={pricedPlans.map((p) => ({
+            options={pricedPlansForSite.map((p) => ({
               value: p.id,
               label: `${p.code} — ${p.name}`,
             }))}

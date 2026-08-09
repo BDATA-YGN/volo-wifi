@@ -1,3 +1,5 @@
+export type CapacityTierTokenUsageScope = "SITE" | "TIER" | "ALL";
+
 export type CapacityTierRecord = {
   id: string;
   code: string;
@@ -5,6 +7,7 @@ export type CapacityTierRecord = {
   description: string | null;
   sortOrder: number;
   isActive: boolean;
+  tokenUsageScope: CapacityTierTokenUsageScope;
   createdAt: string;
   updatedAt: string;
   _count: {
@@ -20,6 +23,7 @@ export type CapacityTierFormValues = {
   description?: string;
   sortOrder: number;
   isActive: boolean;
+  tokenUsageScope: CapacityTierTokenUsageScope;
 };
 
 export type CapacityTiersMeta = {

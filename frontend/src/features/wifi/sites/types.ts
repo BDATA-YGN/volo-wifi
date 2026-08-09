@@ -52,6 +52,7 @@ export type SiteRecord = {
   portalBaseUrl: string | null;
   nasIdentifier: string | null;
   radiusClientIp: string | null;
+  nasMac: string | null;
   vlanId: string | null;
   radiusVendorProfileId: string | null;
   isBillable: boolean;
@@ -74,6 +75,7 @@ export type SiteFormValues = {
   portalBaseUrl?: string;
   nasIdentifier?: string;
   radiusClientIp?: string;
+  nasMac?: string;
   radiusSecret?: string;
   vlanId?: string;
   radiusVendorProfileId?: string | null;

@@ -14,6 +14,7 @@ import {
   resolveResellerContext,
   type ResellerContext,
 } from '@/features/wifi/commerce/shared/resolve-reseller';
+import { loadPricingReadiness } from '@/features/wifi/commerce/shared/resolve-retail-price';
 import { startOfAppDay, APP_TIMEZONE } from '@/utils/app-time';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -43,86 +44,6 @@ function startOfAppMonth(date = new Date()): Date {
     .tz(process.env.TZ || APP_TIMEZONE)
     .startOf('month')
     .toDate();
-}
-
-async function loadPricingReadiness(
-  prisma: PrismaClient,
-  orgId: string,
-  resellerId: string,
-  entitledPlanIds: string[],
-  stationIds: string[]
-): Promise<{ pricedPlanCount: number; hasPricing: boolean }> {
-  if (entitledPlanIds.length === 0) {
-    return { pricedPlanCount: 0, hasPricing: false };
-  }
-
-  const books = await prisma.planPriceBook.findMany({
-    where: {
-      orgId,
-      deletedAt: null,
-      OR: [
-        { resellers: { some: { resellerId } } },
-        ...(stationIds.length > 0
-          ? [{ stations: { some: { stationId: { in: stationIds } } } }]
-          : []),
-        { isDefault: true },
-      ],
-    },
-    select: {
-      id: true,
-      isDefault: true,
-      stations: { select: { stationId: true } },
-      resellers: { select: { resellerId: true } },
-    },
-  });
-
-  const bookIds = books.map((b) => b.id);
-  if (bookIds.length === 0) {
-    return { pricedPlanCount: 0, hasPricing: false };
-  }
-
-  const pricedPlans = await prisma.planPrice.findMany({
-    where: {
-      orgId,
-      deletedAt: null,
-      isActive: true,
-      priceBookId: { in: bookIds },
-      planId: { in: entitledPlanIds },
-    },
-    select: { planId: true, priceBookId: true },
-  });
-
-  const resellerBookIds = new Set(
-    books.filter((b) => b.resellers.some((r) => r.resellerId === resellerId)).map((b) => b.id)
-  );
-  const siteBookIds = new Set(
-    books
-      .filter((b) => b.stations.some((s) => stationIds.includes(s.stationId)))
-      .map((b) => b.id)
-  );
-  const defaultBookIds = new Set(books.filter((b) => b.isDefault).map((b) => b.id));
-
-  // Priority: Reseller → Site → Organization default (same as sell-time resolution)
-  const covered = new Set<string>();
-  for (const planId of entitledPlanIds) {
-    const rows = pricedPlans.filter((p) => p.planId === planId);
-    if (rows.some((r) => resellerBookIds.has(r.priceBookId))) {
-      covered.add(planId);
-      continue;
-    }
-    if (rows.some((r) => siteBookIds.has(r.priceBookId))) {
-      covered.add(planId);
-      continue;
-    }
-    if (rows.some((r) => defaultBookIds.has(r.priceBookId))) {
-      covered.add(planId);
-    }
-  }
-
-  return {
-    pricedPlanCount: covered.size,
-    hasPricing: covered.size > 0,
-  };
 }
 
 async function buildDashboard(
@@ -246,8 +167,10 @@ async function buildDashboard(
   const planCount = reseller.planEntitlements.length;
   const hasSites = stationCount > 0;
   const hasPlans = planCount > 0;
-  const hasPricing = pricing.hasPricing && pricing.pricedPlanCount >= planCount;
+  // Org default alone is enough — do not require every entitled plan or a site book.
+  const hasPricing = pricing.hasPricing;
   const canSellTokens = hasSites && hasPlans && hasPricing && reseller.status === 'ACTIVE';
+  const pricedPlanIdSet = new Set(pricing.pricedPlanIds);
 
   return {
     mode,
@@ -270,6 +193,7 @@ async function buildDashboard(
     plans: reseller.planEntitlements.map((pe) => ({
       entitlementId: pe.id,
       ...pe.plan,
+      hasPricing: pricedPlanIdSet.has(pe.planId),
     })),
     stats: {
       stationCount,
@@ -286,7 +210,10 @@ async function buildDashboard(
       hasSites,
       hasPlans,
       hasPricing,
+      hasDefaultBook: pricing.hasDefaultBook,
       pricedPlanCount: pricing.pricedPlanCount,
+      planCount,
+      priceScope: pricing.priceScope,
       canSellTokens,
     },
     recentOrders: recentOrders.map((o) => ({

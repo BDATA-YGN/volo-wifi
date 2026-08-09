@@ -40,7 +40,6 @@ model Plan {
   yearlyStats     YearlySalesStat[]
   dailyRadiusUsageStats DailyRadiusUsageStat[]
   resellerEntitlements ResellerPlanEntitlement[]
-  stationPlanOffers    StationPlanOffer[]
 
   createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
   updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt

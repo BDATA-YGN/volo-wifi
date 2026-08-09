@@ -9,6 +9,7 @@ import {
   partnerApiClient,
   partnerSessionBootstrapApiClient,
 } from "@/lib/restapi/apiClient";
+import { resolveServerActionClientIp } from "@/lib/restapi/server-actions";
 import { COMMERCE_PARTNERS_WORKSPACE_API } from "@/features/wifi/commerce/partners/workspace/constant";
 import { cookies } from "next/headers";
 
@@ -94,9 +95,14 @@ export async function partnerPrepareLogin(): Promise<PartnerLoginPrep> {
  */
 export async function partnerSignIn(input: LoginInput): Promise<PartnerLoginResult> {
   try {
+    const clientIp = input.clientIp ?? (await resolveServerActionClientIp());
     const loginRes: any = await partnerSessionBootstrapApiClient.post(
       AUTH_API_ROUTES.login(input.username, input.password),
-      input
+      {
+        username: input.username,
+        password: input.password,
+        ...(clientIp ? { clientIp } : {}),
+      }
     );
 
     // Same server-action: freshly set cookies may not be readable via cookies().get yet.

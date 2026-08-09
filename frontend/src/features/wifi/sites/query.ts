@@ -62,6 +62,7 @@ export const create = async (payload: SiteFormValues, orgId?: string): Promise<C
         portalBaseUrl: payload.portalBaseUrl?.trim() || null,
         nasIdentifier: payload.nasIdentifier?.trim() || null,
         radiusClientIp: payload.radiusClientIp?.trim() || null,
+        nasMac: payload.nasMac?.trim() || null,
         radiusSecret: payload.radiusSecret?.trim() || null,
         vlanId: payload.vlanId?.trim() || null,
       },

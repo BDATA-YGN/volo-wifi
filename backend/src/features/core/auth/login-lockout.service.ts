@@ -96,8 +96,15 @@ export async function recordFailedLoginAttempt(
   username: string,
   req: Request,
   policy: LoginLockPolicy,
+  clientIp?: string | null,
 ): Promise<void> {
-  await recordLogin({ userId: adminId, userEmail: username, type: 'LOGIN_FAILED', req });
+  await recordLogin({
+    userId: adminId,
+    userEmail: username,
+    type: 'LOGIN_FAILED',
+    req,
+    ipAddress: clientIp,
+  });
 
   const failures = await countRecentFailedAttempts(adminId, policy.windowMs);
   if (failures < policy.maxAttempts) {
@@ -109,6 +116,12 @@ export async function recordFailedLoginAttempt(
     } satisfies LoginLockErrorDetails);
   }
 
-  await recordLogin({ userId: adminId, userEmail: username, type: 'ACCOUNT_LOCKED', req });
+  await recordLogin({
+    userId: adminId,
+    userEmail: username,
+    type: 'ACCOUNT_LOCKED',
+    req,
+    ipAddress: clientIp,
+  });
   await assertLoginNotLocked(adminId, policy);
 }

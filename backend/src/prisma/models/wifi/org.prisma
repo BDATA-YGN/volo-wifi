@@ -71,7 +71,6 @@ model Org {
   memberStations             OrgMemberStation[]
   resellerPlanEntitlements   ResellerPlanEntitlement[]
   resellerStations           ResellerStation[]
-  stationPlanOffers          StationPlanOffer[]
   orgLicenseStationSizePrices OrgLicenseStationSizePrice[]
   finSettlementLines         RptFinSettlementLine[]
   finAttestations            RptFinAttestation[]

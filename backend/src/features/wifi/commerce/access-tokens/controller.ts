@@ -16,6 +16,7 @@ import {
   resolveResellerContext,
   resolveRoleScopedReseller,
 } from '@/features/wifi/commerce/shared/resolve-reseller';
+import { resolveRetailPrice } from '@/features/wifi/commerce/shared/resolve-retail-price';
 import {
   CAPTIVE_SESSION_PREVIEW_LIMIT,
   RADIUS_SESSION_PREVIEW_LIMIT,
@@ -485,99 +486,6 @@ function queryResellerParams(query: AuthenticatedRequest['query']) {
     orgId: typeof query.orgId === 'string' ? query.orgId : undefined,
     resellerId: typeof query.resellerId === 'string' ? query.resellerId : undefined,
   };
-}
-
-async function resolveRetailPrice(
-  prisma: PrismaClient,
-  orgId: string,
-  resellerId: string,
-  stationId: string,
-  planId: string
-): Promise<{ price: Prisma.Decimal; priceBookId: string } | null> {
-  const station = await prisma.wifiStation.findFirst({
-    where: { id: stationId, orgId, deletedAt: null },
-    select: { id: true, stationSizeId: true },
-  });
-  if (!station) return null;
-
-  // Empty allow-list = all plans; otherwise plan must be offered at this site.
-  const offerCount = await prisma.stationPlanOffer.count({
-    where: { orgId, stationId },
-  });
-  if (offerCount > 0) {
-    const offered = await prisma.stationPlanOffer.findFirst({
-      where: { orgId, stationId, planId },
-      select: { id: true },
-    });
-    if (!offered) return null;
-  }
-
-  const books = await prisma.planPriceBook.findMany({
-    where: {
-      orgId,
-      deletedAt: null,
-      OR: [
-        { stations: { some: { stationId } } },
-        { resellers: { some: { resellerId } } },
-        { stationSizeId: station.stationSizeId },
-        { isDefault: true },
-      ],
-    },
-    select: {
-      id: true,
-      isDefault: true,
-      stationSizeId: true,
-      stations: { select: { stationId: true } },
-      resellers: { select: { resellerId: true } },
-    },
-  });
-
-  const bookIds = books.map((b) => b.id);
-  if (bookIds.length === 0) return null;
-
-  const prices = await prisma.planPrice.findMany({
-    where: {
-      orgId,
-      deletedAt: null,
-      isActive: true,
-      planId,
-      priceBookId: { in: bookIds },
-    },
-    select: { retailPrice: true, priceBookId: true },
-  });
-
-  // Priority: Reseller override → Site override → Station-size → Organization default
-  const resellerBook = books.find((b) => b.resellers.some((r) => r.resellerId === resellerId));
-  if (resellerBook) {
-    const match = prices.find((p) => p.priceBookId === resellerBook.id);
-    if (match) return { price: match.retailPrice, priceBookId: resellerBook.id };
-  }
-
-  const stationBook = books.find((b) => b.stations.some((s) => s.stationId === stationId));
-  if (stationBook) {
-    const match = prices.find((p) => p.priceBookId === stationBook.id);
-    if (match) return { price: match.retailPrice, priceBookId: stationBook.id };
-  }
-
-  const tierBook = books.find(
-    (b) =>
-      b.stationSizeId === station.stationSizeId &&
-      b.stations.length === 0 &&
-      b.resellers.length === 0 &&
-      !b.isDefault
-  );
-  if (tierBook) {
-    const match = prices.find((p) => p.priceBookId === tierBook.id);
-    if (match) return { price: match.retailPrice, priceBookId: tierBook.id };
-  }
-
-  const defaultBook = books.find((b) => b.isDefault);
-  if (defaultBook) {
-    const match = prices.find((p) => p.priceBookId === defaultBook.id);
-    if (match) return { price: match.retailPrice, priceBookId: defaultBook.id };
-  }
-
-  return null;
 }
 
 async function loadSellableCatalog(

@@ -5,7 +5,7 @@ import { cookies, headers } from "next/headers";
 import setCookie from 'set-cookie-parser';
 import { AxiosResponse } from 'axios';
 import { cookieNamesForAuthApp, type AuthApp } from '@/lib/auth/cookies';
-import { buildForwardedClientHeaderRecord } from '@/lib/http/client-ip';
+import { buildForwardedClientHeaderRecord, resolveHeadersClientIp } from '@/lib/http/client-ip';
 
 /**
  * Headers we pull off the incoming Next.js request so the Express backend can
@@ -21,6 +21,19 @@ export async function getForwardedClientHeaders(): Promise<Record<string, string
   } catch {
     // `headers()` throws when there is no active request (e.g. during build).
     return {};
+  }
+}
+
+/**
+ * Browser client IP as seen by Next.js (edge/proxy headers). Sent in login body
+ * as `clientIp` so Express prefers it over the Next→API hop address.
+ */
+export async function resolveServerActionClientIp(): Promise<string | null> {
+  try {
+    const h = await headers();
+    return resolveHeadersClientIp(h);
+  } catch {
+    return null;
   }
 }
 

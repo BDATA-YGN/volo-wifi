@@ -6,7 +6,7 @@ import { Button, Dropdown, Table, Tag, Tooltip, Typography, theme } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DeleteOutlined, EditOutlined, LinkOutlined, MoreOutlined } from "@ant-design/icons";
 import type { CapacityTierRecord } from "../types";
-import { resolveTierColor } from "../constant";
+import { resolveTierColor, TOKEN_USAGE_SCOPE_LABEL } from "../constant";
 
 const { Text } = Typography;
 
@@ -68,6 +68,14 @@ const CapacityTiersTable: React.FC<Props> = ({
             </div>
           ) : null}
         </div>
+      ),
+    },
+    {
+      title: "Token usage",
+      dataIndex: "tokenUsageScope",
+      width: 120,
+      render: (scope: string | undefined) => (
+        <Text style={{ fontSize: 13 }}>{TOKEN_USAGE_SCOPE_LABEL[scope ?? "ALL"] ?? scope ?? "All sites"}</Text>
       ),
     },
     {

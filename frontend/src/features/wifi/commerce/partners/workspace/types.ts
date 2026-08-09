@@ -20,6 +20,8 @@ export type WorkspaceStation = {
   assignedAt: string;
 };
 
+export type WorkspacePriceScope = "RESELLER" | "STATION" | "STATION_SIZE" | "DEFAULT";
+
 export type WorkspacePlan = {
   entitlementId: string;
   id: string;
@@ -27,6 +29,8 @@ export type WorkspacePlan = {
   name: string;
   quotaType: string;
   isActive: boolean;
+  /** True when the winning price book (reseller → site → org) has an active price. */
+  hasPricing?: boolean;
 };
 
 export type WorkspaceRecentOrder = {
@@ -57,7 +61,12 @@ export type WorkspaceReadiness = {
   hasSites: boolean;
   hasPlans: boolean;
   hasPricing: boolean;
+  /** Org-level default price book exists (site/reseller override not required). */
+  hasDefaultBook?: boolean;
   pricedPlanCount: number;
+  planCount?: number;
+  /** Winning retail scope for this partner's mapped sites. */
+  priceScope?: WorkspacePriceScope | null;
   canSellTokens: boolean;
 };
 

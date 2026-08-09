@@ -100,28 +100,14 @@ const SiteDetailDrawer: React.FC<Props> = ({
               <Descriptions.Item label="Capacity tier">
                 {row.stationSize.name} ({row.stationSize.code})
               </Descriptions.Item>
-              <Descriptions.Item label="Portal URL">
-                {row.portalBaseUrl ? (
-                  <a href={row.portalBaseUrl} target="_blank" rel="noreferrer">
-                    {row.portalBaseUrl}
-                  </a>
-                ) : (
-                  "—"
-                )}
-              </Descriptions.Item>
               <Descriptions.Item label="Vendor profile">
                 {row.radiusVendorProfile
                   ? `${row.radiusVendorProfile.name} (${row.radiusVendorProfile.vendor})`
                   : "—"}
               </Descriptions.Item>
               <Descriptions.Item label="NAS-Identifier">{row.nasIdentifier ?? "—"}</Descriptions.Item>
-              <Descriptions.Item label="RADIUS client IP">
-                {row.radiusClientIp ?? "—"}
-              </Descriptions.Item>
-              <Descriptions.Item label="VLAN">{row.vlanId ?? "—"}</Descriptions.Item>
-              <Descriptions.Item label="RADIUS secret">
-                {row.hasRadiusSecret ? "Configured" : "—"}
-              </Descriptions.Item>
+              <Descriptions.Item label="NAS IP">{row.radiusClientIp ?? "—"}</Descriptions.Item>
+              <Descriptions.Item label="NAS MAC">{row.nasMac ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Devices">{row._count?.devices ?? 0}</Descriptions.Item>
               <Descriptions.Item label="Credentials">{row._count?.credentials ?? 0}</Descriptions.Item>
               <Descriptions.Item label="Site ID">

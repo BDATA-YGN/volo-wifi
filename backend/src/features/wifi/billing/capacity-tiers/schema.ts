@@ -2,6 +2,8 @@ import Joi from 'joi';
 
 const codePattern = /^[A-Z][A-Z0-9_]{0,31}$/;
 
+const tokenUsageScope = Joi.string().valid('SITE', 'TIER', 'ALL');
+
 const tierFields = {
   code: Joi.string()
     .trim()
@@ -12,6 +14,7 @@ const tierFields = {
   description: Joi.string().trim().max(500).allow('', null),
   sortOrder: Joi.number().integer().min(0).max(9999),
   isActive: Joi.boolean(),
+  tokenUsageScope,
 };
 
 export const BillingCapacityTiersCreateSchema = Joi.object({
@@ -21,6 +24,7 @@ export const BillingCapacityTiersCreateSchema = Joi.object({
   description: tierFields.description.optional(),
   sortOrder: tierFields.sortOrder.default(0),
   isActive: tierFields.isActive.default(true),
+  tokenUsageScope: tokenUsageScope.default('ALL'),
 }).unknown(false);
 
 export const BillingCapacityTiersUpdateSchema = Joi.object({
@@ -30,6 +34,7 @@ export const BillingCapacityTiersUpdateSchema = Joi.object({
   description: tierFields.description.optional(),
   sortOrder: tierFields.sortOrder.optional(),
   isActive: tierFields.isActive.optional(),
+  tokenUsageScope: tokenUsageScope.optional(),
 })
   .min(1)
   .unknown(false);

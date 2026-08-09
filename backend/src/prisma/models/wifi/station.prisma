@@ -17,11 +17,14 @@ model WifiStation {
   stationSizeId String      @map("station_size_id")
   stationSize   StationSize @relation(fields: [stationSizeId], references: [id], onDelete: Restrict, onUpdate: NoAction)
 
-  // Captive portal / NAS settings
-  portalBaseUrl  String? // e.g. https://portal.example.com @map("portal_base_url")
-  nasIdentifier  String? // NAS-Identifier (if you use) @map("nas_identifier")
-  radiusClientIp String? // The NAS IP as seen by RADIUS @map("radius_client_ip")
-  radiusSecret   String? // (optional) if you manage shared secret centrally @map("radius_secret")
+  // Captive portal / NAS settings (site-lock: NASID / nas_ip / nas_mac)
+  // Live DB column names are camelCase for these legacy fields.
+  portalBaseUrl  String? @map("portalBaseUrl")
+  nasIdentifier  String? @map("nasIdentifier")
+  radiusClientIp String? @map("radiusClientIp")
+  /// Gateway MAC from Ruijie redirect `nas_mac`.
+  nasMac         String? @map("nasMac")
+  radiusSecret   String? @map("radiusSecret")
   vlanId         String? @map("vlan_id")
 
   // Link to Admin account for portal login
@@ -55,7 +58,6 @@ model WifiStation {
   resellerStations    ResellerStation[]
   memberRoles         OrgMemberRole[]
   memberStationScopes OrgMemberStation[]
-  planOffers          StationPlanOffer[]
 
   createdAt DateTime @db.Timestamptz(3) @map("created_at")  @default(now())
   updatedAt DateTime @db.Timestamptz(3) @map("updated_at")  @updatedAt
@@ -65,26 +67,10 @@ model WifiStation {
   @@index([orgId, status], map: "idx_wf_station__org_id__status")
   @@index([stationSizeId], map: "idx_wf_station__station_size_id")
   @@index([radiusVendorProfileId], map: "idx_wf_station__radius_vendor_profile_id")
+  @@index([orgId, nasIdentifier], map: "idx_wf_station__org_id__nas_identifier")
+  @@index([orgId, radiusClientIp], map: "idx_wf_station__org_id__radius_client_ip")
+  @@index([orgId, nasMac], map: "idx_wf_station__org_id__nas_mac")
   @@map("wf_station")
-}
-
-/// Which service plans a site may sell. Empty for a site = all org plans that have a resolvable price.
-model StationPlanOffer {
-  id        String      @id @default(uuid()) @map("id")
-  orgId     String      @map("org_id")
-  org       Org         @relation(fields: [orgId], references: [id], onDelete: Restrict)
-  stationId String      @map("station_id")
-  station   WifiStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
-  planId    String      @map("plan_id")
-  plan      Plan        @relation(fields: [planId], references: [id], onDelete: Restrict)
-
-  createdAt DateTime @db.Timestamptz(3) @map("created_at") @default(now())
-  updatedAt DateTime @db.Timestamptz(3) @map("updated_at") @updatedAt
-
-  @@unique([stationId, planId], map: "uq_wf_station_plan_offer__station_id__plan_id")
-  @@index([orgId, stationId], map: "idx_wf_station_plan_offer__org_id__station_id")
-  @@index([orgId, planId], map: "idx_wf_station_plan_offer__org_id__plan_id")
-  @@map("wf_station_plan_offer")
 }
 
 model StationDevice {

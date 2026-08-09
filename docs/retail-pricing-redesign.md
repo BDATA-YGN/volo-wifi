@@ -24,27 +24,21 @@ Reseller “which plans can this partner sell?” already exists as **`ResellerP
 
 ## Target model (recommended)
 
-Split **price** from **catalog allow-list**:
-
 ```
-Price resolution (most specific wins)
-  1. Site price override book     (rare)
-  2. Reseller price override book (partner-specific amounts)
+Price resolution (winner-takes-all scope)
+  1. Reseller price override book (if partner is linked to a book)
+  2. Site price override book     (if site is linked to a book)
   3. Capacity-tier price book     (optional: SMALL/MEDIUM/LARGE list prices)
   4. Org default price book       (canonical retail/cost per plan)
 
 Sellability filters (AND)
-  • ResellerPlanEntitlement     — partner may sell these plans
-  • StationPlanOffer            — site may sell these plans
-       empty for a site = all org active plans that have a resolvable price
-  • Resolved price must exist
+  • ResellerPlanEntitlement — partner may sell these plans
+  • Resolved price must exist on the winning book
 ```
 
 ### Capacity tiers
 
 Use **tier price books** for shared list prices (e.g. Medium sites share one MMK list), not one book per station.
-
-Per-site differences that are only “which plans” belong in **`StationPlanOffer`**, not another full price matrix.
 
 ### UI
 
@@ -55,11 +49,10 @@ Select / read-only fields must show **`name (code)`**, never raw UUIDs.
 1. **Backup** `wf_plan_price_book` + `wf_plan_price` → `backend/tmp/retail-pricing-backup-*.json`
 2. Build **one org DEFAULT** book with modal prices per plan (from current site books):
    - P00 → 0, P01 → 2000, P02 → 0, P03 → 0 (majority) or keep outliers as site overrides, PLNA94 → 5000
-3. For each former site book, write **StationPlanOffer** rows for that site’s plan set
-4. Soft-delete redundant site price books (keep only true price outliers as site overrides)
-5. Keep / add reseller books only when partner list prices differ
+3. Soft-delete redundant site price books (keep only true price outliers as site overrides)
+4. Keep / add reseller books only when partner list prices differ
 
-Expected shape after: **~1 default (+ optional tier/reseller/outlier site books)** instead of **84** site clones, with sellability preserved via offers + partner entitlements.
+Expected shape after: **~1 default (+ optional tier/reseller/outlier site books)** instead of **84** site clones, with sellability via partner entitlements + resolvable prices.
 
 ## Tooling
 

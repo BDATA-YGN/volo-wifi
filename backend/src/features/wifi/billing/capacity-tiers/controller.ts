@@ -19,6 +19,7 @@ const tierSelect = {
   description: true,
   sortOrder: true,
   isActive: true,
+  tokenUsageScope: true,
   createdAt: true,
   updatedAt: true,
   _count: {
@@ -172,6 +173,9 @@ export class BillingCapacityTiersController {
               : {}),
             ...(value.sortOrder !== undefined ? { sortOrder: value.sortOrder } : {}),
             ...(value.isActive !== undefined ? { isActive: value.isActive } : {}),
+            ...(value.tokenUsageScope !== undefined
+              ? { tokenUsageScope: value.tokenUsageScope }
+              : {}),
           },
           select: tierSelect,
         });
@@ -197,6 +201,7 @@ export class BillingCapacityTiersController {
           description: value.description || null,
           sortOrder: value.sortOrder ?? 0,
           isActive: value.isActive ?? true,
+          tokenUsageScope: value.tokenUsageScope ?? 'ALL',
         },
         select: tierSelect,
       });

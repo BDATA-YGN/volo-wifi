@@ -16,6 +16,12 @@ export const captiveErrors = {
     'ဤ plan အတွက် သတ်မှတ်ထားသော အချိန်ကျော်လွန်လားပါယာ။ Login မလုပ်နိုင်ပါယာ။',
   DEVICE_LIMIT_REACHED:
     'ချိတ်ဆက်နိုင်သော ဖုန်း အရေအတွက် ပြည့်နီပါရေ။ အခြား ဖုန်း တစ်ခုကို ဖြုတ်ပြီးမှ ဝင်ပါ။',
+  TOKEN_SITE_MISMATCH:
+    'ဤ code သည် အခြား ဆိုင်အတွက် ဖြစ်ပါရေ။ ဤဆိုင်တွင် အသုံးမပြုနိုင်ပါ။',
+  TOKEN_LOCATION_UNKNOWN:
+    'ဆိုင် တည်နေရာ အတည်မပြုနိုင်ပါ။ ဝိုင်ဖိုင် ပြန်ချိတ်ပြီးမှ ကြိုးစားပါ။',
+  TOKEN_LOCATION_AMBIGUOUS:
+    'ဆိုင် တည်နေရာ မရှင်းလင်းပါ။ ဆိုင်မှ အကူအညီ တောင်းပါ။',
   NO_TIME_REMAINING: 'သင့် plan တွင် အချိန် မကျန်တော့ပါ။',
   NO_DATA_REMAINING: 'သင့် plan တွင် Data မကျန်တော့ပါ။',
   UNAUTHORIZED: 'Authentication လိုအပ်ပါရေ။',

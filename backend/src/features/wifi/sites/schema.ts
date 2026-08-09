@@ -18,6 +18,20 @@ const stationFields = {
   portalBaseUrl: Joi.string().trim().max(500).allow('', null),
   nasIdentifier: Joi.string().trim().max(128).allow('', null),
   radiusClientIp: Joi.string().trim().max(45).allow('', null),
+  /** Ruijie redirect `nas_mac` — stored lowercase hex with optional separators stripped to colon form. */
+  nasMac: Joi.string()
+    .trim()
+    .max(32)
+    .allow('', null)
+    .custom((value, helpers) => {
+      if (value == null || value === '') return null;
+      const hex = String(value).toLowerCase().replace(/[^a-f0-9]/g, '');
+      if (hex.length !== 12) {
+        return helpers.error('any.invalid');
+      }
+      return hex.match(/.{1,2}/g)!.join(':');
+    })
+    .messages({ 'any.invalid': 'NAS MAC must be a 12-digit hex address' }),
   radiusSecret: Joi.string().trim().max(128).allow('', null),
   vlanId: Joi.string().trim().max(32).allow('', null),
   radiusVendorProfileId: Joi.string().uuid().allow(null),
@@ -35,6 +49,7 @@ export const SitesCreateSchema = Joi.object({
   portalBaseUrl: stationFields.portalBaseUrl.optional(),
   nasIdentifier: stationFields.nasIdentifier.optional(),
   radiusClientIp: stationFields.radiusClientIp.optional(),
+  nasMac: stationFields.nasMac.optional(),
   radiusSecret: stationFields.radiusSecret.optional(),
   vlanId: stationFields.vlanId.optional(),
   radiusVendorProfileId: stationFields.radiusVendorProfileId.optional(),
@@ -52,6 +67,7 @@ export const SitesUpdateSchema = Joi.object({
   portalBaseUrl: stationFields.portalBaseUrl.optional(),
   nasIdentifier: stationFields.nasIdentifier.optional(),
   radiusClientIp: stationFields.radiusClientIp.optional(),
+  nasMac: stationFields.nasMac.optional(),
   radiusSecret: stationFields.radiusSecret.optional(),
   vlanId: stationFields.vlanId.optional(),
   radiusVendorProfileId: stationFields.radiusVendorProfileId.optional(),

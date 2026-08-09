@@ -88,7 +88,7 @@ const SitesTable: React.FC<Props> = ({
       width: 160,
       ellipsis: true,
       render: (_, row) =>
-        row.radiusClientIp || row.nasIdentifier ? (
+        row.radiusClientIp || row.nasIdentifier || row.nasMac ? (
           <div>
             {row.radiusClientIp ? (
               <Text code style={{ fontSize: 11 }}>
@@ -99,6 +99,13 @@ const SitesTable: React.FC<Props> = ({
               <div>
                 <Text type="secondary" style={{ fontSize: 11 }}>
                   {row.nasIdentifier}
+                </Text>
+              </div>
+            ) : null}
+            {row.nasMac ? (
+              <div>
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  {row.nasMac}
                 </Text>
               </div>
             ) : null}

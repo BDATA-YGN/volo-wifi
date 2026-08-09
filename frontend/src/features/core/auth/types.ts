@@ -14,6 +14,8 @@ export interface LoginResponse {
   export interface LoginInput {
     username: string;
     password: string;
+    /** Browser client IP resolved by Next.js server action (preferred by API). */
+    clientIp?: string | null;
   }
 
   /** Server action return — avoids throwing across the RSC boundary (metadata would be lost). */

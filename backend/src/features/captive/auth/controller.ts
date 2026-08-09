@@ -48,6 +48,16 @@ function mapLoginGuardError(error: unknown): never {
       );
     case 'INVALID_CREDENTIAL':
       throw new CustomException(400, 'INVALID_CREDENTIAL', captiveErrors.INVALID_CREDENTIAL);
+    case 'TOKEN_SITE_MISMATCH':
+      throw new CustomException(400, 'TOKEN_SITE_MISMATCH', captiveErrors.TOKEN_SITE_MISMATCH);
+    case 'TOKEN_LOCATION_UNKNOWN':
+      throw new CustomException(400, 'TOKEN_LOCATION_UNKNOWN', captiveErrors.TOKEN_LOCATION_UNKNOWN);
+    case 'TOKEN_LOCATION_AMBIGUOUS':
+      throw new CustomException(
+        400,
+        'TOKEN_LOCATION_AMBIGUOUS',
+        captiveErrors.TOKEN_LOCATION_AMBIGUOUS,
+      );
     default:
       // Do not mask DB / unexpected guard failures as "wrong token".
       logger.error(
@@ -142,7 +152,7 @@ export class CaptiveAuthController {
       const clientMac = resolveCaptiveClientMac(req, nasParamsBody) ?? null;
 
       try {
-        await runCaptiveLoginGuards(credential, { clientMac });
+        await runCaptiveLoginGuards(credential, { clientMac, nasParams: nasParamsBody });
       } catch (error) {
         mapLoginGuardError(error);
       }

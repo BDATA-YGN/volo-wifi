@@ -217,8 +217,8 @@ const PartnerDetailDrawer: React.FC<Props> = ({
 
             <Title level={5}>Plan entitlements</Title>
             <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-              Sellable toggles control which plans this partner may sell. Retail price is resolved
-              as Reseller book → Site book → Organization default.
+              Sellable toggles control which plans this partner may sell. Pricing uses the first
+              matching book only (Reseller → Site → Organization default) — no mix across scopes.
             </Paragraph>
             {planRows.length > 0 ? (
               <Table<PartnerPlanEntitlement>

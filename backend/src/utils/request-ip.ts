@@ -32,6 +32,18 @@ const normalize = (ip: string | null | undefined): string | null => {
   return v;
 };
 
+const IPV4_RE = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/;
+const IPV6_RE = /^[0-9a-fA-F:]+$/;
+
+/** True when the value looks like a single IPv4/IPv6 address (not a list or junk). */
+export const isValidClientIp = (ip: string | null | undefined): boolean => {
+  const value = normalize(ip);
+  if (!value) return false;
+  if (IPV4_RE.test(value)) return true;
+  if (value.includes(':') && IPV6_RE.test(value) && value.length <= 45) return true;
+  return false;
+};
+
 const readHeader = (req: Request, key: string): string | undefined => {
   const raw = req.headers[key];
   if (Array.isArray(raw)) return raw[0];
@@ -71,6 +83,20 @@ export const resolveClientIp = (req: Request): string | null => {
 
   const fromSocket = normalize(req.socket?.remoteAddress);
   return fromSocket;
+};
+
+/**
+ * Auth / audit IP: prefer an explicit client hint from the Next.js frontend
+ * (login body `clientIp`) when it is a valid address; otherwise use headers.
+ * Mirrors captive NAS-param preference so server/edge public hops do not win.
+ */
+export const resolveRequestClientIp = (
+  req: Request,
+  preferred?: string | null,
+): string | null => {
+  const fromPreferred = normalize(preferred);
+  if (fromPreferred && isValidClientIp(fromPreferred)) return fromPreferred;
+  return resolveClientIp(req);
 };
 
 /** Reads the User-Agent header in the same forgiving way as `resolveClientIp`. */

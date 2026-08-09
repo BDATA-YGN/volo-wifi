@@ -25,6 +25,8 @@ export interface RecordLoginInput {
   type: LoginLogType;
   /** Express request — used to derive IP, UA, platform, device. */
   req: Request;
+  /** Optional override when frontend/auth already resolved the browser IP. */
+  ipAddress?: string | null;
 }
 
 /** Tiny, dependency-free UA classifier — good enough for sign-in history. */
@@ -71,7 +73,7 @@ export const recordLogin = async (input: RecordLoginInput): Promise<void> => {
         loginDateTime: new Date(),
         loginPlatform: parsePlatform(userAgent),
         loginDevices: parseDevice(userAgent),
-        ipAddress: resolveClientIp(input.req),
+        ipAddress: input.ipAddress ?? resolveClientIp(input.req),
       },
     });
   } catch (err) {
