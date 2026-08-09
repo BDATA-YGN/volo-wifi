@@ -123,8 +123,8 @@ const PartnersTable: React.FC<Props> = ({
         }
         return (
           <Tooltip title={dayjs(lastLogin).format("YYYY-MM-DD HH:mm:ss")}>
-            <span style={{ fontSize: 12 }}>
-              {dayjs(lastLogin).format("MMM D, HH:mm")}
+            <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+              {dayjs(lastLogin).format("YYYY-MM-DD HH:mm")}
             </span>
           </Tooltip>
         );

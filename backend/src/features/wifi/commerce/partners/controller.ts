@@ -24,7 +24,7 @@ import {
 import { provisionPartnerPortalAccount } from './provision-portal-account';
 import { hashPassword } from '@/utils/password';
 
-const resellerSelect = {
+const partnerCoreSelect = {
   id: true,
   orgId: true,
   code: true,
@@ -36,15 +36,15 @@ const resellerSelect = {
   adminId: true,
   createdAt: true,
   updatedAt: true,
-  _count: {
-    select: {
-      resellerStations: { where: { deletedAt: null } },
-      planEntitlements: { where: { isEnabled: true } },
-      credentials: true,
-      sales: true,
-    },
-  },
 } satisfies Prisma.ResellerSelect;
+
+/** Detail / delete guards — includes heavy credential & sales counts. */
+const partnerDetailCountSelect = {
+  resellerStations: { where: { deletedAt: null } },
+  planEntitlements: { where: { isEnabled: true } },
+  credentials: true,
+  sales: true,
+} satisfies Prisma.ResellerCountOutputTypeSelect;
 
 const stationBriefSelect = {
   id: true,
@@ -61,8 +61,13 @@ const planBriefSelect = {
   isActive: true,
 } satisfies Prisma.PlanSelect;
 
+/**
+ * List select intentionally omits `_count.credentials` / `_count.sales`.
+ * Those correlated counts scan large tables per row and timed out (~30s)
+ * with ~250 partners. Sales counts are batched via groupBy after the page load.
+ */
 const listPartnerSelect = {
-  ...resellerSelect,
+  ...partnerCoreSelect,
   admin: {
     select: { id: true, username: true, fullName: true, lastLogin: true },
   },
@@ -114,7 +119,12 @@ async function resolveOrgFromRequest(
   return resolved.orgId;
 }
 
-type ResellerRow = Prisma.ResellerGetPayload<{ select: typeof resellerSelect }>;
+type PartnerDetailCounts = {
+  resellerStations: number;
+  planEntitlements: number;
+  credentials: number;
+  sales: number;
+};
 
 function serializePortalAccount(
   admin:
@@ -130,11 +140,30 @@ function serializePortalAccount(
   };
 }
 
-function serializePartner(
-  row: ResellerRow,
-  admin?:
+function serializePartnerBase(
+  row: {
+    id: string;
+    orgId: string;
+    code: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    status: string;
+    adminId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  admin:
     | { username: string; fullName: string | null; lastLogin?: Date | null }
     | null
+    | undefined,
+  counts: {
+    stationCount: number;
+    enabledPlanCount: number;
+    credentialCount: number;
+    salesCount: number;
+  },
 ) {
   return {
     id: row.id,
@@ -147,24 +176,55 @@ function serializePartner(
     status: row.status,
     hasPortalAccount: Boolean(row.adminId),
     portalAccount: serializePortalAccount(admin ?? null),
-    stationCount: row._count.resellerStations,
-    enabledPlanCount: row._count.planEntitlements,
-    credentialCount: row._count.credentials,
-    salesCount: row._count.sales,
+    stationCount: counts.stationCount,
+    enabledPlanCount: counts.enabledPlanCount,
+    credentialCount: counts.credentialCount,
+    salesCount: counts.salesCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-function serializePartnerListRow(row: ResellerListRow) {
+function serializePartnerListRow(row: ResellerListRow, salesCount: number) {
   const stations = row.resellerStations.map((rs) => rs.station);
   const sellablePlans = row.planEntitlements.map((pe) => pe.plan);
 
   return {
-    ...serializePartner(row, row.admin),
+    ...serializePartnerBase(row, row.admin, {
+      stationCount: stations.length,
+      enabledPlanCount: sellablePlans.length,
+      // List does not load credential totals (detail does).
+      credentialCount: 0,
+      salesCount,
+    }),
     stations,
     sellablePlans,
   };
+}
+
+async function loadSalesCountsByReseller(
+  prisma: PrismaClient,
+  orgId: string,
+  resellerIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (resellerIds.length === 0) return map;
+
+  const grouped = await prisma.saleOrder.groupBy({
+    by: ['resellerId'],
+    where: {
+      orgId,
+      resellerId: { in: resellerIds },
+    },
+    _count: { _all: true },
+  });
+
+  for (const row of grouped) {
+    if (row.resellerId) {
+      map.set(row.resellerId, row._count._all);
+    }
+  }
+  return map;
 }
 
 function buildListWhere(
@@ -316,7 +376,11 @@ async function loadPartnerDetail(prisma: PrismaClient, orgId: string, id: string
   const row = await prisma.reseller.findFirst({
     where: { id, orgId, deletedAt: null },
     select: {
-      ...listPartnerSelect,
+      ...partnerCoreSelect,
+      _count: { select: partnerDetailCountSelect },
+      admin: {
+        select: { id: true, username: true, fullName: true, lastLogin: true },
+      },
       resellerStations: {
         where: { deletedAt: null },
         select: {
@@ -341,12 +405,17 @@ async function loadPartnerDetail(prisma: PrismaClient, orgId: string, id: string
 
   if (!row) return null;
 
-  const { resellerStations, planEntitlements, admin, ...base } = row;
-  const stations = resellerStations.map((rs) => rs.station);
+  const { resellerStations, planEntitlements, admin, _count, ...base } = row;
   const sellablePlans = planEntitlements.filter((pe) => pe.isEnabled).map((pe) => pe.plan);
+  const counts: PartnerDetailCounts = _count;
 
   return {
-    ...serializePartner(base, admin),
+    ...serializePartnerBase(base, admin, {
+      stationCount: counts.resellerStations,
+      enabledPlanCount: counts.planEntitlements,
+      credentialCount: counts.credentials,
+      salesCount: counts.sales,
+    }),
     stations: resellerStations.map((rs) => ({
       mappingId: rs.id,
       ...rs.station,
@@ -479,9 +548,17 @@ export class CommercePartnersController {
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
         ]);
 
+      const salesByReseller = await loadSalesCountsByReseller(
+        this.prisma,
+        orgId,
+        rows.map((row) => row.id),
+      );
+
       responseSuccess(res, {
         message: 'Success',
-        data: rows.map(serializePartnerListRow),
+        data: rows.map((row) =>
+          serializePartnerListRow(row, salesByReseller.get(row.id) ?? 0),
+        ),
         meta: {
           page,
           limit,

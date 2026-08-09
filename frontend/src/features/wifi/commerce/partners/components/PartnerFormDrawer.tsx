@@ -14,8 +14,10 @@ import {
   Table,
   Tabs,
   Tag,
+  Transfer,
   Typography,
 } from "antd";
+import type { TransferProps } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -34,6 +36,42 @@ import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { TextArea } = Input;
 const { Text, Paragraph } = Typography;
+
+type SiteTransferItem = {
+  key: string;
+  title: string;
+  description?: string;
+  disabled?: boolean;
+};
+
+type SitesTransferProps = {
+  value?: string[];
+  onChange?: (next: string[]) => void;
+  dataSource: SiteTransferItem[];
+};
+
+const SitesTransfer: React.FC<SitesTransferProps> = ({ value, onChange, dataSource }) => {
+  const handleChange: TransferProps["onChange"] = (nextTargetKeys) => {
+    onChange?.(nextTargetKeys.map(String));
+  };
+
+  return (
+    <Transfer
+      dataSource={dataSource}
+      titles={["Available sites", "Mapped sites"]}
+      targetKeys={value ?? []}
+      onChange={handleChange}
+      render={(item) => item.title}
+      showSearch
+      filterOption={(input, item) =>
+        (item.title ?? "").toLowerCase().includes(input.toLowerCase()) ||
+        (item.description ?? "").toLowerCase().includes(input.toLowerCase())
+      }
+      styles={{ section: { width: 260, height: 320 } }}
+      oneWay={false}
+    />
+  );
+};
 
 type PartnerFormFields = PartnerFormValues & {
   enabledPlanIds: string[];
@@ -128,6 +166,12 @@ const PartnerFormDrawer: React.FC<Props> = ({
   }, [open, editing, formOptions.existingCodes, form]);
 
   const handleFinish = async (values: PartnerFormFields) => {
+    // Include values from inactive tabs (Ant Form omits unmounted fields from `values`
+    // when preserve is false — that wiped sites when saving from Plans, and vice versa).
+    const allValues = form.getFieldsValue(true) as PartnerFormFields;
+    const stationIds = allValues.stationIds ?? values.stationIds ?? [];
+    const enabledPlanIds = allValues.enabledPlanIds ?? values.enabledPlanIds ?? [];
+
     const payload: PartnerFormValues = {
       code: values.code,
       name: values.name,
@@ -135,11 +179,8 @@ const PartnerFormDrawer: React.FC<Props> = ({
       email: values.email,
       address: values.address,
       status: values.status,
-      stationIds: values.stationIds ?? [],
-      planEntitlements: buildPlanEntitlementsFromForm(
-        formOptions.plans,
-        values.enabledPlanIds ?? []
-      ),
+      stationIds,
+      planEntitlements: buildPlanEntitlementsFromForm(formOptions.plans, enabledPlanIds),
     };
 
     if (isCreate) {
@@ -368,12 +409,24 @@ const PartnerFormDrawer: React.FC<Props> = ({
     </>
   );
 
+  const siteTransferData: SiteTransferItem[] = useMemo(() => {
+    const byId = new Map(formOptions.stations.map((s) => [s.id, s]));
+    for (const s of editing?.stations ?? []) byId.set(s.id, s);
+    return [...byId.values()].map((s) => ({
+      key: s.id,
+      title: `${s.code} — ${s.name}`,
+      description: s.status,
+      disabled: s.status === "DISABLED",
+    }));
+  }, [formOptions.stations, editing?.stations]);
+
   const sitesTab = (
     <>
       <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        Sites this partner can sell at. Only mapped sites appear in their POS workspace.
+        Sites this partner can sell at. Move sites to the right to map them — only mapped sites
+        appear in their POS workspace.
       </Paragraph>
-      {formOptions.stations.length === 0 ? (
+      {formOptions.stations.length === 0 && (editing?.stations?.length ?? 0) === 0 ? (
         <Alert
           type="warning"
           showIcon
@@ -386,18 +439,12 @@ const PartnerFormDrawer: React.FC<Props> = ({
           }
         />
       ) : (
-        <Form.Item name="stationIds" label="Mapped sites">
-          <Select
-            mode="multiple"
-            showSearch
-            optionFilterProp="label"
-            placeholder="Select one or more sites"
-            options={formOptions.stations.map((s) => ({
-              value: s.id,
-              label: `${s.code} — ${s.name}`,
-              disabled: s.status === "DISABLED",
-            }))}
-          />
+        <Form.Item
+          name="stationIds"
+          label="Mapped sites"
+          extra="Left = available · Right = assigned to this partner"
+        >
+          <SitesTransfer dataSource={siteTransferData} />
         </Form.Item>
       )}
     </>
@@ -438,15 +485,15 @@ const PartnerFormDrawer: React.FC<Props> = ({
   );
 
   const tabItems = [
-    { key: "general", label: "General", children: generalTab },
-    { key: "sites", label: "Sites", children: sitesTab },
-    { key: "plans", label: "Plans", children: plansTab },
+    { key: "general", label: "General", forceRender: true, children: generalTab },
+    { key: "sites", label: "Sites", forceRender: true, children: sitesTab },
+    { key: "plans", label: "Plans", forceRender: true, children: plansTab },
   ];
 
   return (
     <Drawer
       title={editing ? `Edit ${editing.name}` : "New partner"}
-      size={560}
+      size={720}
       open={open}
       onClose={onClose}
       destroyOnHidden
@@ -474,8 +521,8 @@ const PartnerFormDrawer: React.FC<Props> = ({
       <Form
         form={form}
         layout="vertical"
-        onFinish={handleFinish}
-        preserve={false}
+        onFinish={(v) => void handleFinish(v)}
+        preserve
         key={editing?.id ?? "create"}
       >
         <Tabs items={tabItems} />
