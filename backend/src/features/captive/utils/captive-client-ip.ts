@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import { resolveClientIp } from '@/utils/request-ip';
+import { normalizeMacKey } from '@/utils/mac-address';
 
 function normalizeIp(ip: string | null | undefined): string | null {
   if (!ip) return null;
@@ -10,11 +11,24 @@ function normalizeIp(ip: string | null | undefined): string | null {
   return value;
 }
 
-function readNasString(nasParams: Record<string, unknown> | null | undefined, keys: string[]): string | null {
+function coerceNasString(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value) && value.length > 0) return coerceNasString(value[0]);
+  return null;
+}
+
+function readNasString(
+  nasParams: Record<string, unknown> | null | undefined,
+  keys: string[],
+): string | null {
   if (!nasParams) return null;
+  const lowerMap = new Map(
+    Object.entries(nasParams).map(([k, v]) => [k.toLowerCase(), v]),
+  );
   for (const key of keys) {
-    const value = nasParams[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
+    const coerced = coerceNasString(lowerMap.get(key.toLowerCase()));
+    if (coerced) return coerced;
   }
   return null;
 }
@@ -51,13 +65,20 @@ export function resolveCaptiveClientMac(
   const header = req.headers['x-calling-station-id'];
   if (typeof header === 'string' && header.trim()) return header.trim();
 
-  const fromNas = readNasString(nasParams, ['mac', 'usermac', 'user_mac', 'client_mac']);
+  const fromNas = readNasString(nasParams, [
+    'mac',
+    'usermac',
+    'user_mac',
+    'client_mac',
+    'calling_station_id',
+  ]);
   return fromNas ?? undefined;
 }
 
-/** Strip separators for MAC compare (`aa:bb` / `AABB` / `aa-bb` → `aabb…`). */
+/**
+ * Canonical MAC compare key (12 lowercase hex digits).
+ * Aliases {@link normalizeMacKey} for captive login / site-lock.
+ */
 export function normalizeCaptiveMac(mac: string | null | undefined): string | null {
-  if (!mac?.trim()) return null;
-  const hex = mac.trim().toLowerCase().replace(/[^a-f0-9]/g, '');
-  return hex.length >= 8 ? hex : null;
+  return normalizeMacKey(mac);
 }

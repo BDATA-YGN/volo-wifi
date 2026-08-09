@@ -1,7 +1,14 @@
 import PrismaDBConnection from '@/prisma/prisma-client';
-import { normalizeCaptiveMac } from '@/features/captive/utils/captive-client-ip';
+import { normalizeMacKey } from '@/utils/mac-address';
 
 const prisma = PrismaDBConnection.getConnection();
+
+function coerceNasString(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value) && value.length > 0) return coerceNasString(value[0]);
+  return null;
+}
 
 function readNasString(
   nasParams: Record<string, unknown> | null | undefined,
@@ -12,8 +19,8 @@ function readNasString(
     Object.entries(nasParams).map(([k, v]) => [k.toLowerCase(), v]),
   );
   for (const key of keys) {
-    const value = lowerMap.get(key.toLowerCase());
-    if (typeof value === 'string' && value.trim()) return value.trim();
+    const coerced = coerceNasString(lowerMap.get(key.toLowerCase()));
+    if (coerced) return coerced;
   }
   return null;
 }
@@ -42,7 +49,7 @@ export type ResolveRequestStationResult =
  * OR match (any one hit is enough):
  * - NASID / nasid / nas_id → WifiStation.nasIdentifier
  * - nas_ip / nasip / wlanacip → WifiStation.radiusClientIp
- * - nas_mac → WifiStation.nasMac
+ * - nas_mac → WifiStation.nasMac (any MAC format; compared via normalizeMacKey)
  *
  * NAS-Identifier OR NAS MAC alone qualifies when that param is present.
  */
@@ -59,9 +66,11 @@ export async function resolveRequestStationFromNasParams(options: {
   const nasIp = normalizeNasIp(
     readNasString(nasParams, ['nas_ip', 'nasip', 'wlanacip', 'nasIp', 'ap_ip']),
   );
-  const nasMac = normalizeCaptiveMac(readNasString(nasParams, ['nas_mac', 'nasmac', 'ap_mac']));
+  const nasMacKey = normalizeMacKey(
+    readNasString(nasParams, ['nas_mac', 'nasmac', 'ap_mac', 'apmac', 'gw_mac', 'gateway_mac']),
+  );
 
-  if (!nasId && !nasIp && !nasMac) {
+  if (!nasId && !nasIp && !nasMacKey) {
     return { status: 'unknown' };
   }
 
@@ -69,12 +78,12 @@ export async function resolveRequestStationFromNasParams(options: {
 
   const addRows = (
     rows: Array<{ id: string; stationSizeId: string | null; nasMac?: string | null }>,
-    macOnly?: string | null,
+    macKeyOnly?: string | null,
   ) => {
     for (const row of rows) {
-      if (macOnly) {
-        const stored = normalizeCaptiveMac(row.nasMac);
-        if (!stored || stored !== macOnly) continue;
+      if (macKeyOnly) {
+        const storedKey = normalizeMacKey(row.nasMac);
+        if (!storedKey || storedKey !== macKeyOnly) continue;
       }
       candidates.set(row.id, { id: row.id, stationSizeId: row.stationSizeId });
     }
@@ -104,7 +113,7 @@ export async function resolveRequestStationFromNasParams(options: {
     addRows(rows);
   }
 
-  if (nasMac) {
+  if (nasMacKey) {
     const rows = await prisma.wifiStation.findMany({
       where: {
         orgId,
@@ -113,7 +122,7 @@ export async function resolveRequestStationFromNasParams(options: {
       },
       select: { id: true, stationSizeId: true, nasMac: true },
     });
-    addRows(rows, nasMac);
+    addRows(rows, nasMacKey);
   }
 
   if (candidates.size === 0) {

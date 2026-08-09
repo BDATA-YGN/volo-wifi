@@ -14,6 +14,7 @@ import type { SiteFormValues, SiteRecord, SitesFormOptions } from "../types";
 import { SITE_CODE_PATTERN, STATUS_OPTIONS } from "../constant";
 import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 import { usePlaceTowns } from "@/features/system/places/usePlaceTowns";
+import { formatMacColon, normalizeMacKey } from "@/lib/mac-address";
 
 const { TextArea } = Input;
 const { Paragraph, Text } = Typography;
@@ -94,7 +95,7 @@ const SiteFormDrawer: React.FC<Props> = ({
       status: values.status,
       nasIdentifier: values.nasIdentifier,
       radiusClientIp: values.radiusClientIp,
-      nasMac: values.nasMac,
+      nasMac: values.nasMac?.trim() ? formatMacColon(values.nasMac) : null,
       radiusVendorProfileId: values.radiusVendorProfileId,
     };
     if (editing) {
@@ -220,20 +221,31 @@ const SiteFormDrawer: React.FC<Props> = ({
       <Form.Item
         name="nasMac"
         label="NAS MAC"
-        extra="Ruijie redirect nas_mac (gateway MAC). Accepts aa:bb:… or aabb…."
+        extra="Gateway MAC from redirect (nas_mac). Any format is fine — saved as aa:bb:cc:dd:ee:ff and matched the same way at captive login."
         rules={[
           {
             validator: async (_, value) => {
               if (value == null || String(value).trim() === "") return;
-              const hex = String(value).toLowerCase().replace(/[^a-f0-9]/g, "");
-              if (hex.length !== 12) {
-                throw new Error("NAS MAC must be a 12-digit hex address");
+              if (!normalizeMacKey(value)) {
+                throw new Error(
+                  "NAS MAC must be 12 hex digits (aa:bb:…, aa-bb-…, or aabbccddeeff)"
+                );
               }
             },
           },
         ]}
+        normalize={(value) => {
+          if (value == null || String(value).trim() === "") return value;
+          return formatMacColon(value) ?? value;
+        }}
       >
-        <Input placeholder="aa:bb:cc:dd:ee:ff" />
+        <Input
+          placeholder="aa:bb:cc:dd:ee:ff"
+          onBlur={(e) => {
+            const formatted = formatMacColon(e.target.value);
+            if (formatted) form.setFieldValue("nasMac", formatted);
+          }}
+        />
       </Form.Item>
 
       <Form.Item name="radiusVendorProfileId" label="RADIUS vendor profile">

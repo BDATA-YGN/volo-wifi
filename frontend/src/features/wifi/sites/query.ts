@@ -5,6 +5,7 @@ import { handleApiError } from "@/common/exceptions/handleApiError";
 import type { CommonListResponse, CommonResponse } from "@/common/interface/interface";
 import { SITES_API } from "./constant";
 import type { SiteFormValues, SitesFormOptions, SitesListParams } from "./types";
+import { formatMacColon } from "@/lib/mac-address";
 
 export const list = async (params?: SitesListParams): Promise<CommonListResponse> => {
   try {
@@ -62,7 +63,7 @@ export const create = async (payload: SiteFormValues, orgId?: string): Promise<C
         portalBaseUrl: payload.portalBaseUrl?.trim() || null,
         nasIdentifier: payload.nasIdentifier?.trim() || null,
         radiusClientIp: payload.radiusClientIp?.trim() || null,
-        nasMac: payload.nasMac?.trim() || null,
+        nasMac: payload.nasMac?.trim() ? formatMacColon(payload.nasMac) : null,
         radiusSecret: payload.radiusSecret?.trim() || null,
         vlanId: payload.vlanId?.trim() || null,
       },
@@ -82,6 +83,9 @@ export const update = async (
   try {
     const body = { ...payload };
     if (body.code) body.code = body.code.trim().toUpperCase();
+    if (body.nasMac !== undefined) {
+      body.nasMac = body.nasMac?.trim() ? formatMacColon(body.nasMac) : null;
+    }
     const res = await apiClient.post(SITES_API.createOrUpdate(id), body, {
       params: { orgId: orgId || undefined },
     });
