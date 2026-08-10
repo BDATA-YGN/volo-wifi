@@ -34,7 +34,7 @@ import {
   formatStatusLabel,
 } from "../utils";
 
-const { Text, Paragraph } = Typography;
+const { Text, Title, Paragraph } = Typography;
 
 type Props = {
   open: boolean;
