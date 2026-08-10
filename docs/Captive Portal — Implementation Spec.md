@@ -285,11 +285,11 @@ Cookie options:
 
 | Limiter | Default | Key |
 |---------|---------|-----|
-| Per IP | 30 failures / 15m | client IP |
-| Per credential | 8 failures / 15m | `login:token:TOKEN` or `login:user:username` |
+| Per NAS client IP | 30 / 15m | NAS `ip` / `wlanuserip` only (not portal/proxy IP) |
+| Per credential | 8 / 15m | `login:token:TOKEN` or `login:user:username` |
 
-- `skipSuccessfulRequests: true` (only failures count)
-- Disable IP limiter: `CAPTIVE_LOGIN_IP_RATE_LIMIT_ENABLED=false`
+- IP limiter skips when NAS did not send a client IP (avoids shared public/edge buckets).
+- Disable IP limiter: App Setting `captive_login_ip_rate_limit_enabled=false`, or env `CAPTIVE_LOGIN_IP_RATE_LIMIT_ENABLED=false` (env overrides setting when set).
 - Tunables: `CAPTIVE_LOGIN_IP_MAX`, `CAPTIVE_LOGIN_IP_WINDOW_MS`, `CAPTIVE_LOGIN_CREDENTIAL_MAX`, `CAPTIVE_LOGIN_CREDENTIAL_WINDOW_MS`
 - On exceed → HTTP 429, code `TOO_MANY_REQUESTS`
 
@@ -390,12 +390,14 @@ Ruijie-style params (`login_url`, `logout_url`, `uamip`, …) should also be acc
 | `REFRESH_TOKEN_SECRET` | JWT refresh | `REFRESH_SECRET` |
 | `NODE_ENV` | cookie secure/httpOnly | — |
 | `CAPTIVE_TOKEN_DEVICE_BIND_ENABLED` | Bind voucher to first MAC | on |
-| `CAPTIVE_LOGIN_IP_RATE_LIMIT_ENABLED` | Per-IP rate limit | on |
+| `CAPTIVE_LOGIN_IP_RATE_LIMIT_ENABLED` | Per–NAS-client-IP rate limit (env overrides App Setting) | on |
 | `CAPTIVE_LOGIN_IP_MAX` | | 30 |
 | `CAPTIVE_LOGIN_IP_WINDOW_MS` | | 900000 |
 | `CAPTIVE_LOGIN_CREDENTIAL_MAX` | | 8 |
 | `CAPTIVE_LOGIN_CREDENTIAL_WINDOW_MS` | | 900000 |
 | `CAPTIVE_LOGIN_DEBUG` | Log login gate traces | off |
+
+App Setting (console): `captive_login_ip_rate_limit_enabled` — same toggle without redeploy when env is unset. Rate-limit key uses **only** NAS client IP (`ip` / `wlanuserip`); request/proxy IP is never used, and missing NAS IP skips the IP limiter.
 | Portal `API_URL` | BFF → backend | required |
 
 ---

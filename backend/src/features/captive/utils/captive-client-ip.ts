@@ -34,17 +34,13 @@ function readNasString(
 }
 
 /**
- * Resolve the WiFi client IP for captive portal session / audit / rate-limit.
- *
- * Prefer NAS redirect params (MikroTik `ip`, Ruijie `wlanuserip`, …) — that is
- * the station client address. Request/proxy headers often show the portal
- * server or edge hop (public Droplet IP), which must not win when NAS has a value.
+ * Wi‑Fi client IP from NAS redirect params only (MikroTik `ip`, Ruijie `wlanuserip`, …).
+ * Does not fall back to request/proxy headers — those are often the portal edge IP.
  */
-export function resolveCaptiveClientIp(
-  req: Request,
+export function resolveCaptiveNasClientIp(
   nasParams?: Record<string, unknown> | null,
 ): string | null {
-  const fromNas = normalizeIp(
+  return normalizeIp(
     readNasString(nasParams, [
       'ip',
       'wlanuserip',
@@ -53,6 +49,20 @@ export function resolveCaptiveClientIp(
       'client_ip',
     ]),
   );
+}
+
+/**
+ * Resolve the WiFi client IP for captive portal session / audit.
+ *
+ * Prefer NAS redirect params; fall back to request/proxy headers when NAS
+ * did not send a client address. Prefer {@link resolveCaptiveNasClientIp}
+ * for login rate-limiting (same-IP) so shared portal edges are not bucketed.
+ */
+export function resolveCaptiveClientIp(
+  req: Request,
+  nasParams?: Record<string, unknown> | null,
+): string | null {
+  const fromNas = resolveCaptiveNasClientIp(nasParams);
   if (fromNas) return fromNas;
 
   return normalizeIp(resolveClientIp(req));

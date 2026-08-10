@@ -113,7 +113,8 @@ export type MemberCreateFormValues = {
   title?: string;
   status: MemberStatus;
   isPrimary: boolean;
-  roleCodes: ProvisionMemberRoleCode[];
+  /** Single staff role selected in the form. */
+  roleCode: ProvisionMemberRoleCode;
   stationIds: string[];
 };
 

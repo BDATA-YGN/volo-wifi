@@ -44,14 +44,21 @@ type Props = {
   onUpdate: (id: string, values: MemberCreateFormValues) => Promise<void>;
 };
 
-function provisionRoleCodesFromMember(record: OrgMemberRecord): ProvisionMemberRoleCode[] {
-  return [
+function provisionRoleCodeFromMember(record: OrgMemberRecord): ProvisionMemberRoleCode {
+  const codes = [
     ...new Set(
       record.roles
         .map((role) => normalizeMemberRoleCode(role.roleCode))
         .filter((code): code is ProvisionMemberRoleCode => code != null && isProvisionMemberRoleCode(code))
     ),
   ];
+  return codes[0] ?? "ORG_VIEWER";
+}
+
+function memberHasOrgAdminRole(record: OrgMemberRecord): boolean {
+  return record.roles.some(
+    (role) => normalizeMemberRoleCode(role.roleCode) === "ORG_ADMIN"
+  );
 }
 
 function buildMemberFormValues(editing: OrgMemberRecord | null): MemberCreateFormValues {
@@ -64,7 +71,7 @@ function buildMemberFormValues(editing: OrgMemberRecord | null): MemberCreateFor
       title: editing.title ?? undefined,
       status: editing.status,
       isPrimary: editing.isPrimary,
-      roleCodes: provisionRoleCodesFromMember(editing),
+      roleCode: provisionRoleCodeFromMember(editing),
       stationIds: editing.stationScopes.map((s) => s.stationId),
       password: "",
       confirmPassword: "",
@@ -79,7 +86,7 @@ function buildMemberFormValues(editing: OrgMemberRecord | null): MemberCreateFor
     title: undefined,
     status: "ACTIVE",
     isPrimary: false,
-    roleCodes: ["ORG_VIEWER"],
+    roleCode: "ORG_VIEWER",
     stationIds: [],
     password: "",
     confirmPassword: "",
@@ -98,6 +105,7 @@ const MemberFormDrawer: React.FC<Props> = ({
   const [form] = Form.useForm<MemberCreateFormValues>();
   const password = Form.useWatch("password", form) ?? "";
   const confirmPassword = Form.useWatch("confirmPassword", form) ?? "";
+  const roleCode = Form.useWatch("roleCode", form);
   const passwordStrength = useMemo(() => scorePassword(password), [password]);
   const passwordRules = useMemo(() => getPasswordStrengthChecklist(password), [password]);
   useDrawerFormSync(form, open, buildMemberFormValues(editing), editing?.id ?? "create");
@@ -132,16 +140,22 @@ const MemberFormDrawer: React.FC<Props> = ({
       ]
     : [];
 
+  /** Primary membership is edit-only, and only for ORG_ADMIN accounts. */
+  const showPrimaryToggle =
+    Boolean(editing) && (memberHasOrgAdminRole(editing!) || roleCode === "ORG_ADMIN");
+
   const handleFinish = async (values: MemberCreateFormValues) => {
     const { confirmPassword: _confirm, password: nextPassword, ...rest } = values;
+    const canBePrimary = rest.roleCode === "ORG_ADMIN";
     const payload: MemberCreateFormValues = {
       ...rest,
+      isPrimary: canBePrimary ? Boolean(rest.isPrimary) : false,
       ...(nextPassword && nextPassword.trim() ? { password: nextPassword.trim() } : {}),
     };
     if (editing) {
       await onUpdate(editing.id, payload);
     } else {
-      await onCreate(payload);
+      await onCreate({ ...payload, isPrimary: false });
     }
   };
 
@@ -299,19 +313,24 @@ const MemberFormDrawer: React.FC<Props> = ({
             />
           </Form.Item>
 
-          <Form.Item name="isPrimary" label="Primary membership" valuePropName="checked">
-            <Switch />
-          </Form.Item>
+          {showPrimaryToggle ? (
+            <Form.Item name="isPrimary" label="Primary membership" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+          ) : (
+            <Form.Item name="isPrimary" hidden valuePropName="checked">
+              <Switch />
+            </Form.Item>
+          )}
 
           <Form.Item
-            name="roleCodes"
-            label="Roles"
-            rules={[{ required: true, message: "Select at least one role" }]}
+            name="roleCode"
+            label="Role"
+            rules={[{ required: true, message: "Select a role" }]}
           >
             <Select
-              mode="multiple"
               optionFilterProp="label"
-              placeholder="Admin, Site operations, Finance, Viewer"
+              placeholder="Admin, Site operations, Finance, or Viewer"
               options={roleOptions.map((option) => ({
                 value: option.value,
                 label: option.label,

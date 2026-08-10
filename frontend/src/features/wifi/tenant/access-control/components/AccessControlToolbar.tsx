@@ -3,8 +3,8 @@
 import React from "react";
 import { Button, Input, Select, Space } from "antd";
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { PROVISION_ROLE_OPTIONS } from "../constant";
 import type { MemberRoleCode, MemberStatus } from "../types";
-import { ROLE_OPTIONS } from "../constant";
 
 type Props = {
   search: string;
@@ -49,7 +49,7 @@ const AccessControlToolbar: React.FC<Props> = ({
         style={{ width: 180 }}
         value={roleCode ?? undefined}
         onChange={(v) => onRoleCodeChange((v as MemberRoleCode) ?? null)}
-        options={ROLE_OPTIONS.map((option) => ({
+        options={PROVISION_ROLE_OPTIONS.map((option) => ({
           value: option.value,
           label: option.label,
         }))}

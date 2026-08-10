@@ -2213,6 +2213,133 @@ async function importCredentials(ctx: Ctx): Promise<void> {
 /* Sales / payments                                                           */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Delta catch-up: sale items/payments updated after --since may reference older
+ * orders that were not re-selected by the order since-filter. Pull those parents.
+ */
+async function ensureParentSaleOrdersForDelta(ctx: Ctx): Promise<void> {
+  if (!ctx.apply || !ctx.since || !ctx.old.hasTable('wf_sale_order')) return;
+
+  const orderIds = new Set<string>();
+  if (ctx.old.hasTable('wf_sale_item')) {
+    const w = childOrgWhere(ctx, 'wf_sale_item');
+    const orderCol = ctx.old.col('wf_sale_item', 'orderId');
+    if (orderCol) {
+      const rows = await ctx.old.query<{ order_id: string }>(
+        `SELECT DISTINCT ${ctx.old.q(orderCol)} AS order_id
+         FROM ${ctx.old.q('wf_sale_item')} ${w.sql}`,
+        w.params,
+      );
+      for (const r of rows) {
+        if (r.order_id) orderIds.add(String(r.order_id));
+      }
+    }
+  }
+  if (ctx.old.hasTable('wf_payment')) {
+    const w = childOrgWhere(ctx, 'wf_payment');
+    const orderCol = ctx.old.col('wf_payment', 'orderId');
+    if (orderCol) {
+      const rows = await ctx.old.query<{ order_id: string }>(
+        `SELECT DISTINCT ${ctx.old.q(orderCol)} AS order_id
+         FROM ${ctx.old.q('wf_payment')} ${w.sql}`,
+        w.params,
+      );
+      for (const r of rows) {
+        if (r.order_id) orderIds.add(String(r.order_id));
+      }
+    }
+  }
+
+  if (!orderIds.size) return;
+  const ids = [...orderIds];
+  const existing = await ctx.newPool.query<{ id: string }>(
+    `SELECT id FROM wf_sale_order WHERE id = ANY($1::text[])`,
+    [ids],
+  );
+  const have = new Set(existing.rows.map((r) => r.id));
+  const missing = ids.filter((id) => !have.has(id));
+  if (!missing.length) return;
+
+  ctx.report.notes.push(
+    `Delta: importing ${missing.length} parent SaleOrder row(s) referenced by newer items/payments`,
+  );
+
+  const fields = [
+    'id',
+    'orgId',
+    'orderNo',
+    'status',
+    'resellerId',
+    'stationId',
+    'subtotal',
+    'discount',
+    'total',
+    'currency',
+    'note',
+    'soldAt',
+    'createdAt',
+    'updatedAt',
+  ];
+  const select = ctx.old.selectList('wf_sale_order', fields);
+  const idCol = ctx.old.col('wf_sale_order', 'id')!;
+  const oldRows = await ctx.old.query<Record<string, unknown>>(
+    `SELECT ${select} FROM ${ctx.old.q('wf_sale_order')}
+     WHERE ${ctx.old.q(idCol)} = ANY($1::text[])`,
+    [missing],
+  );
+
+  const columns = [
+    'id',
+    'org_id',
+    'order_no',
+    'status',
+    'reseller_id',
+    'station_id',
+    'subtotal',
+    'discount',
+    'total',
+    'currency',
+    'note',
+    'sold_at',
+    'created_at',
+    'updated_at',
+  ];
+  const rows = oldRows.map((row) => [
+    String(row.id),
+    String(row.orgId),
+    String(row.orderNo),
+    asString(row.status) ?? 'DRAFT',
+    asString(row.resellerId),
+    mapStationId(ctx, asString(row.stationId)),
+    asDecimalString(row.subtotal),
+    asDecimalString(row.discount),
+    asDecimalString(row.total),
+    asString(row.currency) ?? 'MMK',
+    asString(row.note),
+    asDate(row.soldAt),
+    asDate(row.createdAt) ?? new Date(),
+    asDate(row.updatedAt) ?? new Date(),
+  ]);
+
+  for (let i = 0; i < rows.length; i += ctx.batchSize) {
+    const chunk = rows.slice(i, i + ctx.batchSize);
+    await bulkUpsertById(ctx.newPool, 'wf_sale_order', columns, chunk, [
+      'org_id',
+      'order_no',
+      'status',
+      'reseller_id',
+      'station_id',
+      'subtotal',
+      'discount',
+      'total',
+      'currency',
+      'note',
+      'sold_at',
+      'updated_at',
+    ]);
+  }
+}
+
 async function importSales(ctx: Ctx): Promise<void> {
   const orderStats = ensureStats(ctx.report, 'SaleOrder');
   const itemStats = ensureStats(ctx.report, 'SaleItem');
@@ -2236,6 +2363,8 @@ async function importSales(ctx: Ctx): Promise<void> {
     }
     return;
   }
+
+  await ensureParentSaleOrdersForDelta(ctx);
 
   if (ctx.old.hasTable('wf_sale_order')) {
     const fields = [

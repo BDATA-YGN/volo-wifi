@@ -55,11 +55,16 @@ export const loadFormOptions = async (
 };
 
 export const create = async (
-  payload: MemberCreateFormValues,
+  payload: MemberCreateFormValues & { roleCodes: string[] },
   orgId?: string
 ): Promise<CommonResponse & { data: OrgMemberRecord }> => {
   try {
-    const { confirmPassword: _confirm, ...body } = payload;
+    const { confirmPassword: _confirm, roleCode: _roleCode, ...rest } = payload;
+    const body = {
+      ...rest,
+      roleCodes: payload.roleCodes,
+      isPrimary: false,
+    };
     const res = await apiClient.post(TENANT_ACCESS_CONTROL_API.createOrUpdate(), body, {
       params: { orgId: orgId || undefined },
     });

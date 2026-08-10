@@ -536,6 +536,14 @@ const appSettingsData: AppSettingSeed[] = [
     description: "When off, end-user captive portal login is discouraged in the admin UI.",
   },
   {
+    key: "captive_login_ip_rate_limit_enabled", value: "true", defaultValue: "true",
+    valueType: "BOOLEAN", controlType: "BOOLEAN",
+    category: "wifi", sortOrder: 71, isPublic: false,
+    labelEn: "Captive login same-IP rate limit", labelMy: "Captive same-IP rate limit",
+    description:
+      "Throttle failed/frequent captive logins per NAS client IP (MikroTik ip / Ruijie wlanuserip). Does not use portal/proxy public IP. Override with CAPTIVE_LOGIN_IP_RATE_LIMIT_ENABLED env if set.",
+  },
+  {
     key: "sms_payments_require_finance_confirm", value: "true", defaultValue: "true",
     valueType: "BOOLEAN", controlType: "BOOLEAN",
     category: "wifi", sortOrder: 8, isPublic: false,

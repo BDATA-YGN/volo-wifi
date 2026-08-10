@@ -118,7 +118,11 @@ const TenantAccessControlPage: React.FC = () => {
   const handleCreate = async (values: MemberCreateFormValues) => {
     setSaving(true);
     try {
-      await createMember(values);
+      await createMember({
+        ...values,
+        isPrimary: false,
+        roleCodes: [values.roleCode],
+      });
       message.success("Team member provisioned");
       setDrawerOpen(false);
     } catch (err: unknown) {
@@ -134,8 +138,8 @@ const TenantAccessControlPage: React.FC = () => {
       await updateMember(id, {
         title: values.title,
         status: values.status,
-        isPrimary: values.isPrimary,
-        roleCodes: values.roleCodes,
+        isPrimary: values.roleCode === "ORG_ADMIN" ? values.isPrimary : false,
+        roleCodes: [values.roleCode],
         stationIds: values.stationIds,
         ...(values.password ? { password: values.password } : {}),
       });

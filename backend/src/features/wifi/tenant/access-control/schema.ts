@@ -2,7 +2,12 @@ import Joi from 'joi';
 import { passwordMeetsStrengthRules, passwordStrengthErrorMessage } from '@/utils/passwordStrength';
 import { MEMBER_STATUSES, PROVISION_MEMBER_ROLE_CODES } from './constants';
 
-const roleCodesField = Joi.array().items(Joi.string().valid(...PROVISION_MEMBER_ROLE_CODES));
+const roleCodesField = Joi.array()
+  .items(Joi.string().valid(...PROVISION_MEMBER_ROLE_CODES))
+  .length(1)
+  .messages({
+    'array.length': 'Select exactly one role',
+  });
 
 const passwordField = Joi.string()
   .required()
@@ -33,8 +38,9 @@ export const TenantAccessControlCreateSchema = Joi.object({
   status: Joi.string()
     .valid(...MEMBER_STATUSES)
     .default('ACTIVE'),
-  isPrimary: Joi.boolean().default(false),
-  roleCodes: roleCodesField.min(1).required(),
+  // New members are never primary — primary is set only when editing an ORG_ADMIN.
+  isPrimary: Joi.boolean().default(false).valid(false),
+  roleCodes: roleCodesField.required(),
   stationIds: Joi.array().items(Joi.string().uuid()).default([]),
 });
 
@@ -42,7 +48,7 @@ export const TenantAccessControlUpdateSchema = Joi.object({
   title: Joi.string().trim().max(128).allow('', null),
   status: Joi.string().valid(...MEMBER_STATUSES),
   isPrimary: Joi.boolean(),
-  roleCodes: roleCodesField.min(1),
+  roleCodes: roleCodesField,
   stationIds: Joi.array().items(Joi.string().uuid()),
   password: optionalPasswordField,
 }).min(1);

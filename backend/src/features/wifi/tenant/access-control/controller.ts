@@ -19,12 +19,23 @@ import {
   loadOrgMembershipOptions,
   resolveOrgIdForAdmin,
 } from '@/features/wifi/shared/resolve-org';
-import { MEMBER_ROLE_CODES, PROVISION_MEMBER_ROLE_CODES, LOCKED_MEMBER_ROLE_CODES, isLockedMemberRoleCode, pickConsoleRoleName } from './constants';
+import { PROVISION_MEMBER_ROLE_CODES, LOCKED_MEMBER_ROLE_CODES, isLockedMemberRoleCode, normalizeMemberRoleCode, pickConsoleRoleName } from './constants';
 import {
   TenantAccessControlCreateSchema,
   TenantAccessControlUpdateSchema,
   TenantAccessControlResetPasswordSchema,
 } from './schema';
+
+/** Access Control lists tenant staff only — Partner accounts live under Partners. */
+function staffMemberRoleFilter(): Prisma.OrgMemberRoleListRelationFilter {
+  return {
+    some: {
+      deletedAt: null,
+      isActive: true,
+      roleCode: { in: [...PROVISION_MEMBER_ROLE_CODES] },
+    },
+  };
+}
 
 const memberSelect = {
   id: true,
@@ -287,7 +298,12 @@ export class TenantAccessControlController {
         const orgId = await resolveOrgFromRequest(this.prisma, req);
 
         const member = await this.prisma.orgMember.findFirst({
-          where: { id, orgId, deletedAt: null },
+          where: {
+            id,
+            orgId,
+            deletedAt: null,
+            roles: staffMemberRoleFilter(),
+          },
           select: memberSelect,
         });
 
@@ -339,6 +355,7 @@ export class TenantAccessControlController {
       const where: Prisma.OrgMemberWhereInput = {
         orgId,
         deletedAt: null,
+        roles: staffMemberRoleFilter(),
       };
 
       if (status && ['ACTIVE', 'SUSPENDED', 'DISABLED'].includes(status)) {
@@ -347,7 +364,7 @@ export class TenantAccessControlController {
 
       if (
         roleCodeRaw &&
-        (MEMBER_ROLE_CODES as readonly string[]).includes(roleCodeRaw)
+        (PROVISION_MEMBER_ROLE_CODES as readonly string[]).includes(roleCodeRaw)
       ) {
         where.roles = {
           some: {
@@ -367,6 +384,12 @@ export class TenantAccessControlController {
         ];
       }
 
+      const staffScope: Prisma.OrgMemberWhereInput = {
+        orgId,
+        deletedAt: null,
+        roles: staffMemberRoleFilter(),
+      };
+
       const [rows, total, activeCount, suspendedCount, roleAssignments] = await Promise.all([
         this.prisma.orgMember.findMany({
           where,
@@ -376,14 +399,15 @@ export class TenantAccessControlController {
           take,
         }),
         this.prisma.orgMember.count({ where }),
-        this.prisma.orgMember.count({ where: { orgId, deletedAt: null, status: 'ACTIVE' } }),
+        this.prisma.orgMember.count({ where: { ...staffScope, status: 'ACTIVE' } }),
         this.prisma.orgMember.count({
-          where: { orgId, deletedAt: null, status: 'SUSPENDED' },
+          where: { ...staffScope, status: 'SUSPENDED' },
         }),
         this.prisma.orgMemberRole.count({
           where: {
             deletedAt: null,
             isActive: true,
+            roleCode: { in: [...PROVISION_MEMBER_ROLE_CODES] },
             orgMember: { orgId, deletedAt: null },
           },
         }),
@@ -436,7 +460,14 @@ export class TenantAccessControlController {
 
         const existing = await this.prisma.orgMember.findFirst({
           where: { id: recordId!, orgId, deletedAt: null },
-          select: { id: true, adminId: true },
+          select: {
+            id: true,
+            adminId: true,
+            roles: {
+              where: { deletedAt: null, isActive: true },
+              select: { roleCode: true },
+            },
+          },
         });
 
         if (!existing) {
@@ -468,7 +499,25 @@ export class TenantAccessControlController {
           }
         }
 
-        if (value.isPrimary === true) {
+        const nextRoleCodes =
+          (value.roleCodes as string[] | undefined) ?? existing.roles.map((r) => r.roleCode);
+        const isOrgAdmin = nextRoleCodes.some(
+          (code) => normalizeMemberRoleCode(code) === 'ORG_ADMIN'
+        );
+        if (value.isPrimary === true && !isOrgAdmin) {
+          return responseError(res, 400, {
+            code: 'PRIMARY_REQUIRES_ORG_ADMIN',
+            message: 'Only ORG_ADMIN members can be set as primary membership.',
+          });
+        }
+        let nextIsPrimary: boolean | undefined;
+        if (!isOrgAdmin) {
+          nextIsPrimary = false;
+        } else if (value.isPrimary !== undefined) {
+          nextIsPrimary = Boolean(value.isPrimary);
+        }
+
+        if (nextIsPrimary === true) {
           await this.prisma.orgMember.updateMany({
             where: { orgId, deletedAt: null, id: { not: recordId! } },
             data: { isPrimary: false },
@@ -481,7 +530,7 @@ export class TenantAccessControlController {
             data: {
               ...(value.title !== undefined && { title: value.title || null }),
               ...(value.status !== undefined && { status: value.status }),
-              ...(value.isPrimary !== undefined && { isPrimary: value.isPrimary }),
+              ...(nextIsPrimary !== undefined && { isPrimary: nextIsPrimary }),
             },
           });
 
@@ -611,7 +660,7 @@ export class TenantAccessControlController {
             orgId,
             adminId: targetAdminId,
             status: (value.status as string) || 'ACTIVE',
-            isPrimary: Boolean(value.isPrimary),
+            isPrimary: false,
             title: value.title?.trim() || null,
             createdByAdminId: actorAdminId,
             joinedAt: new Date(),

@@ -69,7 +69,7 @@ export function useTenantAccessControl() {
   );
 
   const createMember = useCallback(
-    async (payload: MemberCreateFormValues) => {
+    async (payload: MemberCreateFormValues & { roleCodes: string[] }) => {
       await Query.create(payload, orgId);
       refresh();
     },
