@@ -3,6 +3,10 @@
 import React from "react";
 import { Button, Input, Select, Space } from "antd";
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  voucherCodeFontClassName,
+  voucherCodeTextStyle,
+} from "@/features/wifi/shared/components/VoucherCodeText";
 import type { CredentialStatus, SellableCatalog } from "../types";
 import type { ResellerPickerOption } from "@/features/wifi/commerce/partners/workspace/types";
 import { STATUS_OPTIONS } from "../constant";
@@ -56,7 +60,8 @@ const AccessTokensToolbar: React.FC<Props> = ({
         placeholder="Search token, plan, site…"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
-        style={{ width: 240 }}
+        className={voucherCodeFontClassName}
+        style={{ width: 240, ...voucherCodeTextStyle }}
       />
       {showPartnerFilter ? (
         <Select

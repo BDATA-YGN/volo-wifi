@@ -5,6 +5,7 @@ import { Button, Empty, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { AccessTokenRecord } from "../types";
 import { formatWifiDateTime, maskVoucherToken } from "@/features/wifi/shared/format";
+import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
 import { STATUS_COLOR } from "../constant";
 import { formatMoney, formatStatusLabel } from "../utils";
 import { buildWifiTablePagination } from "@/features/wifi/shared/pagination";
@@ -40,16 +41,12 @@ const AccessTokensTable: React.FC<Props> = ({
       key: "token",
       render: (_, row) =>
         row.token ? (
-          <Text
-            code
-            copyable={{
-              text: row.token,
-              tooltips: ["Copy code", "Copied"],
-            }}
-            style={{ fontSize: 11 }}
-          >
-            {maskVoucherToken(row.token)}
-          </Text>
+          <VoucherCodeText
+            value={maskVoucherToken(row.token)}
+            copyable
+            copyText={row.token}
+            style={{ fontSize: 12, fontWeight: 600 }}
+          />
         ) : (
           "—"
         ),
@@ -61,7 +58,9 @@ const AccessTokensTable: React.FC<Props> = ({
       ellipsis: true,
       render: (_, row) => (
         <div>
-          <Tag style={{ fontFamily: "monospace", marginRight: 4 }}>{row.plan.code}</Tag>
+          <Tag>
+            <VoucherCodeText value={row.plan.code} style={{ fontSize: 12 }} />
+          </Tag>{" "}
           <Text style={{ fontSize: 12 }}>{row.plan.name}</Text>
         </div>
       ),
@@ -73,7 +72,9 @@ const AccessTokensTable: React.FC<Props> = ({
       ellipsis: true,
       render: (_, row) =>
         row.station ? (
-          <Tag style={{ fontFamily: "monospace" }}>{row.station.code}</Tag>
+          <Tag>
+            <VoucherCodeText value={row.station.code} style={{ fontSize: 12 }} />
+          </Tag>
         ) : (
           "—"
         ),
@@ -88,7 +89,9 @@ const AccessTokensTable: React.FC<Props> = ({
           <div>
             <Text style={{ fontSize: 12 }}>{row.reseller.name}</Text>
             <div>
-              <Tag style={{ fontFamily: "monospace", marginTop: 2 }}>{row.reseller.code}</Tag>
+              <Tag style={{ marginTop: 2 }}>
+                <VoucherCodeText value={row.reseller.code} style={{ fontSize: 12 }} />
+              </Tag>
             </div>
           </div>
         ) : (

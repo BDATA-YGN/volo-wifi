@@ -13,7 +13,8 @@ import {
   formatSessionDuration,
   formatStatusLabel,
 } from "@/features/wifi/commerce/access-tokens/utils";
-import { formatWifiDateTime, maskVoucherToken } from "@/features/wifi/shared/format";
+import { formatWifiDateTime } from "@/features/wifi/shared/format";
+import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
 import styles from "./partner.module.css";
 
 type Props = {
@@ -72,10 +73,17 @@ export default function PartnerTokenDetailDrawer({
       <Spin spinning={loading}>
         {row ? (
           <div className={styles.detailStack}>
-            <div className={styles.detailHero}>
-              <p className={styles.detailTokenCode}>
-                {row.token ? maskVoucherToken(row.token) : "—"}
-              </p>
+              <div className={styles.detailHero}>
+              {row.token ? (
+                <VoucherCodeText
+                  value={row.token}
+                  block
+                  className={styles.detailTokenCode}
+                  style={{ fontWeight: 700, fontSize: "1.35rem" }}
+                />
+              ) : (
+                <p className={styles.detailTokenCode}>—</p>
+              )}
               <p className={styles.listSecondary}>
                 {row.plan?.name ?? "Plan"}
                 {row.station ? ` · ${row.station.code}` : ""}

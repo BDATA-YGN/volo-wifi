@@ -3,26 +3,11 @@
 import React, { useCallback } from "react";
 import { App, Button, Modal, Typography, theme } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
-import { Roboto_Mono } from "next/font/google";
+import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
 import type { IssueTokenResult } from "../types";
 import { formatMoney } from "../utils";
 
 const { Text, Paragraph } = Typography;
-
-/** Monospace with slashed zero — distinguishes 0 from O in voucher codes. */
-const accessTokenFont = Roboto_Mono({
-  subsets: ["latin"],
-  weight: "600",
-  display: "swap",
-});
-
-const tokenTextStyle: React.CSSProperties = {
-  fontSize: 16,
-  lineHeight: 1.3,
-  letterSpacing: "0.12em",
-  fontVariantNumeric: "slashed-zero",
-  fontFeatureSettings: '"zero" 1',
-};
 
 type Props = {
   open: boolean;
@@ -94,13 +79,12 @@ const IssueSuccessModal: React.FC<Props> = ({ open, result, onClose }) => {
                   background: token.colorFillTertiary,
                 }}
               >
-                <span
-                  className={`${accessTokenFont.className} truncate`}
-                  style={tokenTextStyle}
+                <VoucherCodeText
+                  value={c.token ?? ""}
+                  className="truncate"
+                  style={{ fontSize: 16, lineHeight: 1.3, letterSpacing: "0.12em", fontWeight: 600 }}
                   title={c.token ?? undefined}
-                >
-                  {c.token}
-                </span>
+                />
                 {c.token ? (
                   <Button
                     type="text"

@@ -13,6 +13,7 @@ import { BRAND_METADATA_ICONS } from "@/common/brand";
 import DynamicIntlProvider from "@/common/provider/DynamicIntlProvider";
 import { Suspense } from "react";
 import { Loading } from "@/common/components/Base/Loading";
+import { voucherCodeFont } from "@/features/wifi/shared/voucher-code-font";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -57,7 +58,7 @@ async function DynamicContent({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={voucherCodeFont.variable}>
       <body>
         <Suspense fallback={
           <div style={{

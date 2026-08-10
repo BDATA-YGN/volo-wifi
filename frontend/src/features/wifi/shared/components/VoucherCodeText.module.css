@@ -1,0 +1,57 @@
+.voucherCode {
+  font-family: var(--font-voucher-code), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+    Monaco, Consolas, "Liberation Mono", monospace !important;
+  font-variant-numeric: slashed-zero;
+  font-feature-settings: "zero" 1;
+  font-synthesis: none;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.voucherCodeInline {
+  display: inline;
+}
+
+.voucherCodeBlock {
+  display: block;
+  margin: 0;
+}
+
+.char {
+  display: inline-block;
+}
+
+/**
+ * Drawn slash — guarantees 0 ≠ O even when the webfont / OpenType zero feature fails
+ * (e.g. NotoSansMyanmar inheritance inside Ant Design drawers).
+ */
+.zero {
+  position: relative;
+  display: inline-block;
+  /* Keep glyph metrics stable while the slash is drawn on top */
+  min-width: 0.55em;
+  text-align: center;
+}
+
+.zero::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: max(2px, 0.11em);
+  height: 84%;
+  background: currentColor;
+  border-radius: 1px;
+  transform: translateX(-50%) rotate(-28deg);
+  pointer-events: none;
+  opacity: 1;
+}
+
+.copyWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+}

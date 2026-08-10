@@ -25,6 +25,13 @@ export {
 export { KpiDeltaText } from "./components/KpiDeltaText";
 export { WifiMutedText } from "./components/WifiMutedText";
 export {
+  VoucherCodeText,
+  voucherCodeFontClassName,
+  voucherCodeTextStyle,
+  VOUCHER_CODE_FONT_STACK,
+} from "./components/VoucherCodeText";
+export { voucherCodeFont } from "./voucher-code-font";
+export {
   WIFI_DATE_FORMAT,
   WIFI_DATETIME_FORMAT,
   WIFI_TIME_FORMAT,

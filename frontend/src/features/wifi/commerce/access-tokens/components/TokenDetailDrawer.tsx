@@ -20,7 +20,12 @@ import type {
   CredentialLifecycleAction,
   RadiusSessionPreview,
 } from "../types";
-import { formatWifiDateTime, maskVoucherToken } from "@/features/wifi/shared/format";
+import { formatWifiDateTime } from "@/features/wifi/shared/format";
+import {
+  VoucherCodeText,
+  voucherCodeFontClassName,
+  voucherCodeTextStyle,
+} from "@/features/wifi/shared/components/VoucherCodeText";
 import { STATUS_COLOR } from "../constant";
 import {
   formatBytes,
@@ -29,7 +34,7 @@ import {
   formatStatusLabel,
 } from "../utils";
 
-const { Text, Title, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 
 type Props = {
   open: boolean;
@@ -260,16 +265,11 @@ const TokenDetailDrawer: React.FC<Props> = ({
           <>
             <div className="mb-4">
               {row.token ? (
-                <Text
-                  code
-                  copyable={{
-                    text: row.token,
-                    tooltips: ["Copy code", "Copied"],
-                  }}
-                  style={{ fontSize: 13 }}
-                >
-                  {maskVoucherToken(row.token)}
-                </Text>
+                <VoucherCodeText
+                  value={row.token}
+                  copyable
+                  style={{ fontSize: 16, fontWeight: 700 }}
+                />
               ) : null}
               <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 8 }}>
                 {row.plan.name} · {row.station?.code ?? "No site"}
@@ -288,10 +288,20 @@ const TokenDetailDrawer: React.FC<Props> = ({
 
             <Descriptions column={1} size="small" bordered className="mb-4">
               <Descriptions.Item label="Plan">
-                <Tag style={{ fontFamily: "monospace" }}>{row.plan.code}</Tag> {row.plan.name}
+                <Tag className={voucherCodeFontClassName} style={voucherCodeTextStyle}>
+                  {row.plan.code}
+                </Tag>{" "}
+                {row.plan.name}
               </Descriptions.Item>
               <Descriptions.Item label="Site">
-                {row.station ? `${row.station.code} — ${row.station.name}` : "—"}
+                {row.station ? (
+                  <>
+                    <VoucherCodeText value={row.station.code} />
+                    {` — ${row.station.name}`}
+                  </>
+                ) : (
+                  "—"
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Sale">
                 {row.sale ? (

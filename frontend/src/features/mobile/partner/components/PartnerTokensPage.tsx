@@ -13,6 +13,7 @@ import type {
 } from "@/features/wifi/commerce/access-tokens/types";
 import { calcLineTotal, formatMoney, formatStatusLabel } from "@/features/wifi/commerce/access-tokens/utils";
 import { formatWifiDateTime } from "@/features/wifi/shared/format";
+import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
 import { usePartnerAuthRedirect } from "../hooks/usePartnerAuthRedirect";
 import PartnerTokenDetailDrawer from "./PartnerTokenDetailDrawer";
 import styles from "./partner.module.css";
@@ -294,8 +295,11 @@ function TokenListCard({ row, onOpen }: { row: AccessTokenRecord; onOpen: () => 
     <button type="button" className={styles.listCardButton} onClick={onOpen}>
       <div className={styles.listRow}>
         <div>
-          <p className={styles.listPrimary} style={{ fontFamily: "monospace", letterSpacing: "0.06em" }}>
-            {maskSoldToken(row.token)}
+          <p className={styles.listPrimary}>
+            <VoucherCodeText
+              value={maskSoldToken(row.token)}
+              style={{ fontWeight: 700, fontSize: "inherit" }}
+            />
           </p>
           <p className={styles.listSecondary}>
             {row.plan?.name ?? "Plan"}
@@ -349,7 +353,12 @@ function PartnerSaleSuccess({
             <p className={styles.tokenPhotoLabel}>
               Token {credentials.length > 1 ? `${index + 1} of ${credentials.length}` : ""}
             </p>
-            <p className={styles.tokenPhotoCode}>{c.token ?? "—"}</p>
+            <VoucherCodeText
+              value={c.token ?? "—"}
+              block
+              className={styles.tokenPhotoCode}
+              style={{ fontWeight: 700, fontSize: "1.75rem", letterSpacing: "0.14em" }}
+            />
             <p className={styles.tokenPhotoDetail}>
               {c.plan?.name ?? "Plan"}
               {c.station ? ` · ${c.station.code}` : ""}
