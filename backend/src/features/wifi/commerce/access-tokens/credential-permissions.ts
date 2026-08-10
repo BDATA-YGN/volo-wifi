@@ -2,6 +2,7 @@ export type CredentialActions = {
   canRevoke: boolean;
   canPause: boolean;
   canUnlock: boolean;
+  canAllowNewDevice: boolean;
   canRevertToSold: boolean;
   revokeBlockedReason?: string;
 };
@@ -10,6 +11,7 @@ export type CredentialActions = {
 const REVOKABLE = new Set(['SOLD']);
 const PAUSABLE = new Set(['ACTIVATED']);
 const UNLOCKABLE = new Set(['PAUSED']);
+const ALLOW_NEW_DEVICE = new Set(['ACTIVATED']);
 const REVERTABLE = new Set(['ACTIVATED', 'PAUSED']);
 
 export type CredentialPermissionContext = {
@@ -51,6 +53,8 @@ export function resolveCredentialActions(
     canRevoke,
     canPause: isOpsElevated && PAUSABLE.has(status),
     canUnlock: UNLOCKABLE.has(status),
+    // Partner + org staff: free device slots for ACTIVATED tokens (does not raise maxDevices).
+    canAllowNewDevice: ALLOW_NEW_DEVICE.has(status),
     // Developer role only — not other platform roles, even in preview mode.
     canRevertToSold: ctx.isDeveloper && REVERTABLE.has(status),
     revokeBlockedReason,
@@ -67,12 +71,13 @@ export function adminRevocableStatuses(): Set<string> {
 
 export function assertCredentialActionAllowed(
   actions: CredentialActions,
-  action: 'revoke' | 'pause' | 'unlock' | 'revertToSold'
+  action: 'revoke' | 'pause' | 'unlock' | 'allowNewDevice' | 'revertToSold'
 ): void {
   const allowed =
     (action === 'revoke' && actions.canRevoke) ||
     (action === 'pause' && actions.canPause) ||
     (action === 'unlock' && actions.canUnlock) ||
+    (action === 'allowNewDevice' && actions.canAllowNewDevice) ||
     (action === 'revertToSold' && actions.canRevertToSold);
 
   if (!allowed) {
@@ -82,7 +87,9 @@ export function assertCredentialActionAllowed(
           'Revoke is only allowed before the token has been used.'
         : action === 'revertToSold'
           ? 'Revert to sold is only available to developers.'
-          : `Action "${action}" is not allowed for this token.`;
+          : action === 'allowNewDevice'
+            ? 'Allow new device is only available for activated tokens.'
+            : `Action "${action}" is not allowed for this token.`;
     throw Object.assign(new Error(message), { status: 403, code: 'ACTION_NOT_ALLOWED' });
   }
 }

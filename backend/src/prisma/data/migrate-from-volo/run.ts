@@ -44,6 +44,11 @@ type Ctx = {
   since: Date | null;
   /** OLD admin id → NEW admin id (after username collision remaps). */
   adminIdMap: Map<string, string>;
+  /**
+   * OLD station id → NEW station id when org+code already exists under a different id.
+   * Identity mapping is omitted (caller uses old id when absent).
+   */
+  stationIdMap: Map<string, string>;
   defaultStationSizeId: string;
   mediumUnitPrice: string;
 };
@@ -163,9 +168,13 @@ export async function runWifiLegacyMigration(
       orgIds,
       since: options.since ?? null,
       adminIdMap: new Map(),
+      stationIdMap: new Map(),
       defaultStationSizeId: medium?.id ?? 'DRY_RUN_SIZE',
       mediumUnitPrice: mediumPrice ? String(mediumPrice.unitPrice) : '100000.00',
     };
+
+    // Always build station remaps before inventory/commerce so FKs resolve.
+    await ensureStationIdRemaps(ctx);
 
     if (run1) {
       console.log(`→ ${PHASE_LABELS[1]}`);
@@ -558,6 +567,52 @@ function mapAdminId(ctx: Ctx, oldAdminId: string | null | undefined): string | n
   return ctx.adminIdMap.get(oldAdminId) ?? null;
 }
 
+function mapStationId(ctx: Ctx, oldStationId: string | null | undefined): string | null {
+  if (!oldStationId) return null;
+  return ctx.stationIdMap.get(oldStationId) ?? oldStationId;
+}
+
+/**
+ * When NEW already has a station with the same org+code but a different id,
+ * map OLD station ids → NEW so credentials/sales FKs still resolve.
+ */
+async function ensureStationIdRemaps(ctx: Ctx): Promise<void> {
+  if (!ctx.apply || !ctx.old.hasTable('wf_station')) return;
+
+  const { sql, params } = childOrgWhere(ctx, 'wf_station', { since: false });
+  const fields = ['id', 'orgId', 'code'];
+  const select = ctx.old.selectList('wf_station', fields);
+  const oldRows = await ctx.old.query<{ id: string; orgId: string; code: string }>(
+    `SELECT ${select} FROM ${ctx.old.q('wf_station')} ${sql}`,
+    params,
+  );
+  if (!oldRows.length) return;
+
+  const orgIds = [...new Set(oldRows.map((r) => String(r.orgId)))];
+  const existing = await ctx.newPool.query<{ id: string; org_id: string; code: string }>(
+    `SELECT id, org_id, code
+     FROM wf_station
+     WHERE org_id = ANY($1::text[])`,
+    [orgIds],
+  );
+  const byOrgCode = new Map(existing.rows.map((r) => [`${r.org_id}::${r.code}`, r.id]));
+
+  let remapped = 0;
+  for (const row of oldRows) {
+    const key = `${row.orgId}::${row.code}`;
+    const newId = byOrgCode.get(key);
+    if (newId && newId !== row.id) {
+      ctx.stationIdMap.set(String(row.id), newId);
+      remapped++;
+    }
+  }
+  if (remapped > 0) {
+    ctx.report.notes.push(
+      `Station id remaps: ${remapped} OLD station(s) share org+code with a different NEW id`,
+    );
+  }
+}
+
 
 /* -------------------------------------------------------------------------- */
 /* Orgs + licenses                                                            */
@@ -806,7 +861,9 @@ async function importResellers(ctx: Ctx): Promise<void> {
       'deleted_at',
     ];
     const rows = batch.map((row) => {
-      const stationIds = parseStationIdsJson(row.stationIds);
+      const stationIds = parseStationIdsJson(row.stationIds).map(
+        (id) => mapStationId(ctx, id) ?? id,
+      );
       return [
         String(row.id),
         String(row.orgId),
@@ -844,31 +901,53 @@ async function importResellers(ctx: Ctx): Promise<void> {
       // Fall back row-by-row on unique conflicts
       for (const row of batch) {
         try {
+          const mappedAdminId = mapAdminId(ctx, asString(row.adminId));
+          let adminId = mappedAdminId;
+          if (adminId) {
+            const taken = await ctx.prisma.reseller.findFirst({
+              where: { adminId, NOT: { id: String(row.id) } },
+              select: { id: true },
+            });
+            if (taken) {
+              issue(
+                ctx.report,
+                'Reseller',
+                'warn',
+                `admin_id ${adminId} already on reseller ${taken.id}; importing ${row.id} with null adminId`,
+                String(row.id),
+              );
+              adminId = null;
+            }
+          }
           await ctx.prisma.reseller.upsert({
             where: { id: String(row.id) },
             create: {
               id: String(row.id),
               orgId: String(row.orgId),
-              adminId: mapAdminId(ctx, asString(row.adminId)),
+              adminId,
               code: String(row.code),
               name: String(row.name),
               phone: asString(row.phone),
               email: asString(row.email),
               address: asString(row.address),
               status: normalizeUserStatus(asString(row.status)),
-              stationIds: parseStationIdsJson(row.stationIds),
+              stationIds: parseStationIdsJson(row.stationIds).map(
+                (id) => mapStationId(ctx, id) ?? id,
+              ),
               createdAt: asDate(row.createdAt) ?? new Date(),
               updatedAt: asDate(row.updatedAt) ?? new Date(),
               deletedAt: asDate(row.deletedAt),
             },
             update: {
-              adminId: mapAdminId(ctx, asString(row.adminId)),
+              ...(adminId ? { adminId } : {}),
               name: String(row.name),
               phone: asString(row.phone),
               email: asString(row.email),
               address: asString(row.address),
               status: normalizeUserStatus(asString(row.status)),
-              stationIds: parseStationIdsJson(row.stationIds),
+              stationIds: parseStationIdsJson(row.stationIds).map(
+                (id) => mapStationId(ctx, id) ?? id,
+              ),
               updatedAt: asDate(row.updatedAt) ?? new Date(),
               deletedAt: asDate(row.deletedAt),
             },
@@ -990,8 +1069,111 @@ async function importStationsAndDevices(ctx: Ctx): Promise<void> {
       bump(stats, 'inserted', result.inserted);
       bump(stats, 'updated', result.updated);
     } catch (err) {
-      bump(stats, 'errors', batch.length);
-      issue(ctx.report, 'WifiStation', 'error', (err as Error).message);
+      issue(
+        ctx.report,
+        'WifiStation',
+        'warn',
+        `Batch upsert failed, fell back row-by-row: ${(err as Error).message}`,
+      );
+      for (const row of batch) {
+        const oldId = String(row.id);
+        const orgId = String(row.orgId);
+        const code = String(row.code);
+        const values = [
+          oldId,
+          orgId,
+          code,
+          String(row.name),
+          asString(row.location),
+          asString(row.address),
+          asString(row.status) ?? 'ACTIVE',
+          ctx.defaultStationSizeId,
+          asString(row.portalBaseUrl),
+          asString(row.nasIdentifier),
+          asString(row.radiusClientIp),
+          asString(row.radiusSecret),
+          row.vlanId == null ? null : String(row.vlanId),
+          mapAdminId(ctx, asString(row.adminId)),
+          null,
+          asDate(row.createdAt) ?? new Date(),
+          asDate(row.updatedAt) ?? new Date(),
+          asDate(row.deletedAt),
+        ];
+        try {
+          const result = await bulkUpsertById(ctx.newPool, 'wf_station', stationColumns, [values], [
+            'org_id',
+            'code',
+            'name',
+            'location',
+            'address',
+            'status',
+            'station_size_id',
+            'portalBaseUrl',
+            'nasIdentifier',
+            'radiusClientIp',
+            'radiusSecret',
+            'vlan_id',
+            'admin_id',
+            'updated_at',
+            'deleted_at',
+          ]);
+          bump(stats, 'inserted', result.inserted);
+          bump(stats, 'updated', result.updated);
+        } catch (rowErr) {
+          // org+code already taken by a different id — keep NEW id and remap.
+          const existing = await ctx.newPool.query<{ id: string }>(
+            `SELECT id FROM wf_station WHERE org_id = $1 AND code = $2 LIMIT 1`,
+            [orgId, code],
+          );
+          const existingId = existing.rows[0]?.id;
+          if (existingId && existingId !== oldId) {
+            await ctx.newPool.query(
+              `UPDATE wf_station SET
+                 name = $3,
+                 location = $4,
+                 address = $5,
+                 status = $6,
+                 "portalBaseUrl" = $7,
+                 "nasIdentifier" = $8,
+                 "radiusClientIp" = $9,
+                 "radiusSecret" = $10,
+                 vlan_id = $11,
+                 admin_id = $12,
+                 updated_at = $13,
+                 deleted_at = $14
+               WHERE id = $1 AND org_id = $2`,
+              [
+                existingId,
+                orgId,
+                String(row.name),
+                asString(row.location),
+                asString(row.address),
+                asString(row.status) ?? 'ACTIVE',
+                asString(row.portalBaseUrl),
+                asString(row.nasIdentifier),
+                asString(row.radiusClientIp),
+                asString(row.radiusSecret),
+                row.vlanId == null ? null : String(row.vlanId),
+                mapAdminId(ctx, asString(row.adminId)),
+                asDate(row.updatedAt) ?? new Date(),
+                asDate(row.deletedAt),
+              ],
+            );
+            ctx.stationIdMap.set(oldId, existingId);
+            bump(stats, 'updated');
+            issue(
+              ctx.report,
+              'WifiStation',
+              'warn',
+              `Remapped station ${code}: OLD ${oldId} → NEW ${existingId}`,
+              oldId,
+            );
+          } else {
+            bump(stats, 'errors');
+            issue(ctx.report, 'WifiStation', 'error', (rowErr as Error).message, oldId);
+          }
+        }
+      }
     }
   }
   stats.source = source;
@@ -1058,7 +1240,7 @@ async function importStationsAndDevices(ctx: Ctx): Promise<void> {
     const rows = batch.map((row) => [
       String(row.id),
       String(row.orgId),
-      asString(row.stationId),
+      mapStationId(ctx, asString(row.stationId)),
       asString(row.type) ?? 'ROUTER',
       asString(row.vendor),
       asString(row.model),
@@ -1452,7 +1634,7 @@ async function importPlansAndPrices(ctx: Ctx): Promise<void> {
 
         for (const row of batch) {
           const bookId = String(row.id);
-          const stationId = asString(row.stationId);
+          const stationId = mapStationId(ctx, asString(row.stationId));
           const resellerId = asString(row.resellerId);
           if (stationId) {
             await ctx.newPool.query(
@@ -1659,8 +1841,43 @@ async function importResellerEntitlementsAndStations(ctx: Ctx): Promise<void> {
           bump(entStats, 'inserted', result.inserted);
           bump(entStats, 'updated', result.updated);
         } catch (err) {
-          bump(entStats, 'errors', batch.length);
-          issue(ctx.report, 'ResellerPlanEntitlement', 'error', (err as Error).message);
+          issue(
+            ctx.report,
+            'ResellerPlanEntitlement',
+            'warn',
+            `Batch upsert failed, fell back: ${(err as Error).message}`,
+          );
+          for (const row of batch) {
+            try {
+              await ctx.newPool.query(
+                `INSERT INTO wf_reseller_plan_entitlement (
+                   id, org_id, reseller_id, plan_id, is_enabled, created_at, updated_at
+                 ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+                 ON CONFLICT (reseller_id, plan_id) DO UPDATE SET
+                   is_enabled = EXCLUDED.is_enabled,
+                   updated_at = EXCLUDED.updated_at`,
+                [
+                  String(row.id),
+                  asString(row.orgId) ?? String(row.orgIdFromReseller),
+                  String(row.resellerId),
+                  String(row.planId),
+                  asBool(row.isEnabled, true),
+                  asDate(row.createdAt) ?? new Date(),
+                  asDate(row.updatedAt) ?? new Date(),
+                ],
+              );
+              bump(entStats, 'updated');
+            } catch (rowErr) {
+              bump(entStats, 'errors');
+              issue(
+                ctx.report,
+                'ResellerPlanEntitlement',
+                'error',
+                (rowErr as Error).message,
+                String(row.id),
+              );
+            }
+          }
         }
       } else {
         bump(entStats, 'inserted', batch.length);
@@ -1679,7 +1896,9 @@ async function importResellerEntitlementsAndStations(ctx: Ctx): Promise<void> {
     select: { id: true, orgId: true, stationIds: true },
   });
   for (const rs of resellers) {
-    const stationIds = parseStationIdsJson(rs.stationIds);
+    const stationIds = parseStationIdsJson(rs.stationIds).map(
+      (id) => mapStationId(ctx, id) ?? id,
+    );
     for (const stationId of stationIds) {
       rsStats.source += 1;
       try {
@@ -1779,7 +1998,7 @@ async function importVoucherBatches(ctx: Ctx): Promise<void> {
         remaining,
         asString(row.prefix),
         asString(row.note),
-        asString(row.stationId),
+        mapStationId(ctx, asString(row.stationId)),
         asString(row.resellerId),
         asDate(row.createdAt) ?? new Date(),
         asDate(row.updatedAt) ?? new Date(),
@@ -1903,7 +2122,7 @@ async function importCredentials(ctx: Ctx): Promise<void> {
       asString(row.token),
       asString(row.username),
       asString(row.passwordHash),
-      asString(row.stationId),
+      mapStationId(ctx, asString(row.stationId)),
       asString(row.resellerId),
       hasVoucherBatch ? asString(row.voucherBatchId) : null,
       asDate(row.soldAt),
@@ -1943,9 +2162,45 @@ async function importCredentials(ctx: Ctx): Promise<void> {
       bump(stats, 'inserted', result.inserted);
       bump(stats, 'updated', result.updated);
     } catch (err) {
-      bump(stats, 'errors', batch.length);
-      issue(ctx.report, 'Credential', 'error', (err as Error).message);
-      if (stats.errors > 10_000) {
+      issue(
+        ctx.report,
+        'Credential',
+        'warn',
+        `Batch upsert failed, fell back row-by-row: ${(err as Error).message}`,
+      );
+      for (const row of rows) {
+        try {
+          const result = await bulkUpsertById(ctx.newPool, 'wf_credential', columns, [row], [
+            'org_id',
+            'type',
+            'status',
+            'plan_id',
+            'token',
+            'username',
+            'password_hash',
+            'station_id',
+            'reseller_id',
+            'voucher_batch_id',
+            'sold_at',
+            'activated_at',
+            'expires_at',
+            'revoked_at',
+            'single_session_reseller_unlock_at',
+            'timeRemainingSec',
+            'data_remaining_mb',
+            'updated_at',
+            'deleted_at',
+          ]);
+          bump(stats, 'inserted', result.inserted);
+          bump(stats, 'updated', result.updated);
+        } catch (rowErr) {
+          bump(stats, 'errors');
+          if (stats.errors <= 25) {
+            issue(ctx.report, 'Credential', 'error', (rowErr as Error).message, String(row[0]));
+          }
+        }
+      }
+      if (stats.errors > 50_000) {
         issue(ctx.report, 'Credential', 'error', 'Too many credential errors; aborting further batches');
         break;
       }
@@ -2032,7 +2287,7 @@ async function importSales(ctx: Ctx): Promise<void> {
         String(row.orderNo),
         asString(row.status) ?? 'DRAFT',
         asString(row.resellerId),
-        asString(row.stationId),
+        mapStationId(ctx, asString(row.stationId)),
         asDecimalString(row.subtotal),
         asDecimalString(row.discount),
         asDecimalString(row.total),

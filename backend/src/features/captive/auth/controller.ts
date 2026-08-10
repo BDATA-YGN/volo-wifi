@@ -24,6 +24,11 @@ import {
 import { CaptiveLoginSchema } from './schema';
 import { captiveLoginCredentialInclude, runCaptiveLoginGuards } from './login-guards';
 import { recordCaptivePortalSession } from '@/features/captive/services/captive-portal-session.service';
+import {
+  computeCredentialTimeRemainingSec,
+  planTimeQuotaSec,
+  resolveActivationExpiresAt,
+} from '@/features/shared/credentials/credential-sync.helpers';
 
 const prisma = PrismaDBConnection.getConnection();
 
@@ -125,13 +130,24 @@ export class CaptiveAuthController {
           shouldMarkActivated ||
           credential.status === CredentialStatus.ACTIVATED
         ) {
+          const activatedAt = credential.activatedAt ?? new Date();
+          const expiresAt = resolveActivationExpiresAt(
+            activatedAt,
+            credential.plan?.validityDays,
+            credential.expiresAt,
+          );
+          const quotaSec = planTimeQuotaSec(credential.plan);
           await prisma.credential.update({
             where: { id: credential.id },
             data: {
               ...(shouldMarkActivated
                 ? { status: CredentialStatus.ACTIVATED }
                 : {}),
-              activatedAt: credential.activatedAt ?? new Date(),
+              activatedAt,
+              ...(expiresAt && !credential.expiresAt ? { expiresAt } : {}),
+              ...(quotaSec != null && credential.timeRemainingSec == null
+                ? { timeRemainingSec: quotaSec }
+                : {}),
             },
           });
         }
@@ -155,6 +171,18 @@ export class CaptiveAuthController {
         await runCaptiveLoginGuards(credential, { clientMac, nasParams: nasParamsBody });
       } catch (error) {
         mapLoginGuardError(error);
+      }
+
+      // Keep remaining-time cache aligned so FreeRADIUS/dashboard stay consistent.
+      if (credential.plan) {
+        const remainingSec = await computeCredentialTimeRemainingSec(credential, credential.plan);
+        if (remainingSec != null && remainingSec !== credential.timeRemainingSec) {
+          await prisma.credential.update({
+            where: { id: credential.id },
+            data: { timeRemainingSec: remainingSec },
+          });
+          credential = { ...credential, timeRemainingSec: remainingSec };
+        }
       }
 
       const radiusUserName = credential.username ?? credential.token ?? '';

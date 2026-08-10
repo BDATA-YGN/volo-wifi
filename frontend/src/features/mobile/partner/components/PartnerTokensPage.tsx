@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { App, Drawer, Form, InputNumber, Select, Spin } from "antd";
 import { useRequest } from "ahooks";
+import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import { useCommerceAccessTokens } from "@/features/wifi/commerce/access-tokens/useCommerceAccessTokens";
 import type {
   AccessTokenRecord,
@@ -138,7 +139,7 @@ export default function PartnerTokensPage() {
     {
       manual: true,
       onError: (err) => {
-        message.error(err instanceof Error ? err.message : "Sale failed");
+        message.error(getApiErrorMessage(err, "Could not issue tokens. Please try again."));
       },
     }
   );

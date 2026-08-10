@@ -86,6 +86,7 @@ FROM (
 
 --
 -- View: radreply — per-user REPLY (station-scoped plan attributes + remaining quota)
+-- {timeSeconds} expands to plan_quota − cumulative RADIUS used (not a fresh full quota).
 --
 CREATE OR REPLACE VIEW radreply AS
 SELECT
@@ -106,17 +107,33 @@ FROM (
 				REPLACE(
 					pra.value,
 					'{timeSeconds}',
-					COALESCE(
-						c."timeRemainingSec"::text,
-						(p.time_amount *
-							CASE p.time_unit
-								WHEN 'MINUTE' THEN 60
-								WHEN 'HOUR' THEN 3600
-								WHEN 'DAY' THEN 86400
-								ELSE 0
-							END)::text,
-						'0'
-					)
+					CASE
+						WHEN COALESCE(p.time_amount, 0) > 0 AND p.time_unit IS NOT NULL THEN
+							GREATEST(
+								0,
+								(p.time_amount *
+									CASE p.time_unit
+										WHEN 'MINUTE' THEN 60
+										WHEN 'HOUR' THEN 3600
+										WHEN 'DAY' THEN 86400
+										WHEN 'MONTH' THEN 2592000
+										ELSE 0
+									END) - COALESCE(used.used_sec, 0)
+							)::text
+						ELSE
+							COALESCE(
+								c."timeRemainingSec"::text,
+								(COALESCE(p.time_amount, 0) *
+									CASE p.time_unit
+										WHEN 'MINUTE' THEN 60
+										WHEN 'HOUR' THEN 3600
+										WHEN 'DAY' THEN 86400
+										WHEN 'MONTH' THEN 2592000
+										ELSE 0
+									END)::text,
+								'0'
+							)
+					END
 				)
 			WHEN pra.value LIKE '%{dataMb}%' THEN
 				REPLACE(
@@ -129,6 +146,36 @@ FROM (
 	FROM wf_credential c
 	INNER JOIN wf_plan p ON p.id = c.plan_id AND p.deleted_at IS NULL
 	LEFT JOIN wf_station ws ON ws.id = c.station_id AND ws.deleted_at IS NULL
+	LEFT JOIN LATERAL (
+		SELECT COALESCE(SUM(
+			CASE
+				WHEN rs.stopped_at IS NOT NULL THEN
+					COALESCE(
+						rs."sessionTimeSec",
+						GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (rs.stopped_at - rs.started_at))))::integer
+					)
+				ELSE
+					GREATEST(
+						COALESCE(rs."sessionTimeSec", 0),
+						GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - rs.started_at))))::integer
+					)
+			END
+		), 0)::integer AS used_sec
+		FROM wf_radius_session rs
+		WHERE (
+			(c.username IS NOT NULL AND rs.user_name = c.username)
+			OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
+		)
+		AND (
+			p.time_usage_mode::text IS DISTINCT FROM 'SINGLE_SESSION'
+			OR rs.started_at >= COALESCE(
+				c.single_session_reseller_unlock_at,
+				c.activated_at,
+				c.sold_at,
+				'-infinity'::timestamptz
+			)
+		)
+	) used ON true
 	INNER JOIN wf_plan_radius_attribute pra ON pra.plan_id = p.id
 		AND pra.phase = 'REPLY'
 		AND pra.deleted_at IS NULL

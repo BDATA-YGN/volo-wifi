@@ -1,10 +1,20 @@
 import PrismaDBConnection from '@/prisma/prisma-client';
 import {
   Plan,
+  PlanTimeUsageMode,
   UnitTime,
 } from '@/generated/prisma/client';
 
 const prisma = PrismaDBConnection.getConnection();
+
+export type CredentialTimeUsageIdentity = {
+  id: string;
+  username: string | null;
+  token: string | null;
+  singleSessionResellerUnlockAt?: Date | null;
+  activatedAt?: Date | null;
+  soldAt?: Date | null;
+};
 
 export function planHasTimeQuota(
   plan: Pick<Plan, 'quotaType' | 'timeAmount'> | null | undefined,
@@ -114,10 +124,58 @@ export async function aggregateRadiusUsedSeconds(
         Math.max(0, Math.floor((s.stoppedAt.getTime() - s.startedAt.getTime()) / 1000));
       total += sec;
     } else if (includeActive) {
-      const sec =
-        s.sessionTimeSec ?? Math.max(0, Math.floor((now - s.startedAt.getTime()) / 1000));
+      const wall = Math.max(0, Math.floor((now - s.startedAt.getTime()) / 1000));
+      const sec = Math.max(s.sessionTimeSec ?? 0, wall);
       total += sec;
     }
   }
   return total;
+}
+
+export function radiusUsageSinceForPlan(
+  credential: Pick<
+    CredentialTimeUsageIdentity,
+    'singleSessionResellerUnlockAt' | 'activatedAt' | 'soldAt'
+  >,
+  plan: Pick<Plan, 'timeUsageMode'>,
+): Date | null {
+  if (plan.timeUsageMode !== PlanTimeUsageMode.SINGLE_SESSION) {
+    return null;
+  }
+  return (
+    credential.singleSessionResellerUnlockAt ??
+    credential.activatedAt ??
+    credential.soldAt ??
+    null
+  );
+}
+
+/** Remaining plan seconds (quota − RADIUS used), or null when the plan has no time quota. */
+export async function computeCredentialTimeRemainingSec(
+  credential: CredentialTimeUsageIdentity,
+  plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode'>,
+): Promise<number | null> {
+  if (!planHasTimeQuota(plan)) {
+    return null;
+  }
+  const quotaSec = planTimeQuotaSec(plan);
+  if (quotaSec == null || quotaSec <= 0) {
+    return null;
+  }
+  const usedSec = await aggregateRadiusUsedSeconds(credential, {
+    since: radiusUsageSinceForPlan(credential, plan),
+    includeActive: true,
+  });
+  return Math.max(0, quotaSec - usedSec);
+}
+
+/** Wall-clock voucher expiry from first activation (validityDays). */
+export function resolveActivationExpiresAt(
+  activatedAt: Date,
+  validityDays: number | null | undefined,
+  existingExpiresAt?: Date | null,
+): Date | null {
+  if (existingExpiresAt) return existingExpiresAt;
+  if (validityDays == null || validityDays <= 0) return null;
+  return new Date(activatedAt.getTime() + validityDays * 86_400_000);
 }

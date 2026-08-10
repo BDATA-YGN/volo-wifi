@@ -137,6 +137,7 @@ const CommerceAccessTokensPage: React.FC = () => {
   const actionLabels: Record<CredentialLifecycleAction, string> = {
     pause: "Pause this token?",
     unlock: "Unlock this token for login?",
+    allowNewDevice: "Allow a new device to use this token?",
     revertToSold: "Revert this token to sold status?",
   };
 
@@ -148,13 +149,26 @@ const CommerceAccessTokensPage: React.FC = () => {
           ? "Activation state will be cleared. Org staff and developers only."
           : action === "pause"
             ? "The customer will not be able to log in until the token is unlocked."
-            : "The customer can log in again if the plan quota allows.",
-      okText: action === "pause" ? "Pause" : action === "unlock" ? "Unlock" : "Revert",
+            : action === "allowNewDevice"
+              ? "Releases the current device slot (online session / recent portal login) so another phone or laptop can log in with this token. This does not add permanent multi-device capacity."
+              : "The customer can log in again if the plan quota allows.",
+      okText:
+        action === "pause"
+          ? "Pause"
+          : action === "unlock"
+            ? "Unlock"
+            : action === "allowNewDevice"
+              ? "Allow new device"
+              : "Revert",
       onOk: async () => {
         try {
           const updated = await applyTokenAction(record.id, action);
           setSelected(updated);
-          message.success("Token updated");
+          message.success(
+            action === "allowNewDevice"
+              ? "Device binding cleared. Customer can log in from a new device now."
+              : "Token updated"
+          );
         } catch (err: unknown) {
           message.error(getApiErrorMessage(err, "Failed to update token"));
         }

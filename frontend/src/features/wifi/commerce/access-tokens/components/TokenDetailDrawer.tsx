@@ -231,6 +231,11 @@ const TokenDetailDrawer: React.FC<Props> = ({
                 Unlock
               </Button>
             ) : null}
+            {actions.canAllowNewDevice ? (
+              <Button size="small" type="primary" onClick={() => onApplyAction(row, "allowNewDevice")}>
+                Allow new device
+              </Button>
+            ) : null}
             {actions.canPause ? (
               <Button size="small" onClick={() => onApplyAction(row, "pause")}>
                 Pause

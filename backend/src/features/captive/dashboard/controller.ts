@@ -12,6 +12,8 @@ import {
   captiveSuccess,
 } from '@/features/captive/messages';
 import {
+  computeCredentialTimeRemainingSec,
+  planTimeQuotaSec,
   radiusSessionMatchWhere,
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
@@ -136,13 +138,15 @@ export class CaptiveDashboardController {
           };
         });
 
-        let totalTimeSec: number | null = null;
-        let remainingTimeSec: number | null = credential.timeRemainingSec ?? null;
-        if (plan?.timeAmount != null && plan?.timeUnit) {
-          const unitMultiplier =
-            plan.timeUnit === 'MINUTE' ? 60 : plan.timeUnit === 'HOUR' ? 3600 : plan.timeUnit === 'DAY' ? 86400 : 0;
-          totalTimeSec = plan.timeAmount * unitMultiplier;
-          if (remainingTimeSec == null) remainingTimeSec = totalTimeSec;
+        let totalTimeSec: number | null = planTimeQuotaSec(plan);
+        let remainingTimeSec: number | null = null;
+        if (totalTimeSec != null && plan) {
+          remainingTimeSec = await computeCredentialTimeRemainingSec(credential, plan);
+          if (remainingTimeSec == null) {
+            remainingTimeSec = credential.timeRemainingSec ?? totalTimeSec;
+          }
+        } else if (credential.timeRemainingSec != null) {
+          remainingTimeSec = credential.timeRemainingSec;
         }
 
         const usedTimeSec =
@@ -309,13 +313,15 @@ export class CaptiveDashboardController {
         }
 
         const plan = credential.plan;
-        let totalTimeSec: number | null = null;
-        let remainingTimeSec: number | null = credential.timeRemainingSec ?? null;
-        if (plan?.timeAmount != null && plan?.timeUnit) {
-          const unitMultiplier =
-            plan.timeUnit === 'MINUTE' ? 60 : plan.timeUnit === 'HOUR' ? 3600 : plan.timeUnit === 'DAY' ? 86400 : 0;
-          totalTimeSec = plan.timeAmount * unitMultiplier;
-          if (remainingTimeSec == null) remainingTimeSec = totalTimeSec;
+        let totalTimeSec: number | null = planTimeQuotaSec(plan);
+        let remainingTimeSec: number | null = null;
+        if (totalTimeSec != null && plan) {
+          remainingTimeSec = await computeCredentialTimeRemainingSec(credential, plan);
+          if (remainingTimeSec == null) {
+            remainingTimeSec = credential.timeRemainingSec ?? totalTimeSec;
+          }
+        } else if (credential.timeRemainingSec != null) {
+          remainingTimeSec = credential.timeRemainingSec;
         }
 
         const usedTimeSec =

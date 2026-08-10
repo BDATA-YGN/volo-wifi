@@ -12,7 +12,12 @@ export const CommerceAccessTokensIssueSchema = Joi.object({
   note: Joi.string().trim().max(500).allow('', null),
 }).unknown(false);
 
-export const CREDENTIAL_LIFECYCLE_ACTIONS = ['pause', 'unlock', 'revertToSold'] as const;
+export const CREDENTIAL_LIFECYCLE_ACTIONS = [
+  'pause',
+  'unlock',
+  'allowNewDevice',
+  'revertToSold',
+] as const;
 
 export const CommerceAccessTokensActionSchema = Joi.object({
   action: Joi.string()

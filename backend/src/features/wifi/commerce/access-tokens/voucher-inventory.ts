@@ -5,13 +5,27 @@ export class InsufficientVoucherInventoryError extends Error {
   readonly code = 'INSUFFICIENT_VOUCHER_INVENTORY';
 
   constructor(available: number, requested: number) {
-    super(
-      available <= 0
-        ? 'No voucher capacity is available for this plan and site. Create a voucher run first.'
-        : `Only ${available} voucher slot${available === 1 ? '' : 's'} available (requested ${requested}).`
-    );
+    super(formatInsufficientVoucherInventoryMessage(available, requested));
     this.name = 'InsufficientVoucherInventoryError';
   }
+}
+
+/** End-user copy when voucher-run token allowance is exhausted or too low. */
+export function formatInsufficientVoucherInventoryMessage(
+  available: number,
+  requested: number,
+): string {
+  if (available <= 0) {
+    return (
+      'Token allowance for this plan and site is used up. ' +
+      'Create a new voucher run (Access → Voucher Runs) to add more tokens before issuing.'
+    );
+  }
+  const left = available === 1 ? '1 token left' : `${available} tokens left`;
+  return (
+    `Not enough tokens left to issue. ${left} for this plan and site, ` +
+    `but you requested ${requested}. Lower the quantity or create a new voucher run.`
+  );
 }
 
 type InventoryClient = Pick<Prisma.TransactionClient, 'voucherBatch'>;

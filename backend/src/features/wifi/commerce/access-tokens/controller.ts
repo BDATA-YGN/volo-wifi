@@ -30,6 +30,7 @@ import {
   type CredentialPermissionContext,
 } from './credential-permissions';
 import {
+  allowNewDeviceAccessToken,
   pauseAccessToken,
   revertAccessTokenToSold,
   unlockAccessToken,
@@ -39,6 +40,7 @@ import { revokeAccessToken } from './revoke-access-token';
 import { generateUniqueAlphanumericToken } from '@/features/shared/credentials/voucher-token';
 import {
   countAvailableVoucherSlots,
+  formatInsufficientVoucherInventoryMessage,
   InsufficientVoucherInventoryError,
   reserveVoucherBatchSlots,
 } from './voucher-inventory';
@@ -1125,14 +1127,12 @@ export class CommerceAccessTokensController {
         if (availableSlots < quantity) {
           return responseError(res, 409, {
             code: 'INSUFFICIENT_VOUCHER_INVENTORY',
-            message:
-              availableSlots <= 0
-                ? 'No voucher capacity is available for this plan and site. Create a voucher run first.'
-                : `Only ${availableSlots} voucher slot${availableSlots === 1 ? '' : 's'} available (requested ${quantity}).`,
+            message: formatInsufficientVoucherInventoryMessage(availableSlots, quantity),
           });
         }
 
-        const result = await this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(
+          async (tx) => {
           const batchIds = await reserveVoucherBatchSlots(
             tx,
             orgId,
@@ -1206,7 +1206,10 @@ export class CommerceAccessTokensController {
           }
 
           return { order, credentials };
-        });
+          },
+          // Remote DO PG: each token does uniqueness check + creates; default 5s is too tight.
+          { maxWait: 15_000, timeout: 60_000 },
+        );
 
         return responseSuccess(res, {
           status: 201,
@@ -1231,6 +1234,14 @@ export class CommerceAccessTokensController {
       } catch (err: unknown) {
         if (err instanceof InsufficientVoucherInventoryError) {
           return responseError(res, err.status, { code: err.code, message: err.message });
+        }
+        const rawMessage = err instanceof Error ? err.message : '';
+        if (/expired transaction|transaction.*timeout|interactive transaction/i.test(rawMessage)) {
+          return responseError(res, 503, {
+            code: 'ISSUE_TIMEOUT',
+            message:
+              'Issuing tokens took too long (slow database). Please try again with a smaller quantity.',
+          });
         }
         const status =
           err && typeof err === 'object' && 'status' in err
@@ -1334,23 +1345,52 @@ export class CommerceAccessTokensController {
       try {
         const context = await resolveResellerContext(this.prisma, adminId, req.user, q);
 
-        if ('requiresOrgSelection' in context || 'requiresResellerSelection' in context) {
+        if ('requiresOrgSelection' in context) {
           return responseError(res, 400, {
             code: 'RESELLER_REQUIRED',
-            message: 'Select a partner context before changing token status.',
+            message: 'Select an organization before changing token status.',
           });
         }
 
-        const { orgId, resellerId, mode } = context;
         const isDeveloper = isDeveloperAdmin(req.user!);
         const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
 
-        const existing = await this.prisma.credential.findFirst({
-          where: { id, orgId, resellerId, deletedAt: null },
-          select: { status: true, soldAt: true },
-        });
-        if (!existing) {
-          return responseError(res, 404, { code: 'NOT_FOUND', message: 'Access token not found.' });
+        let orgId: string;
+        let resellerId: string;
+        let mode: 'partner' | 'preview';
+        let existing: { status: string; soldAt: Date | null };
+
+        if ('requiresResellerSelection' in context) {
+          // Admin preview with "all partners" list: use the token's own partner.
+          const credential = await this.prisma.credential.findFirst({
+            where: { id, orgId: context.orgId, deletedAt: null },
+            select: { status: true, soldAt: true, resellerId: true },
+          });
+          if (!credential?.resellerId) {
+            return responseError(res, 404, {
+              code: 'NOT_FOUND',
+              message: 'Access token not found.',
+            });
+          }
+          orgId = context.orgId;
+          resellerId = credential.resellerId;
+          mode = 'preview';
+          existing = { status: credential.status, soldAt: credential.soldAt };
+        } else {
+          orgId = context.orgId;
+          resellerId = context.resellerId;
+          mode = context.mode;
+          const row = await this.prisma.credential.findFirst({
+            where: { id, orgId, resellerId, deletedAt: null },
+            select: { status: true, soldAt: true },
+          });
+          if (!row) {
+            return responseError(res, 404, {
+              code: 'NOT_FOUND',
+              message: 'Access token not found.',
+            });
+          }
+          existing = row;
         }
 
         const actions = resolveCredentialActions(
@@ -1366,24 +1406,30 @@ export class CommerceAccessTokensController {
             await pauseAccessToken(tx, params);
           } else if (value.action === 'unlock') {
             await unlockAccessToken(tx, params);
+          } else if (value.action === 'allowNewDevice') {
+            await allowNewDeviceAccessToken(tx, params);
           } else {
             await revertAccessTokenToSold(tx, params);
           }
         });
 
         const row = await this.prisma.credential.findFirst({
-          where: { id, orgId, resellerId, deletedAt: null },
+          where: { id, orgId, deletedAt: null },
           select: credentialSelect,
         });
 
         const actionLabels: Record<string, string> = {
           pause: 'paused',
           unlock: 'unlocked',
+          allowNewDevice: 'ready for a new device',
           revertToSold: 'reverted to sold',
         };
 
         responseSuccess(res, {
-          message: `Access token ${actionLabels[value.action] ?? 'updated'}`,
+          message:
+            value.action === 'allowNewDevice'
+              ? 'Device binding cleared. The customer can log in from a new device now.'
+              : `Access token ${actionLabels[value.action] ?? 'updated'}`,
           data: row
             ? serializeCredential(row, { mode, isDeveloper }, revokeWindowMinutes)
             : null,

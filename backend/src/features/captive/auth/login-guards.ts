@@ -11,6 +11,7 @@ import {
   isPlanActivationWindowExceeded,
   planHasTimeQuota,
   planTimeQuotaSec,
+  radiusUsageSinceForPlan,
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
 import { normalizeCaptiveMac } from '@/features/captive/utils/captive-client-ip';
@@ -105,16 +106,8 @@ export async function assertRadiusTimeQuotaAllowsLogin(
     return null;
   }
 
-  const usageSince =
-    plan.timeUsageMode === PlanTimeUsageMode.SINGLE_SESSION
-      ? credential.singleSessionResellerUnlockAt ??
-        credential.activatedAt ??
-        credential.soldAt ??
-        null
-      : null;
-
   const usedSec = await aggregateRadiusUsedSeconds(credential, {
-    since: usageSince,
+    since: radiusUsageSinceForPlan(credential, plan),
     includeActive: true,
   });
 
