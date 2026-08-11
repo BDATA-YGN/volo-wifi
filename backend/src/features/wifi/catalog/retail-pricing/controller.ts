@@ -628,33 +628,45 @@ export class CatalogRetailPricingController {
         });
       }
 
+      // Unique is on (priceBookId, planId) including soft-deleted rows.
+      // Re-creating after remove must restore that row instead of inserting again.
       const existingPrice = await this.prisma.planPrice.findFirst({
         where: {
           priceBookId: value.priceBookId,
           planId: value.planId,
-          deletedAt: null,
         },
-        select: { id: true },
+        select: { id: true, deletedAt: true },
       });
 
-      if (existingPrice) {
+      if (existingPrice && existingPrice.deletedAt === null) {
         return responseError(res, 409, {
           code: 'PRICE_EXISTS',
           message: 'This plan already has a price in the selected book. Edit the existing row.',
         });
       }
 
-      const created = await this.prisma.planPrice.create({
-        data: {
-          orgId,
-          priceBookId: value.priceBookId,
-          planId: value.planId,
-          retailPrice: value.retailPrice,
-          costPrice: value.costPrice ?? null,
-          isActive: value.isActive ?? true,
-        },
-        select: priceSelect,
-      });
+      const priceData = {
+        retailPrice: value.retailPrice,
+        costPrice: value.costPrice ?? null,
+        isActive: value.isActive ?? true,
+        deletedAt: null,
+      };
+
+      const created = existingPrice
+        ? await this.prisma.planPrice.update({
+            where: { id: existingPrice.id },
+            data: priceData,
+            select: priceSelect,
+          })
+        : await this.prisma.planPrice.create({
+            data: {
+              orgId,
+              priceBookId: value.priceBookId,
+              planId: value.planId,
+              ...priceData,
+            },
+            select: priceSelect,
+          });
 
       return responseSuccess(res, {
         status: 201,
