@@ -31,7 +31,8 @@ type ProfileBrief = {
 };
 
 function timeSecondsHint(plan: PlanBrief): string {
-  // Prefer policy-engine template; fall back to a fixed seconds value when amount is known.
+  // Always expand remaining quota live in FreeRADIUS — never a fixed second literal
+  // on timed plans (fixed 3600 caused full-hour reconnect overshoot).
   if (plan.timeAmount && plan.timeAmount > 0) {
     return '{timeSeconds}';
   }

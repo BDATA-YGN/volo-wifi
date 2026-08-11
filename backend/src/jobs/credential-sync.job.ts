@@ -72,8 +72,8 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
       status = 'STOP',
       stopped_at = COALESCE(stopped_at, CURRENT_TIMESTAMP),
       terminate_cause = COALESCE(NULLIF(terminate_cause, ''), 'Cleanup-Timeout'),
-      "sessionTimeSec" = COALESCE(
-        "sessionTimeSec",
+      "sessionTimeSec" = GREATEST(
+        COALESCE("sessionTimeSec", 0),
         GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)))::integer)
       ),
       updated_at = CURRENT_TIMESTAMP
@@ -125,29 +125,26 @@ async function syncRemainingAndConsume(): Promise<number> {
         AND p.deleted_at IS NULL
       LEFT JOIN LATERAL (
         SELECT COALESCE(SUM(
-          CASE
-            WHEN rs.stopped_at IS NOT NULL THEN
-              COALESCE(
-                rs."sessionTimeSec",
-                GREATEST(
-                  0,
-                  FLOOR(EXTRACT(EPOCH FROM (rs.stopped_at - rs.started_at)))::integer
-                )
-              )
-            ELSE
-              GREATEST(
-                COALESCE(rs."sessionTimeSec", 0),
-                GREATEST(
-                  0,
-                  FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - rs.started_at)))::integer
-                )
-              )
-          END
+          GREATEST(
+            COALESCE(rs."sessionTimeSec", 0),
+            GREATEST(
+              0,
+              FLOOR(EXTRACT(EPOCH FROM (
+                COALESCE(rs.stopped_at, CURRENT_TIMESTAMP) - rs.started_at
+              )))::integer
+            )
+          )
         ), 0)::integer AS used_sec
         FROM wf_radius_session rs
         WHERE (
-          (c.username IS NOT NULL AND rs.user_name = c.username)
-          OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
+          rs.credential_id = c.id
+          OR (
+            rs.credential_id IS NULL
+            AND (
+              (c.username IS NOT NULL AND rs.user_name = c.username)
+              OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
+            )
+          )
         )
         AND (
           p.time_usage_mode::text IS DISTINCT FROM 'SINGLE_SESSION'

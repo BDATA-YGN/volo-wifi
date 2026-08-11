@@ -14,8 +14,7 @@ import {
 import {
   computeCredentialTimeRemainingSec,
   planTimeQuotaSec,
-  radiusSessionMatchWhere,
-  radiusUserNameVariants,
+  radiusSessionUsageWhere,
 } from '@/features/shared/credentials/credential-sync.helpers';
 import { sanitizeCaptiveClientIp } from '@/features/captive/utils/captive-client-ip';
 
@@ -68,7 +67,7 @@ export class CaptiveDashboardController {
         }
 
         const plan = credential.plan;
-        const radiusSessionWhere = radiusSessionMatchWhere(radiusUserNameVariants(credential));
+        const radiusSessionWhere = radiusSessionUsageWhere(credential);
 
         const activeSessions = await prisma.radiusSession.findMany({
           where: {
@@ -227,7 +226,7 @@ export class CaptiveDashboardController {
           return;
         }
 
-        const radiusSessionWhere = radiusSessionMatchWhere(radiusUserNameVariants(credential));
+        const radiusSessionWhere = radiusSessionUsageWhere(credential);
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 
@@ -266,7 +265,7 @@ export class CaptiveDashboardController {
         }
 
         const plan = credential.plan;
-        const radiusSessionWhere = radiusSessionMatchWhere(radiusUserNameVariants(credential));
+        const radiusSessionWhere = radiusSessionUsageWhere(credential);
         const activeSessions = await prisma.radiusSession.findMany({
           where: {
             ...radiusSessionWhere,

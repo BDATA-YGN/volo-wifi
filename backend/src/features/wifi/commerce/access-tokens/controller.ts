@@ -45,7 +45,7 @@ import {
   reserveVoucherBatchSlots,
 } from './voucher-inventory';
 import {
-  radiusSessionMatchWhere,
+  radiusSessionUsageWhere,
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
 import {
@@ -366,8 +366,10 @@ async function loadTokenSessionHistory(
 ) {
   const userNameVariants = radiusUserNameVariants(credential);
   const radiusWhere = {
-    ...radiusSessionMatchWhere(userNameVariants),
-    OR: [{ orgId }, { orgId: null }],
+    AND: [
+      radiusSessionUsageWhere(credential),
+      { OR: [{ orgId }, { orgId: null }] },
+    ],
   };
 
   const [

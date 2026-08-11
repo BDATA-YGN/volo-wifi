@@ -114,47 +114,64 @@ export async function assertRadiusTimeQuotaAllowsLogin(
   return { usedSec, quotaSec };
 }
 
+/** Common Calling-Station-Id spellings for the same 12-hex MAC. */
+function callingStationIdCandidates(macNorm: string): string[] {
+  const hex = macNorm.toLowerCase();
+  const upper = hex.toUpperCase();
+  const colon = hex.match(/.{1,2}/g)?.join(':') ?? hex;
+  const dash = hex.match(/.{1,2}/g)?.join('-') ?? hex;
+  return [...new Set([hex, upper, colon, colon.toUpperCase(), dash, dash.toUpperCase()])];
+}
+
 /**
- * Soft-end open RADIUS rows for this credential that match the client MAC
- * (same-device portal re-login / missing Acct-Stop).
+ * Soft-end open RADIUS rows on this client MAC for any token.
+ * Same-device portal re-login / token switch / missing Acct-Stop — so a new
+ * token is not charged leftover Session-Timeout from the previous token.
  */
 async function endOpenRadiusSessionsForSameDevice(params: {
-  userNameVariants: string[];
   clientMacNorm: string;
 }): Promise<number> {
-  const { userNameVariants, clientMacNorm } = params;
-  if (userNameVariants.length === 0) return 0;
+  const { clientMacNorm } = params;
 
   const openRows = await prisma.radiusSession.findMany({
     where: {
-      userName: { in: userNameVariants },
       status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
       stoppedAt: null,
+      callingStationId: { in: callingStationIdCandidates(clientMacNorm), mode: 'insensitive' },
     },
     select: {
       id: true,
       callingStationId: true,
+      startedAt: true,
+      sessionTimeSec: true,
     },
   });
 
-  const ids = openRows
-    .filter((row) => normalizeCaptiveMac(row.callingStationId) === clientMacNorm)
-    .map((row) => row.id);
-
-  if (ids.length === 0) return 0;
+  const matched = openRows.filter(
+    (row) => normalizeCaptiveMac(row.callingStationId) === clientMacNorm,
+  );
+  if (matched.length === 0) return 0;
 
   const now = new Date();
-  await prisma.radiusSession.updateMany({
-    where: { id: { in: ids } },
-    data: {
-      stoppedAt: now,
-      status: RadiusAcctStatus.STOP,
-      terminateCause: 'Portal-ReLogin',
-      updatedAt: now,
-    },
-  });
+  const nowMs = now.getTime();
+  await Promise.all(
+    matched.map((row) => {
+      const wall = Math.max(0, Math.floor((nowMs - row.startedAt.getTime()) / 1000));
+      const sessionTimeSec = Math.max(row.sessionTimeSec ?? 0, wall);
+      return prisma.radiusSession.update({
+        where: { id: row.id },
+        data: {
+          stoppedAt: now,
+          status: RadiusAcctStatus.STOP,
+          terminateCause: 'Portal-ReLogin',
+          sessionTimeSec,
+          updatedAt: now,
+        },
+      });
+    }),
+  );
 
-  return ids.length;
+  return matched.length;
 }
 
 async function collectOccupiedDeviceKeys(params: {
@@ -220,12 +237,14 @@ export type CaptiveLoginGuardOptions = {
 /**
  * Device / session gates for captive login.
  *
- * - Same MAC with an open RADIUS session → soft-end those rows, then allow.
+ * - Same MAC with any open RADIUS session (any token) → soft-end those rows, then allow.
+ *   Prevents leftover Session-Timeout from a previous token on this phone.
  * - Occupied slots = open RADIUS MACs ∪ CaptivePortalSession MACs (last 3 min).
  * - Same MAC already occupied → allow (reconnect).
  * - Other devices at maxDevices → DEVICE_LIMIT_REACHED.
  * - No client MAC but someone else online → RADIUS_SESSION_ACTIVE.
  * - Capacity-tier tokenUsageScope SITE/TIER → request site must match (nasParams OR).
+ * - Time remaining is always per credential/token, never per device.
  */
 export async function runCaptiveLoginGuards(
   credential: NonNullable<CaptiveLoginCredential>,
@@ -241,9 +260,8 @@ export async function runCaptiveLoginGuards(
   const userNameVariants = radiusUserNameVariants(credential);
   const clientMacNorm = normalizeCaptiveMac(options.clientMac);
 
-  if (clientMacNorm && userNameVariants.length > 0) {
+  if (clientMacNorm) {
     await endOpenRadiusSessionsForSameDevice({
-      userNameVariants,
       clientMacNorm,
     });
   }

@@ -94,7 +94,34 @@ export function radiusSessionMatchWhere(
 }
 
 /**
- * Sum billed seconds from wf_radius_session (matched by FreeRADIUS User-Name only).
+ * Sessions that belong to this credential/token only.
+ * Prefer credential_id; fall back to User-Name only when credential_id is unset.
+ * Never count another credential's row just because User-Name was rewritten on the same device/session.
+ */
+export function radiusSessionUsageWhere(credential: {
+  id: string;
+  username: string | null;
+  token: string | null;
+}): {
+  OR: Array<
+    | { credentialId: string }
+    | { credentialId: null; userName: { in: string[] } }
+  >;
+} {
+  return {
+    OR: [
+      { credentialId: credential.id },
+      {
+        credentialId: null,
+        ...radiusSessionMatchWhere(radiusUserNameVariants(credential)),
+      },
+    ],
+  };
+}
+
+/**
+ * Sum billed seconds from wf_radius_session for this credential/token only
+ * (not other tokens that shared the same device / Calling-Station-Id).
  * @param since If set, only sessions that started on or after this time (single-session cycle).
  */
 export async function aggregateRadiusUsedSeconds(
@@ -102,10 +129,9 @@ export async function aggregateRadiusUsedSeconds(
   options: { since?: Date | null; includeActive?: boolean } = {},
 ): Promise<number> {
   const { since = null, includeActive = true } = options;
-  const userNameVariants = radiusUserNameVariants(credential);
   const sessions = await prisma.radiusSession.findMany({
     where: {
-      ...radiusSessionMatchWhere(userNameVariants),
+      ...radiusSessionUsageWhere(credential),
       ...(since ? { startedAt: { gte: since } } : {}),
     },
     select: {
@@ -118,16 +144,12 @@ export async function aggregateRadiusUsedSeconds(
   const now = Date.now();
   let total = 0;
   for (const s of sessions) {
-    if (s.stoppedAt) {
-      const sec =
-        s.sessionTimeSec ??
-        Math.max(0, Math.floor((s.stoppedAt.getTime() - s.startedAt.getTime()) / 1000));
-      total += sec;
-    } else if (includeActive) {
-      const wall = Math.max(0, Math.floor((now - s.startedAt.getTime()) / 1000));
-      const sec = Math.max(s.sessionTimeSec ?? 0, wall);
-      total += sec;
-    }
+    if (!s.stoppedAt && !includeActive) continue;
+    const endMs = s.stoppedAt ? s.stoppedAt.getTime() : now;
+    const wall = Math.max(0, Math.floor((endMs - s.startedAt.getTime()) / 1000));
+    // Prefer the larger of NAS Acct-Session-Time and wall clock so under-reported
+    // interim/stop values cannot shrink billed usage (reconnect overshoot hole).
+    total += Math.max(s.sessionTimeSec ?? 0, wall);
   }
   return total;
 }
