@@ -40,6 +40,8 @@ export function useNetworkRadiusAuthEvents(
       extended.page,
       extended.limit,
       extended.search,
+      extended.orgId,
+      extended.stationId,
       extended.outcome,
       extended.view,
       extended.authFrom,

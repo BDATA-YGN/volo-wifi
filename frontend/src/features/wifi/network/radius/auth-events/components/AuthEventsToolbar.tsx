@@ -23,12 +23,14 @@ type Props = {
   search: string;
   orgId: string | null;
   showOrgFilter?: boolean;
+  stationId: string | null;
   view: AuthEventView;
   outcome: AuthEventOutcome | null;
   autoRefresh: boolean;
   loading?: boolean;
   onSearchChange: (value: string) => void;
   onOrgChange: (orgId: string | null) => void;
+  onStationChange: (stationId: string | null) => void;
   onViewChange: (view: AuthEventView) => void;
   onOutcomeChange: (outcome: AuthEventOutcome | null) => void;
   onAutoRefreshChange: (enabled: boolean) => void;
@@ -40,12 +42,14 @@ const AuthEventsToolbar: React.FC<Props> = ({
   search,
   orgId,
   showOrgFilter = false,
+  stationId,
   view,
   outcome,
   autoRefresh,
   loading,
   onSearchChange,
   onOrgChange,
+  onStationChange,
   onViewChange,
   onOutcomeChange,
   onAutoRefreshChange,
@@ -91,6 +95,19 @@ const AuthEventsToolbar: React.FC<Props> = ({
       ) : null}
       <Select
         allowClear
+        showSearch
+        placeholder="Station / Site"
+        style={{ minWidth: 220 }}
+        value={stationId ?? undefined}
+        optionFilterProp="label"
+        onChange={(v) => onStationChange(v ?? null)}
+        options={(formOptions.stations ?? []).map((s) => ({
+          value: s.id,
+          label: `${s.name} (${s.code})`,
+        }))}
+      />
+      <Select
+        allowClear
         placeholder="Outcome"
         style={{ width: 130 }}
         value={outcome ?? undefined}
@@ -103,8 +120,8 @@ const AuthEventsToolbar: React.FC<Props> = ({
       <Input
         allowClear
         prefix={<SearchOutlined />}
-        placeholder="Username, MAC, reply…"
-        style={{ minWidth: 240, flex: 1 }}
+        placeholder="Username, client MAC, NAS ID, site…"
+        style={{ minWidth: 260, flex: 1 }}
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
       />

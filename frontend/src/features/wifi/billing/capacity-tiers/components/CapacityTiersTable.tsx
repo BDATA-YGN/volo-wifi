@@ -121,10 +121,7 @@ const CapacityTiersTable: React.FC<Props> = ({
       width: 56,
       fixed: "right",
       render: (_, record) => {
-        const inUse =
-          (record._count?.stations ?? 0) > 0 ||
-          (record._count?.globalLicensePrices ?? 0) > 0 ||
-          (record._count?.orgLicensePrices ?? 0) > 0;
+        const hasLicensedSites = (record._count?.stations ?? 0) > 0;
 
         return (
           <Dropdown
@@ -148,7 +145,10 @@ const CapacityTiersTable: React.FC<Props> = ({
                   icon: <DeleteOutlined />,
                   label: "Delete",
                   danger: true,
-                  disabled: inUse,
+                  disabled: hasLicensedSites,
+                  title: hasLicensedSites
+                    ? "Remove or reassign licensed sites before deleting this tier"
+                    : undefined,
                   onClick: () => onDelete(record),
                 },
               ],

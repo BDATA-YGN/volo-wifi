@@ -1,6 +1,8 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
 
-export type PeriodPreset = "7d" | "30d" | "90d";
+export type PeriodPreset = "today" | "7d" | "30d" | "90d";
+
+export type SiteAnalyticsTab = "stats" | "sites" | "tiers";
 
 export type SiteOption = {
   id: string;
@@ -43,6 +45,20 @@ export type SiteDailyPoint = {
   activeSites: number;
 };
 
+export type SitePlanColumn = {
+  planId: string;
+  code: string;
+  name: string;
+};
+
+export type SitePlanBreakdown = {
+  planId: string;
+  code: string;
+  name: string;
+  tokensCount: number;
+  revenue: number;
+};
+
 export type SiteRow = {
   stationId: string;
   code: string;
@@ -60,6 +76,7 @@ export type SiteRow = {
   sessionsCount: number;
   uniqueCredentials: number;
   totalBytes: number;
+  byPlan: SitePlanBreakdown[];
 };
 
 export type SiteTierRow = {
@@ -82,10 +99,14 @@ export type SiteAnalyticsData = {
   dailyTrend: SiteDailyPoint[];
   bySite: SiteRow[];
   byTier: SiteTierRow[];
+  plans: SitePlanColumn[];
+  planTotals: SitePlanBreakdown[];
+  pagination: { page: number; limit: number; total: number } | null;
   dataSource: "aggregated" | "live";
   periodFrom: string;
   periodTo: string;
   preset: PeriodPreset | null;
+  view?: SiteAnalyticsTab;
   scopeStationId: string | null;
   scopeStationSizeId: string | null;
   org: { id: string; name: string; code: string; currency: string };
@@ -96,12 +117,17 @@ export type SitesFormOptions = {
   stations: SiteOption[];
   stationSizes: StationSizeOption[];
   currency: string;
+  canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
 };
 
 export type SiteAnalyticsMeta = {
   memberships?: OrgMembershipOption[];
   orgId?: string;
   requiresOrgSelection?: boolean;
+  canSwitchOrg?: boolean;
+  view?: SiteAnalyticsTab;
+  pagination?: { page: number; limit: number; total: number } | null;
 };
 
 export type SiteAnalyticsParams = {
@@ -111,4 +137,7 @@ export type SiteAnalyticsParams = {
   preset?: PeriodPreset;
   periodFrom?: string;
   periodTo?: string;
+  view?: SiteAnalyticsTab;
+  page?: number;
+  limit?: number;
 };

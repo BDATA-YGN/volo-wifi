@@ -14,6 +14,7 @@ export const list = async (params?: AuthEventsListParams): Promise<CommonListRes
         limit: params?.limit,
         search: params?.search || undefined,
         orgId: params?.orgId || undefined,
+        stationId: params?.stationId || undefined,
         outcome: params?.outcome || undefined,
         view: params?.view || undefined,
         authFrom: params?.authFrom || undefined,

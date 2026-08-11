@@ -12,5 +12,8 @@ export const AnalyticsSitesQuerySchema = Joi.object({
   orgId: Joi.string().uuid().optional(),
   stationId: Joi.string().uuid().optional(),
   stationSizeId: Joi.string().uuid().optional(),
+  view: Joi.string().valid('stats', 'sites', 'tiers').optional(),
+  page: Joi.number().integer().min(1).optional(),
+  limit: Joi.number().integer().min(1).max(100).optional(),
   formOptions: Joi.string().valid('true').optional(),
 }).unknown(true);

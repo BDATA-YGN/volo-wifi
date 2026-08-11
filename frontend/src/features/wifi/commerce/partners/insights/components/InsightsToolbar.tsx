@@ -5,17 +5,20 @@ import { Button, DatePicker, Segmented, Space, Tag } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import type { Dayjs } from "dayjs";
 import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
-import type { PeriodPreset } from "../types";
 import { PERIOD_PRESETS } from "../constant";
 
 const { RangePicker } = DatePicker;
 
+type PresetOption = { value: string; label: string };
+
 type Props = {
-  preset: PeriodPreset;
+  preset: string;
   customRange: [Dayjs | null, Dayjs | null] | null;
   dataSource?: "aggregated" | "live";
   loading?: boolean;
-  onPresetChange: (preset: PeriodPreset) => void;
+  /** Override default partner-insights presets (e.g. Site Analytics includes Today). */
+  presets?: PresetOption[];
+  onPresetChange: (preset: string) => void;
   onCustomRangeChange: (range: [Dayjs | null, Dayjs | null] | null) => void;
   onRefresh: () => void;
 };
@@ -25,6 +28,7 @@ const InsightsToolbar: React.FC<Props> = ({
   customRange,
   dataSource,
   loading,
+  presets = PERIOD_PRESETS,
   onPresetChange,
   onCustomRangeChange,
   onRefresh,
@@ -33,8 +37,8 @@ const InsightsToolbar: React.FC<Props> = ({
     <Space wrap align="center">
       <Segmented
         value={customRange ? undefined : preset}
-        options={PERIOD_PRESETS.map((p) => ({ value: p.value, label: p.label }))}
-        onChange={(v) => onPresetChange(v as PeriodPreset)}
+        options={presets.map((p) => ({ value: p.value, label: p.label }))}
+        onChange={(v) => onPresetChange(String(v))}
       />
       <RangePicker
         allowClear

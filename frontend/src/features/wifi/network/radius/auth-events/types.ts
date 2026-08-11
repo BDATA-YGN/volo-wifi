@@ -9,6 +9,13 @@ export type AuthEventOrg = {
   isActive: boolean;
 };
 
+export type AuthEventStation = {
+  id: string;
+  code: string;
+  name: string;
+  status?: string;
+};
+
 export type AuthEventRecord = {
   id: string;
   username: string;
@@ -18,6 +25,10 @@ export type AuthEventRecord = {
   authdate: string;
   class: string | null;
   outcome: AuthEventOutcome;
+  stationId?: string | null;
+  station?: AuthEventStation | null;
+  nasIdentifier?: string | null;
+  clientIp?: string | null;
 };
 
 export type AuthEventsMeta = {
@@ -33,6 +44,7 @@ export type AuthEventsMeta = {
 
 export type AuthEventsFormOptions = {
   orgs: AuthEventOrg[];
+  stations: AuthEventStation[];
 };
 
 export type AuthEventsListParams = {
@@ -40,6 +52,7 @@ export type AuthEventsListParams = {
   limit?: number;
   search?: string;
   orgId?: string;
+  stationId?: string;
   outcome?: AuthEventOutcome;
   view?: AuthEventView;
   authFrom?: string;

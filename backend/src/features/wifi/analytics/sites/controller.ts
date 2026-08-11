@@ -17,7 +17,13 @@ import {
   buildSiteAnalytics,
   resolvePeriodFromPreset,
   type SiteAnalyticsPayload,
+  type SiteAnalyticsView,
 } from './build-site-analytics';
+
+const ANALYTICS_VIEWS: SiteAnalyticsView[] = ['stats', 'sites', 'tiers'];
+const DEFAULT_VIEW: SiteAnalyticsView = 'stats';
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
 
 function parseDateParam(value: unknown): Date | null {
   if (typeof value !== 'string' || !value.trim()) return null;
@@ -105,6 +111,7 @@ export class AnalyticsSitesController {
             : Promise.resolve(null),
         ]);
 
+        const canSwitchOrg = canSwitchOrgContext(req.user!);
         return responseSuccess(res, {
           message: 'Success',
           data: {
@@ -120,6 +127,9 @@ export class AnalyticsSitesController {
             })),
             stationSizes,
             currency: org?.currency ?? 'MMK',
+            canSwitchOrg,
+            // Developers always pick a tenant; tenants with one membership auto-scope.
+            requiresOrgSelection: canSwitchOrg || (!orgIdParam && memberships.length !== 1),
           },
         });
       }
@@ -135,14 +145,16 @@ export class AnalyticsSitesController {
 
       const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
       if (!orgIdParam) {
+        const canSwitchOrg = canSwitchOrgContext(req.user!);
         return responseSuccess(res, {
           message: 'Organization required',
           data: null,
           meta: {
             memberships,
-            requiresOrgSelection: canSwitchOrgContext(req.user!) || memberships.length > 1,
-            canSwitchOrg: canSwitchOrgContext(req.user!),
-            orgId: memberships.length === 1 ? memberships[0].id : undefined,
+            requiresOrgSelection: canSwitchOrg || memberships.length > 1,
+            canSwitchOrg,
+            // Never auto-scope developers — they must choose an org explicitly.
+            orgId: canSwitchOrg ? undefined : memberships.length === 1 ? memberships[0].id : undefined,
           },
         });
       }
@@ -160,6 +172,18 @@ export class AnalyticsSitesController {
       const stationSizeId =
         typeof req.query.stationSizeId === 'string' ? req.query.stationSizeId.trim() : undefined;
 
+      const viewParam = typeof req.query.view === 'string' ? req.query.view.trim() : '';
+      const view = (ANALYTICS_VIEWS as string[]).includes(viewParam)
+        ? (viewParam as SiteAnalyticsView)
+        : DEFAULT_VIEW;
+      const pageRaw = Number(req.query.page);
+      const limitRaw = Number(req.query.limit);
+      const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : DEFAULT_PAGE;
+      const limit =
+        Number.isFinite(limitRaw) && limitRaw >= 1
+          ? Math.min(Math.floor(limitRaw), 100)
+          : DEFAULT_LIMIT;
+
       if (stationId) {
         const station = await this.prisma.wifiStation.findFirst({
           where: { id: stationId, orgId: orgIdParam, deletedAt: null },
@@ -174,20 +198,33 @@ export class AnalyticsSitesController {
       }
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
-      const analytics = await buildSiteAnalytics(this.prisma, orgIdParam, periodFrom, periodTo, {
-        stationId,
-        stationSizeId,
-      });
+      const [analytics, org] = await Promise.all([
+        buildSiteAnalytics(
+          this.prisma,
+          orgIdParam,
+          periodFrom,
+          periodTo,
+          { stationId, stationSizeId },
+          { view, page, limit }
+        ),
+        this.prisma.org.findUnique({
+          where: { id: orgIdParam },
+          select: { id: true, name: true, code: true, currency: true },
+        }),
+      ]);
 
-      const org = await this.prisma.org.findUnique({
-        where: { id: orgIdParam },
-        select: { id: true, name: true, code: true, currency: true },
-      });
+      if (!org) {
+        return responseError(res, 404, {
+          code: 'ORG_NOT_FOUND',
+          message: 'Organization not found.',
+        });
+      }
 
       const payload: SiteAnalyticsPayload & {
         periodFrom: string;
         periodTo: string;
         preset: PeriodPreset | null;
+        view: SiteAnalyticsView;
         scopeStationId: string | null;
         scopeStationSizeId: string | null;
         org: { id: string; name: string; code: string; currency: string };
@@ -196,13 +233,14 @@ export class AnalyticsSitesController {
         periodFrom: periodFrom.toISOString(),
         periodTo: periodTo.toISOString(),
         preset,
+        view,
         scopeStationId: stationId ?? null,
         scopeStationSizeId: stationSizeId ?? null,
         org: {
-          id: org!.id,
-          name: org!.name,
-          code: org!.code,
-          currency: org!.currency,
+          id: org.id,
+          name: org.name,
+          code: org.code,
+          currency: org.currency,
         },
       };
 
@@ -213,6 +251,9 @@ export class AnalyticsSitesController {
           memberships,
           orgId: orgIdParam,
           requiresOrgSelection: false,
+          canSwitchOrg: canSwitchOrgContext(req.user!),
+          view,
+          pagination: analytics.pagination,
         },
       });
     }),

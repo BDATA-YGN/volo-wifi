@@ -82,12 +82,36 @@ const AuthEventDetailDrawer: React.FC<Props> = ({
               <Descriptions.Item label="Username">
                 <Text copyable>{row.username}</Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Calling-Station-Id">
-                {formatMac(row.callingStationId)}
+              <Descriptions.Item label="Client MAC (Calling-Station-Id)">
+                <Text code copyable={Boolean(row.callingStationId)}>
+                  {formatMac(row.callingStationId)}
+                </Text>
               </Descriptions.Item>
-              <Descriptions.Item label="Called-Station-Id">
+              <Descriptions.Item label="Site">
+                {row.station ? (
+                  <Text>
+                    {row.station.name}{" "}
+                    <Text type="secondary" style={{ fontFamily: "monospace" }}>
+                      ({row.station.code})
+                    </Text>
+                  </Text>
+                ) : (
+                  "—"
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="NAS Identifier">
+                {row.nasIdentifier ? (
+                  <Text code copyable>
+                    {row.nasIdentifier}
+                  </Text>
+                ) : (
+                  "—"
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="AP / NAS MAC (Called-Station-Id)">
                 {formatMac(row.calledStationId)}
               </Descriptions.Item>
+              <Descriptions.Item label="Client IP">{row.clientIp ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Reply">{row.reply ?? "—"}</Descriptions.Item>
               <Descriptions.Item label="Class">{row.class ?? "—"}</Descriptions.Item>
             </Descriptions>

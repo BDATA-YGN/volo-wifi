@@ -103,9 +103,14 @@ const BillingCapacityTiersPage: React.FC = () => {
   };
 
   const handleDelete = (record: CapacityTierRecord) => {
+    const rateCount =
+      (record._count?.globalLicensePrices ?? 0) + (record._count?.orgLicensePrices ?? 0);
     modal.confirm({
       title: `Delete tier "${record.code}"?`,
-      content: "This action cannot be undone. Tiers referenced by sites or pricing cannot be deleted.",
+      content:
+        rateCount > 0
+          ? "This tier has no licensed sites. Related platform/tenant rates will also be removed. This cannot be undone."
+          : "This action cannot be undone.",
       okText: "Delete",
       okType: "danger",
       onOk: async () => {

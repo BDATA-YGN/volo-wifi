@@ -1,5 +1,4 @@
 import type { Request } from 'express';
-import { resolveClientIp } from '@/utils/request-ip';
 import { normalizeMacKey } from '@/utils/mac-address';
 
 function normalizeIp(ip: string | null | undefined): string | null {
@@ -9,6 +8,41 @@ function normalizeIp(ip: string | null | undefined): string | null {
   if (value.startsWith('::ffff:')) value = value.slice(7);
   if (value === '::1' || value === '0:0:0:0:0:0:0:1') value = '127.0.0.1';
   return value;
+}
+
+/**
+ * Public IPs that belong to our hosting / portal edge — never treat as the
+ * Wi‑Fi client's device address (NAS `ip` / `wlanuserip` / Framed-IP is authoritative).
+ *
+ * Extend via env `CAPTIVE_IGNORE_CLIENT_IPS=ip1,ip2`.
+ */
+const DEFAULT_IGNORED_CLIENT_IPS = ['159.223.63.109'] as const;
+
+export function getIgnoredCaptiveClientIps(): Set<string> {
+  const ignored = new Set<string>();
+  for (const ip of DEFAULT_IGNORED_CLIENT_IPS) {
+    const normalized = normalizeIp(ip);
+    if (normalized) ignored.add(normalized);
+  }
+  const fromEnv = process.env.CAPTIVE_IGNORE_CLIENT_IPS ?? '';
+  for (const part of fromEnv.split(',')) {
+    const normalized = normalizeIp(part);
+    if (normalized) ignored.add(normalized);
+  }
+  return ignored;
+}
+
+/** True when this address is a known portal/hosting hop, not a subscriber device. */
+export function isIgnoredCaptiveClientIp(ip: string | null | undefined): boolean {
+  const normalized = normalizeIp(ip);
+  return Boolean(normalized && getIgnoredCaptiveClientIps().has(normalized));
+}
+
+/** Keep NAS/device IPs; drop hosting/edge hops. */
+export function sanitizeCaptiveClientIp(ip: string | null | undefined): string | null {
+  const normalized = normalizeIp(ip);
+  if (!normalized || isIgnoredCaptiveClientIp(normalized)) return null;
+  return normalized;
 }
 
 function coerceNasString(value: unknown): string | null {
@@ -40,13 +74,17 @@ function readNasString(
 export function resolveCaptiveNasClientIp(
   nasParams?: Record<string, unknown> | null,
 ): string | null {
-  return normalizeIp(
+  return sanitizeCaptiveClientIp(
     readNasString(nasParams, [
       'ip',
       'wlanuserip',
       'userip',
       'user_ip',
       'client_ip',
+      'staip',
+      'sta_ip',
+      'ue-ip',
+      'ue_ip',
     ]),
   );
 }
@@ -54,18 +92,15 @@ export function resolveCaptiveNasClientIp(
 /**
  * Resolve the WiFi client IP for captive portal session / audit.
  *
- * Prefer NAS redirect params; fall back to request/proxy headers when NAS
- * did not send a client address. Prefer {@link resolveCaptiveNasClientIp}
- * for login rate-limiting (same-IP) so shared portal edges are not bucketed.
+ * Uses NAS redirect params only. Request/proxy headers are ignored because they
+ * usually resolve to the captive portal hosting IP (e.g. DigitalOcean droplet),
+ * not the subscriber device address assigned/reported by the NAS.
  */
 export function resolveCaptiveClientIp(
-  req: Request,
+  _req: Request,
   nasParams?: Record<string, unknown> | null,
 ): string | null {
-  const fromNas = resolveCaptiveNasClientIp(nasParams);
-  if (fromNas) return fromNas;
-
-  return normalizeIp(resolveClientIp(req));
+  return resolveCaptiveNasClientIp(nasParams);
 }
 
 export function resolveCaptiveClientMac(

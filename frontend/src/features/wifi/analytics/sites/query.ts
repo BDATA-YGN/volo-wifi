@@ -23,6 +23,9 @@ export const loadAnalytics = async (
         preset: params?.preset || undefined,
         periodFrom: params?.periodFrom || undefined,
         periodTo: params?.periodTo || undefined,
+        view: params?.view || undefined,
+        page: params?.page || undefined,
+        limit: params?.limit || undefined,
       },
     });
     return res.data;

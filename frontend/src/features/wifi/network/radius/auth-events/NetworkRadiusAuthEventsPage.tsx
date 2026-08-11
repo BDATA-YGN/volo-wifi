@@ -18,10 +18,11 @@ import AuthEventsToolbar from "./components/AuthEventsToolbar";
 import AuthEventsTable from "./components/AuthEventsTable";
 import AuthEventDetailDrawer from "./components/AuthEventDetailDrawer";
 
-const { Paragraph } = Typography;
+const { Paragraph, Text } = Typography;
 
 const emptyFormOptions: AuthEventsFormOptions = {
   orgs: [],
+  stations: [],
 };
 
 const NetworkRadiusAuthEventsPage: React.FC = () => {
@@ -87,9 +88,9 @@ const NetworkRadiusAuthEventsPage: React.FC = () => {
       >
         <div className="mb-5 max-w-3xl">
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Post-authentication audit log from FreeRADIUS — accept and reject outcomes with client
-            and NAS identifiers. Use tenant filter to narrow events to credential usernames or
-            tokens for that organization.
+            FreeRADIUS post-auth log from <Text code>radpostauth</Text>, enriched with captive
+            portal and RADIUS session context when available — accept/reject outcomes, client MAC,
+            NAS identifier, and site. Filter by station to see which store is being probed.
           </Paragraph>
         </div>
 
@@ -126,12 +127,22 @@ const NetworkRadiusAuthEventsPage: React.FC = () => {
               search={search}
               orgId={orgId ?? null}
               showOrgFilter={showOrgSwitcher}
+              stationId={(params.stationId as string | undefined) ?? null}
               view={(params.view as AuthEventView) ?? "recent"}
               outcome={(params.outcome as AuthEventOutcome) ?? null}
               autoRefresh={autoRefresh}
               loading={loading}
               onSearchChange={setSearchLocal}
-              onOrgChange={(orgId) => patchParams({ orgId: orgId ?? undefined, page: 1 })}
+              onOrgChange={(nextOrgId) =>
+                patchParams({
+                  orgId: nextOrgId ?? undefined,
+                  stationId: undefined,
+                  page: 1,
+                })
+              }
+              onStationChange={(nextStationId) =>
+                patchParams({ stationId: nextStationId ?? undefined, page: 1 })
+              }
               onViewChange={(view) =>
                 patchParams({ view, page: 1 })
               }

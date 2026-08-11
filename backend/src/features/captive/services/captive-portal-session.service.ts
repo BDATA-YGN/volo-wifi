@@ -1,13 +1,26 @@
 import type { Request } from 'express';
 import PrismaDBConnection from '@/prisma/prisma-client';
-import { resolveCaptiveClientIp, resolveCaptiveClientMac } from '@/features/captive/utils/captive-client-ip';
+import {
+  resolveCaptiveClientIp,
+  resolveCaptiveClientMac,
+  resolveCaptiveNasClientIp,
+  sanitizeCaptiveClientIp,
+} from '@/features/captive/utils/captive-client-ip';
 import { resolveUserAgent } from '@/utils/request-ip';
 
 const prisma = PrismaDBConnection.getConnection();
 
 export type CaptivePortalNasParams = Record<string, unknown>;
 
-const IP_NAS_KEYS = ['ip', 'wlanuserip', 'userip', 'user_ip', 'client_ip'] as const;
+const IP_NAS_KEYS = [
+  'ip',
+  'wlanuserip',
+  'userip',
+  'user_ip',
+  'client_ip',
+  'staip',
+  'sta_ip',
+] as const;
 const MAC_NAS_KEYS = ['mac', 'usermac', 'user_mac', 'client_mac'] as const;
 
 function readBodyNasParams(bodyNasParams: unknown): CaptivePortalNasParams {
@@ -25,16 +38,27 @@ function readNasString(params: CaptivePortalNasParams, keys: readonly string[]):
   return null;
 }
 
+function readNasDeviceIp(params: CaptivePortalNasParams, keys: readonly string[]): string | null {
+  for (const key of keys) {
+    const value = params[key];
+    if (typeof value === 'string' && value.trim()) {
+      return sanitizeCaptiveClientIp(value.trim());
+    }
+  }
+  return null;
+}
+
 export function resolveCaptivePortalSessionIp(
   req: Request,
   bodyNasParams?: unknown,
   builtNasParams?: CaptivePortalNasParams,
 ): string | null {
   const body = readBodyNasParams(bodyNasParams);
-  // Prefer raw NAS redirect fields before request headers (server/edge public IP).
+  // NAS device IP only — never request/proxy hop (hosting public IP).
   return (
-    readNasString(body, IP_NAS_KEYS) ??
-    (builtNasParams ? readNasString(builtNasParams, IP_NAS_KEYS) : null) ??
+    readNasDeviceIp(body, IP_NAS_KEYS) ??
+    (builtNasParams ? readNasDeviceIp(builtNasParams, IP_NAS_KEYS) : null) ??
+    resolveCaptiveNasClientIp(body) ??
     resolveCaptiveClientIp(req, body)
   );
 }
@@ -64,6 +88,13 @@ export function buildCaptivePortalNasParams(
   const clientIp = resolveCaptivePortalSessionIp(req, bodyNasParams, merged);
   const clientMac = resolveCaptivePortalSessionMac(req, bodyNasParams, merged);
   const userAgent = resolveUserAgent(req);
+
+  // Strip hosting/edge IPs that may already be present in redirect junk.
+  for (const key of IP_NAS_KEYS) {
+    if (typeof merged[key] === 'string' && !sanitizeCaptiveClientIp(merged[key] as string)) {
+      delete merged[key];
+    }
+  }
 
   if (clientIp && merged.ip == null && merged.wlanuserip == null && merged.userip == null) {
     merged.ip = clientIp;

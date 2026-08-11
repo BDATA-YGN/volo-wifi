@@ -2,6 +2,7 @@ import { logger } from '@/logging/logger';
 import { startLogCleanupJob } from './log-cleanup.job';
 import { startReportingAggregateJob } from './reporting-aggregate.job';
 import { startOpsArchiveJob } from './ops-archive.job';
+import { startCredentialSyncJob } from './credential-sync.job';
 
 /**
  * Starts every recurring background job for the API process.
@@ -15,6 +16,7 @@ export const startAllJobs = async (): Promise<void> => {
     { name: 'log-cleanup', run: startLogCleanupJob },
     { name: 'reporting-aggregate', run: startReportingAggregateJob },
     { name: 'ops-archive', run: startOpsArchiveJob },
+    { name: 'credential-sync', run: startCredentialSyncJob },
   ];
 
   for (const job of jobs) {
@@ -29,3 +31,4 @@ export const startAllJobs = async (): Promise<void> => {
 export { startLogCleanupJob };
 export { startReportingAggregateJob, runReportingAggregateTick, runReportingRollupTick } from './reporting-aggregate.job';
 export { startOpsArchiveJob, runOpsArchiveTick } from './ops-archive.job';
+export { startCredentialSyncJob, runCredentialSyncTick } from './credential-sync.job';

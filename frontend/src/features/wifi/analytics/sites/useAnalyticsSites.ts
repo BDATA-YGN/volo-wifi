@@ -8,9 +8,10 @@ import type {
   SiteAnalyticsData,
   SiteAnalyticsMeta,
   SiteAnalyticsParams,
+  SiteAnalyticsTab,
   SitesFormOptions,
 } from "./types";
-import { DEFAULT_PRESET } from "./constant";
+import { DEFAULT_PRESET, DEFAULT_SITES_PAGE, DEFAULT_SITES_PAGE_SIZE } from "./constant";
 
 const emptyFormOptions: SitesFormOptions = {
   memberships: [],
@@ -19,7 +20,41 @@ const emptyFormOptions: SitesFormOptions = {
   currency: "MMK",
 };
 
-export function useAnalyticsSites() {
+type ScopeParams = {
+  orgId?: string;
+  stationId?: string;
+  stationSizeId?: string;
+  preset: PeriodPreset;
+  periodFrom?: string;
+  periodTo?: string;
+};
+
+function buildParams(
+  scope: ScopeParams,
+  view: SiteAnalyticsTab,
+  page?: number,
+  limit?: number
+): SiteAnalyticsParams {
+  return {
+    orgId: scope.orgId,
+    stationId: scope.stationId,
+    stationSizeId: scope.stationSizeId,
+    view,
+    ...(view === "sites"
+      ? { page: page ?? DEFAULT_SITES_PAGE, limit: limit ?? DEFAULT_SITES_PAGE_SIZE }
+      : {}),
+    ...(scope.periodFrom && scope.periodTo
+      ? { periodFrom: scope.periodFrom, periodTo: scope.periodTo }
+      : { preset: scope.preset }),
+  };
+}
+
+export function useAnalyticsSites(options: {
+  tab: SiteAnalyticsTab;
+  page: number;
+  pageSize: number;
+}) {
+  const { tab, page, pageSize } = options;
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [stationId, setStationId] = useState<string | undefined>(undefined);
   const [stationSizeId, setStationSizeId] = useState<string | undefined>(undefined);
@@ -30,32 +65,65 @@ export function useAnalyticsSites() {
   }>({});
   const [formOptions, setFormOptions] = useState<SitesFormOptions>(emptyFormOptions);
 
-  const params: SiteAnalyticsParams = {
+  const scope: ScopeParams = {
     orgId,
     stationId,
     stationSizeId,
-    ...(customPeriod.periodFrom && customPeriod.periodTo ? customPeriod : { preset }),
+    preset,
+    periodFrom: customPeriod.periodFrom,
+    periodTo: customPeriod.periodTo,
   };
 
-  const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
-    refreshDeps: [
-      orgId,
-      stationId,
-      stationSizeId,
-      preset,
-      customPeriod.periodFrom,
-      customPeriod.periodTo,
-    ],
-  });
+  const periodDeps = [
+    orgId,
+    stationId,
+    stationSizeId,
+    preset,
+    customPeriod.periodFrom,
+    customPeriod.periodTo,
+  ];
 
-  const analytics = (data?.data ?? null) as SiteAnalyticsData | null;
-  const meta = (data?.meta ?? {}) as SiteAnalyticsMeta;
+  const statsReq = useRequest(
+    () => Query.loadAnalytics(buildParams(scope, "stats")),
+    {
+      ready: Boolean(orgId) && tab === "stats",
+      refreshDeps: periodDeps,
+    }
+  );
+
+  const sitesReq = useRequest(
+    () => Query.loadAnalytics(buildParams(scope, "sites", page, pageSize)),
+    {
+      ready: Boolean(orgId) && tab === "sites",
+      refreshDeps: [...periodDeps, page, pageSize],
+    }
+  );
+
+  const tiersReq = useRequest(
+    () => Query.loadAnalytics(buildParams(scope, "tiers")),
+    {
+      ready: Boolean(orgId) && tab === "tiers",
+      refreshDeps: periodDeps,
+    }
+  );
+
+  const activeReq = tab === "stats" ? statsReq : tab === "sites" ? sitesReq : tiersReq;
+  const analytics = (activeReq.data?.data ?? null) as SiteAnalyticsData | null;
+  const meta = (activeReq.data?.meta ?? {}) as SiteAnalyticsMeta;
+  const loading = activeReq.loading;
+  const error = activeReq.error;
+  const refresh = activeReq.refresh;
 
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as SitesFormOptions;
     setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
+    if (
+      !targetOrgId &&
+      !opts.canSwitchOrg &&
+      !opts.requiresOrgSelection &&
+      opts.memberships.length === 1
+    ) {
       setOrgId(opts.memberships[0].id);
     }
     return opts;

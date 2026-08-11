@@ -221,8 +221,7 @@ export class BillingCapacityTiersController {
           _count: {
             select: {
               stations: true,
-              globalLicensePrices: true,
-              orgLicensePrices: true,
+              invoiceItems: true,
             },
           },
         },
@@ -235,20 +234,28 @@ export class BillingCapacityTiersController {
         });
       }
 
-      const inUse =
-        existing._count.stations > 0 ||
-        existing._count.globalLicensePrices > 0 ||
-        existing._count.orgLicensePrices > 0;
-
-      if (inUse) {
+      if (existing._count.stations > 0) {
         return responseError(res, 409, {
           code: 'TIER_IN_USE',
           message:
-            'This tier is referenced by sites or license pricing. Deactivate it instead of deleting.',
+            'This tier still has licensed sites. Reassign or remove those sites before deleting.',
         });
       }
 
-      await this.prisma.stationSize.delete({ where: { id } });
+      if (existing._count.invoiceItems > 0) {
+        return responseError(res, 409, {
+          code: 'TIER_IN_USE',
+          message:
+            'This tier is referenced by historical invoices. Deactivate it instead of deleting.',
+        });
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.stationLicensePrice.deleteMany({ where: { stationSizeId: id } });
+        await tx.orgLicenseStationSizePrice.deleteMany({ where: { stationSizeId: id } });
+        await tx.stationSize.delete({ where: { id } });
+      });
+
       responseSuccess(res, { message: 'Capacity tier deleted', data: { id } });
     }),
   ];

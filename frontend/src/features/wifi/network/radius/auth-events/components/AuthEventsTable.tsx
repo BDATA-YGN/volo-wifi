@@ -52,6 +52,7 @@ const AuthEventsTable: React.FC<Props> = ({
     {
       title: "Username",
       dataIndex: "username",
+      width: 140,
       ellipsis: true,
       render: (username: string) => <Text strong>{username}</Text>,
     },
@@ -66,6 +67,39 @@ const AuthEventsTable: React.FC<Props> = ({
       ),
     },
     {
+      title: "Site",
+      key: "station",
+      width: 180,
+      ellipsis: true,
+      render: (_, row) =>
+        row.station ? (
+          <div>
+            <Text style={{ fontSize: 13 }}>{row.station.name}</Text>
+            <div>
+              <Text type="secondary" style={{ fontSize: 11, fontFamily: "monospace" }}>
+                {row.station.code}
+              </Text>
+            </div>
+          </div>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
+      title: "NAS ID",
+      dataIndex: "nasIdentifier",
+      width: 140,
+      ellipsis: true,
+      render: (nasId: string | null | undefined) =>
+        nasId ? (
+          <Text code style={{ fontSize: 11 }}>
+            {nasId}
+          </Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
       title: "AP / NAS MAC",
       dataIndex: "calledStationId",
       width: 140,
@@ -78,24 +112,11 @@ const AuthEventsTable: React.FC<Props> = ({
     {
       title: "Reply",
       dataIndex: "reply",
+      width: 120,
       ellipsis: true,
       render: (reply: string | null) =>
         reply ? (
           <Text style={{ fontSize: 12 }}>{reply}</Text>
-        ) : (
-          <Text type="secondary">—</Text>
-        ),
-    },
-    {
-      title: "Class",
-      dataIndex: "class",
-      width: 120,
-      ellipsis: true,
-      render: (classVal: string | null) =>
-        classVal ? (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {classVal}
-          </Text>
         ) : (
           <Text type="secondary">—</Text>
         ),
@@ -128,7 +149,7 @@ const AuthEventsTable: React.FC<Props> = ({
       loading={loading}
       columns={columns}
       dataSource={data}
-      scroll={{ x: 1000 }}
+      scroll={{ x: 1200 }}
       locale={{
         emptyText: (
           <Empty
@@ -142,7 +163,7 @@ const AuthEventsTable: React.FC<Props> = ({
         pageSize,
         total,
         onChange: onPaginationChange,
-        itemLabel: "event"
+        itemLabel: "event",
       })}
       onRow={(record) => ({
         onClick: () => onView(record),

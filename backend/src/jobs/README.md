@@ -10,6 +10,7 @@ are ready (`initializeCronJobs()` → `startAllJobs()`).
 | Job | Default schedule | Purpose |
 |-----|------------------|---------|
 | `log-cleanup` | `0 3 * * *` daily | Purges expired audit and login logs |
+| `credential-sync` | `*/3 * * * *` every 3 min | Closes stale RADIUS sessions; marks tokens `CONSUMED` / `EXPIRED`; refreshes `timeRemainingSec` |
 | `reporting-aggregate` | `15 * * * *` hourly | Builds `rpt_daily_*` stat tables from operational data |
 | `reporting-aggregate` | `30 2 1 * *` monthly | Rolls daily → monthly → yearly sales stats |
 | `ops-archive` | `30 4 * * *` daily | Archives/purges operational tables (see below) |
@@ -48,9 +49,14 @@ Each `ops-archive` tick runs in dependency order:
 ## Manual run (development)
 
 ```ts
-import { runReportingAggregateTick, runReportingRollupTick } from '@/jobs';
-import { runOpsArchiveTick } from '@/jobs';
+import {
+  runReportingAggregateTick,
+  runReportingRollupTick,
+  runOpsArchiveTick,
+  runCredentialSyncTick,
+} from '@/jobs';
 
+await runCredentialSyncTick();
 await runReportingAggregateTick();
 await runReportingRollupTick();
 await runOpsArchiveTick();

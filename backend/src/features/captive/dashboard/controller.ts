@@ -17,6 +17,7 @@ import {
   radiusSessionMatchWhere,
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
+import { sanitizeCaptiveClientIp } from '@/features/captive/utils/captive-client-ip';
 
 const prisma = PrismaDBConnection.getConnection();
 
@@ -88,7 +89,7 @@ export class CaptiveDashboardController {
           }
         }
 
-        const ipAddress = activeSession?.framedIpAddress ?? null;
+        const ipAddress = sanitizeCaptiveClientIp(activeSession?.framedIpAddress ?? null);
         const connected = !!activeSession;
 
         const now = new Date();
@@ -133,7 +134,7 @@ export class CaptiveDashboardController {
             durationDisplay: formatSessionTime(sessionSeconds),
             totalBytes: total,
             totalGb: bytesToGb(total),
-            ipAddress: session.framedIpAddress,
+            ipAddress: sanitizeCaptiveClientIp(session.framedIpAddress),
             status: session.status,
           };
         });
@@ -288,7 +289,7 @@ export class CaptiveDashboardController {
         responseSuccess(res, {
           message: captiveSuccess.CONNECTION_RETRIEVED,
           data: {
-            ipAddress: activeSession?.framedIpAddress ?? null,
+            ipAddress: sanitizeCaptiveClientIp(activeSession?.framedIpAddress ?? null),
             packageType: plan ? captivePlanQuotaTypeLabel(plan.quotaType) : captiveSuccess.NO_PLAN,
             status: captiveCredentialStatusLabel(credential.status ?? ''),
             connected: !!activeSession,

@@ -276,6 +276,38 @@ const appSettingsData: AppSettingSeed[] = [
     description: "Maximum rows deleted per query loop, to keep table locks short.",
   },
 
+  // ── Credential sync (ACTIVATED → CONSUMED / EXPIRED) ────────────────────
+  // Read by `credential-sync.job.ts`.
+
+  {
+    key: "credential_sync_enabled", value: "true", defaultValue: "true",
+    valueType: "BOOLEAN", controlType: "BOOLEAN",
+    category: "ops", sortOrder: 15, isPublic: false,
+    labelEn: "Enable credential sync job", labelMy: "Credential sync ဖွင့်ရန်",
+    description: "Closes stale RADIUS sessions and marks exhausted/expired access tokens CONSUMED or EXPIRED.",
+  },
+  {
+    key: "credential_sync_cron", value: "*/3 * * * *", defaultValue: "*/3 * * * *",
+    valueType: "STRING", controlType: "TEXT",
+    category: "ops", sortOrder: 16, isPublic: false,
+    labelEn: "Credential sync schedule (cron)", labelMy: "Credential sync cron",
+    description: "Default: every 3 minutes. Recomputes remaining time and terminal statuses.",
+  },
+  {
+    key: "credential_sync_stale_interim_minutes", value: "5", defaultValue: "5",
+    valueType: "NUMBER", controlType: "NUMBER",
+    category: "ops", sortOrder: 17, isPublic: false,
+    labelEn: "Stale RADIUS interim (minutes)", labelMy: "Stale RADIUS interim (မိနစ်)",
+    description: "Open START/INTERIM RADIUS rows with no activity longer than this are closed as Cleanup-Timeout.",
+  },
+  {
+    key: "credential_sync_max_open_hours", value: "2", defaultValue: "2",
+    valueType: "NUMBER", controlType: "NUMBER",
+    category: "ops", sortOrder: 18, isPublic: false,
+    labelEn: "Max open RADIUS session (hours)", labelMy: "Max open RADIUS (နာရီ)",
+    description: "Force-close any open RADIUS session older than this many hours.",
+  },
+
   // ── Reporting aggregation (pre-aggregated stat tables — not operational) ─
   // Read by `reporting-aggregate.job.ts`.
 
