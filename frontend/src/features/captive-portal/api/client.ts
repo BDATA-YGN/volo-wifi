@@ -59,6 +59,16 @@ captiveApiClient.interceptors.response.use(
   },
 );
 
+export class CaptiveClientError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "CaptiveClientError";
+    this.code = code;
+  }
+}
+
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<CaptiveApiError>;
   const message =
@@ -74,11 +84,16 @@ function getErrorMessage(error: unknown): string {
   return message;
 }
 
+function getErrorCode(error: unknown): string | undefined {
+  const axiosError = error as AxiosError<CaptiveApiError>;
+  return axiosError.response?.data?.error?.code;
+}
+
 export async function captiveLogin(payload: CaptiveLoginPayload): Promise<void> {
   try {
     await captiveApiClient.post<CaptiveApiSuccess<{ ok: boolean }>>("/login", payload);
   } catch (error) {
-    throw new Error(getErrorMessage(error));
+    throw new CaptiveClientError(getErrorMessage(error), getErrorCode(error));
   }
 }
 

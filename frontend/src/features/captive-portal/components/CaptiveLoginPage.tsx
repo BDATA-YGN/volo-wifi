@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequest } from "ahooks";
 import CaptiveShell from "./CaptiveShell";
-import { captiveLogin } from "../api/client";
+import { captiveLogin, CaptiveClientError } from "../api/client";
 import type { CredentialLoginType } from "../api/types";
 import {
+  extractNasLocationDebug,
   resolveNasParamsForPage,
   storeNasParams,
 } from "../utils/nas-params";
@@ -15,6 +16,12 @@ import { resolvePostLoginPath, storeRouterHandoff } from "../utils/router-handof
 import styles from "../captive-portal.module.css";
 
 type LoginMode = CredentialLoginType;
+
+const SITE_MATCH_ERROR_CODES = new Set([
+  "TOKEN_LOCATION_UNKNOWN",
+  "TOKEN_LOCATION_AMBIGUOUS",
+  "TOKEN_SITE_MISMATCH",
+]);
 
 interface FormState {
   token: string;
@@ -27,6 +34,7 @@ export default function CaptiveLoginPage() {
   const [mode, setMode] = useState<LoginMode>("VOUCHER_TOKEN");
   const [error, setError] = useState<string | null>(null);
   const [nasError, setNasError] = useState<string | null>(null);
+  const [siteMatchFailed, setSiteMatchFailed] = useState(false);
   const [form, setForm] = useState<FormState>({ token: "", username: "", password: "" });
 
   const { nasParams, gatewayError } = useMemo(() => {
@@ -36,6 +44,12 @@ export default function CaptiveLoginPage() {
     const resolved = resolveNasParamsForPage(window.location.search);
     return { nasParams: resolved.active, gatewayError: resolved.gatewayError };
   }, []);
+
+  const nasDebug = useMemo(() => extractNasLocationDebug(nasParams), [nasParams]);
+  const nasHostname =
+    typeof nasParams?.hostname === "string" && nasParams.hostname.trim()
+      ? nasParams.hostname.trim()
+      : undefined;
 
   useEffect(() => {
     if (nasParams && hasNasRedirectContext(nasParams)) {
@@ -52,6 +66,7 @@ export default function CaptiveLoginPage() {
   const { runAsync: submitLogin, loading } = useRequest(
     async () => {
       setError(null);
+      setSiteMatchFailed(false);
       const credential =
         mode === "VOUCHER_TOKEN"
           ? form.token.trim().toUpperCase()
@@ -93,6 +108,8 @@ export default function CaptiveLoginPage() {
     try {
       await submitLogin();
     } catch (err) {
+      const code = err instanceof CaptiveClientError ? err.code : undefined;
+      setSiteMatchFailed(Boolean(code && SITE_MATCH_ERROR_CODES.has(code)));
       setError(err instanceof Error ? err.message : "ဝင်ရောက်မှု မအောင်မြင်ပါ");
     }
   };
@@ -114,6 +131,45 @@ export default function CaptiveLoginPage() {
         {routerHint ? <div className={styles.infoBanner}>{routerHint}</div> : null}
         {nasError ? <div className={styles.infoBanner}>{nasError}</div> : null}
         {error ? <div className={styles.errorBanner} role="alert">{error}</div> : null}
+        {nasDebug || siteMatchFailed ? (
+          <div
+            className={`${styles.nasDebug} ${siteMatchFailed ? styles.nasDebugError : ""}`}
+            role="status"
+          >
+            <p className={styles.nasDebugTitle}>
+              {siteMatchFailed ? "ဆိုင် ရှာမတွေ့ပါ — NAS အချက်အလက်" : "Router NAS"}
+            </p>
+            {siteMatchFailed ? (
+              <p className={styles.nasDebugHint}>
+                Site lock uses NAS-Identifier or NAS MAC only. NAS IP is not used. Compare
+                NAS-Identifier with Site Directory (MikroTik: /system identity).
+              </p>
+            ) : null}
+            <dl className={styles.nasDebugList}>
+              <div>
+                <dt>NAS-Identifier</dt>
+                <dd>{nasDebug?.nasId ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>NAS MAC</dt>
+                <dd>
+                  {nasDebug?.nasMac ??
+                    (siteMatchFailed ? "not sent (MikroTik Hotspot has no NAS MAC variable)" : "—")}
+                </dd>
+              </div>
+              <div>
+                <dt>NAS IP</dt>
+                <dd>{nasDebug?.nasIp ?? "—"}</dd>
+              </div>
+              {nasHostname && nasHostname !== nasDebug?.nasIp ? (
+                <div>
+                  <dt>hostname</dt>
+                  <dd>{nasHostname}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </div>
+        ) : null}
 
         <div className={styles.tabs} role="tablist" aria-label="Login method">
           <button

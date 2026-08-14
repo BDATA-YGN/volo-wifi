@@ -196,16 +196,17 @@ const SiteFormDrawer: React.FC<Props> = ({
   const networkTab = (
     <>
       <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 16 }}>
-        Captive site-lock matching uses these fields against the gateway redirect (
-        <Text code>NASID</Text>, <Text code>nas_ip</Text>, <Text code>nas_mac</Text>
-        ). Any one match is enough — NAS-Identifier or NAS MAC alone qualifies. For Ruijie
-        presets without NASID, fill NAS IP and/or NAS MAC.
+        Captive site-lock matching uses <Text code>NASID</Text> / <Text code>nas_mac</Text> from
+        the gateway redirect. Either one match is enough. NAS IP is not used for site lock
+        (hotspot IPs are often reused). Ruijie: NASID and/or NAS MAC. MikroTik: set{" "}
+        <Text code>/system identity</Text> equal to NAS-Identifier (
+        <Text code>NASID=$(identity)</Text>).
       </Paragraph>
 
       <Form.Item
         name="nasIdentifier"
         label="NAS-Identifier"
-        extra="Optional. Match redirect NASID / nasid when the gateway sends it."
+        extra="Match redirect NASID / nasid / MikroTik $(identity)."
       >
         <Input placeholder="e.g. ANNAPC0001" />
       </Form.Item>
@@ -213,7 +214,7 @@ const SiteFormDrawer: React.FC<Props> = ({
       <Form.Item
         name="radiusClientIp"
         label="NAS IP"
-        extra="Ruijie / MikroTik redirect nas_ip — also used as RADIUS client IP."
+        extra="RADIUS client IP only — not used to lock tokens to a site."
       >
         <Input placeholder="10.0.0.1" />
       </Form.Item>
@@ -221,7 +222,7 @@ const SiteFormDrawer: React.FC<Props> = ({
       <Form.Item
         name="nasMac"
         label="NAS MAC"
-        extra="Gateway MAC from redirect (nas_mac). Any format is fine — saved as aa:bb:cc:dd:ee:ff and matched the same way at captive login."
+        extra="Gateway MAC from redirect (nas_mac). MikroTik Hotspot HTML cannot send this. Any format is fine — saved as aa:bb:cc:dd:ee:ff."
         rules={[
           {
             validator: async (_, value) => {

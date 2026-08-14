@@ -2,6 +2,53 @@ import { CAPTIVE_NAS_STORAGE_KEY, CAPTIVE_ROUTER_CREDENTIAL_KEY } from "../const
 import type { NasParams } from "../api/types";
 import { hasNasRedirectContext as detectRedirectContext } from "./router-redirect";
 
+function firstNasValue(params: NasParams | undefined, keys: string[]): string | undefined {
+  if (!params) return undefined;
+  for (const key of keys) {
+    const value = params[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+/** NAS identity from the gateway redirect — used when site match fails. */
+export type NasLocationDebug = {
+  nasIp?: string;
+  nasMac?: string;
+  nasId?: string;
+};
+
+export function extractNasLocationDebug(params?: NasParams): NasLocationDebug | null {
+  if (!params) return null;
+  const nasIp = firstNasValue(params, [
+    "nas_ip",
+    "nasip",
+    "nasIp",
+    "wlanacip",
+    "server-address",
+    "server_address",
+    "serverAddress",
+  ]);
+  const nasMac = firstNasValue(params, [
+    "nas_mac",
+    "nasmac",
+    "ap_mac",
+    "apmac",
+    "gw_mac",
+    "gateway_mac",
+  ]);
+  const nasId = firstNasValue(params, [
+    "NASID",
+    "nasid",
+    "nas_id",
+    "nas_identifier",
+    "nasIdentifier",
+    "identity",
+  ]);
+  if (!nasIp && !nasMac && !nasId) return null;
+  return { nasIp, nasMac, nasId };
+}
+
 export function parseNasParamsFromSearch(search: string): NasParams {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const result: NasParams = {};

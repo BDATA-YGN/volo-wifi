@@ -118,7 +118,9 @@ For bandwidth-capped plans, add `Mikrotik-Rate-Limit` with a static string (e.g.
 |-------|-------|
 | Portal base URL | Public captive portal URL |
 | RADIUS vendor profile | MikroTik profile |
-| RADIUS client IP | Hotspot interface IP toward FreeRADIUS |
+| RADIUS client IP | Hotspot IP for RADIUS (`hotspot-address`). Not used for captive site lock. |
+| NAS-Identifier | **Required for MikroTik site lock** — same as `/system identity` |
+| NAS MAC | Optional. Ruijie can send this; MikroTik Hotspot HTML cannot |
 | RADIUS shared secret | Same secret used on RouterOS |
 
 ### 5. Register the NAS device
@@ -165,19 +167,21 @@ Replace placeholders:
 ### 1. Hotspot interface and pool
 
 ```routeros
+/system identity set name=ST-YOURSITE
 /ip pool add name=hs-pool ranges=10.10.10.2-10.10.10.254
 /ip hotspot profile add name=volo-hotspot \
     hotspot-address=10.10.10.1 \
     dns-name=wifi.local \
-    html-directory=hotspot \
-    login-by=http-chap,http-pap,mac,cookie \
-    http-cookie-lifetime=1d \
+    html-directory=flash/hotspot \
+    login-by=http-pap \
     use-radius=yes \
     radius-accounting=yes \
     radius-interim-update=5m \
     nas-port-type=wireless-802.11
 /ip hotspot add name=volo interface=bridge-hotspot address-pool=hs-pool profile=volo-hotspot
 ```
+
+`identity` must match the site **NAS-Identifier** (captive site lock). `hotspot-address` is the RADIUS client / login IP only — it is **not** used to verify the site. Use **`http-pap` only** — do not enable `cookie` (cookie re-auth skips the portal after Session-Timeout).
 
 Use your actual bridge/VLAN interface for guest traffic.
 
@@ -190,15 +194,17 @@ Use your actual bridge/VLAN interface for guest traffic.
 
 ### 3. External login page (captive portal)
 
-Point Hotspot to the Volo captive portal. The portal must read MikroTik query variables (`mac`, `ip`, `link-login`, `link-orig`, etc.) and POST them back as `nasParams`.
+Point Hotspot to the Volo captive portal by uploading the `hotspot/` folder (`html-directory=flash/hotspot`). Those pages redirect to `/portal/auth` with:
+
+`mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(identity)&hostname=$(hostname)&server-name=$(server-name)&link-login=…`
+
+Use `$(server-address)` for `nas_ip` so `http://{nas_ip}/login` works. Site lock does **not** use NAS IP. MikroTik has no Hotspot variable for NAS MAC — set `/system identity` to the site NAS-Identifier.
 
 ```routeros
 /ip hotspot profile set volo-hotspot \
-    login-url=PORTAL_URL/login \
-    login-by=http-chap,http-pap,mac,cookie
+    login-by=http-pap \
+    html-directory=flash/hotspot
 ```
-
-Confirm the portal login route accepts MikroTik redirect parameters and, after `POST /api/login`, redirects the user to `link-login` with username = token and the password required by your Hotspot/RADIUS flow.
 
 ### 4. Walled garden
 
@@ -311,6 +317,7 @@ radtest ABCD1234 "" RADIUS_SERVER 0 HOTSPOT_SECRET
 | Symptom | Likely cause | Action |
 |---------|--------------|--------|
 | Redirect loop | `login-url` wrong or portal error | Fix URL; check `/api/check/server` |
+| Portal says site not found (`TOKEN_LOCATION_UNKNOWN`) | Missing `NASID=$(identity)`, or identity ≠ site NAS-Identifier | See **Trace site match** below |
 | `radius timeout` | Firewall / wrong IP | Verify UDP 1812/1813; ping from MikroTik |
 | Login OK, no internet | RADIUS reject | Check secret, token as User-Name, FreeRADIUS debug |
 | `already authorizing` | Stale Hotspot cookie | Clear cookies; `/ip hotspot active remove` |
@@ -324,6 +331,20 @@ Enable RouterOS debug while testing:
 ```routeros
 /system logging add topics=hotspot,debug action=memory
 /radius monitor 0 once
+```
+
+### Trace site match (`TOKEN_LOCATION_UNKNOWN`)
+
+The portal matches **NAS-Identifier or NAS MAC** (not NAS IP).
+
+1. On the phone, open the portal URL and copy the query string.
+2. Confirm `NASID=` equals `/system identity print` and the site **NAS-Identifier**.
+3. If `NASID` is empty, re-upload `hotspot/` pages that include `NASID=$(identity)`.
+4. If the login page shows **NAS MAC** as empty, that is expected on MikroTik — Hotspot HTML has no NAS MAC variable.
+
+```routeros
+/system identity print
+/ip hotspot profile print where name=volo-hotspot
 ```
 
 ---

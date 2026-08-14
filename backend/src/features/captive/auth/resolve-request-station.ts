@@ -25,14 +25,6 @@ function readNasString(
   return null;
 }
 
-function normalizeNasIp(ip: string | null | undefined): string | null {
-  if (!ip) return null;
-  let value = ip.trim();
-  if (!value) return null;
-  if (value.startsWith('::ffff:')) value = value.slice(7);
-  return value;
-}
-
 function normalizeNasIdentifier(value: string | null | undefined): string | null {
   if (!value?.trim()) return null;
   return value.trim();
@@ -46,12 +38,12 @@ export type ResolveRequestStationResult =
 /**
  * Resolve the request WiFi site from captive redirect `nasParams`.
  *
- * OR match (any one hit is enough):
- * - NASID / nasid / nas_id → WifiStation.nasIdentifier
- * - nas_ip / nasip / wlanacip → WifiStation.radiusClientIp
+ * OR match (any one hit is enough) — never NAS IP (hotspot IPs often collide):
+ * - NASID / nasid / nas_id / identity → WifiStation.nasIdentifier
  * - nas_mac → WifiStation.nasMac (any MAC format; compared via normalizeMacKey)
  *
- * NAS-Identifier OR NAS MAC alone qualifies when that param is present.
+ * Ruijie typically sends NASID and/or nas_mac.
+ * MikroTik Hotspot HTML sends NASID=$(identity); it has no NAS MAC variable.
  */
 export async function resolveRequestStationFromNasParams(options: {
   orgId: string;
@@ -61,16 +53,21 @@ export async function resolveRequestStationFromNasParams(options: {
   const { orgId, nasParams, preferStationId } = options;
 
   const nasId = normalizeNasIdentifier(
-    readNasString(nasParams, ['NASID', 'nasid', 'nas_id', 'nas_identifier', 'nasIdentifier']),
-  );
-  const nasIp = normalizeNasIp(
-    readNasString(nasParams, ['nas_ip', 'nasip', 'wlanacip', 'nasIp', 'ap_ip']),
+    readNasString(nasParams, [
+      'NASID',
+      'nasid',
+      'nas_id',
+      'nas_identifier',
+      'nasIdentifier',
+      // MikroTik Hotspot HTML: NASID=$(identity)
+      'identity',
+    ]),
   );
   const nasMacKey = normalizeMacKey(
     readNasString(nasParams, ['nas_mac', 'nasmac', 'ap_mac', 'apmac', 'gw_mac', 'gateway_mac']),
   );
 
-  if (!nasId && !nasIp && !nasMacKey) {
+  if (!nasId && !nasMacKey) {
     return { status: 'unknown' };
   }
 
@@ -95,18 +92,6 @@ export async function resolveRequestStationFromNasParams(options: {
         orgId,
         deletedAt: null,
         nasIdentifier: { equals: nasId, mode: 'insensitive' },
-      },
-      select: { id: true, stationSizeId: true },
-    });
-    addRows(rows);
-  }
-
-  if (nasIp) {
-    const rows = await prisma.wifiStation.findMany({
-      where: {
-        orgId,
-        deletedAt: null,
-        radiusClientIp: nasIp,
       },
       select: { id: true, stationSizeId: true },
     });

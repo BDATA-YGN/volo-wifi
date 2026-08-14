@@ -26,14 +26,40 @@ import {
   TenantAccessControlResetPasswordSchema,
 } from './schema';
 
-/** Access Control lists tenant staff only — Partner accounts live under Partners. */
-function staffMemberRoleFilter(): Prisma.OrgMemberRoleListRelationFilter {
+/**
+ * Access Control lists tenant staff only.
+ * Exclude Partner portal accounts (Partners menu), including legacy rows that used
+ * title "Partner" + STATION_OPS instead of roleCode PARTNER.
+ *
+ * Note: `NOT { title equals Partner }` alone excludes NULL titles in SQL — keep null titles.
+ */
+function staffMemberWhere(orgId: string): Prisma.OrgMemberWhereInput {
   return {
-    some: {
-      deletedAt: null,
-      isActive: true,
-      roleCode: { in: [...PROVISION_MEMBER_ROLE_CODES] },
+    orgId,
+    deletedAt: null,
+    roles: {
+      some: {
+        deletedAt: null,
+        isActive: true,
+        roleCode: { in: [...PROVISION_MEMBER_ROLE_CODES] },
+      },
+      none: {
+        deletedAt: null,
+        isActive: true,
+        roleCode: { in: [...LOCKED_MEMBER_ROLE_CODES, 'RESELLER_MANAGER'] },
+      },
     },
+    AND: [
+      {
+        OR: [
+          { title: null },
+          { NOT: { title: { equals: 'Partner', mode: 'insensitive' } } },
+        ],
+      },
+      {
+        NOT: { admin: { wifiReseller: { is: { deletedAt: null } } } },
+      },
+    ],
   };
 }
 
@@ -300,9 +326,7 @@ export class TenantAccessControlController {
         const member = await this.prisma.orgMember.findFirst({
           where: {
             id,
-            orgId,
-            deletedAt: null,
-            roles: staffMemberRoleFilter(),
+            ...staffMemberWhere(orgId),
           },
           select: memberSelect,
         });
@@ -353,9 +377,7 @@ export class TenantAccessControlController {
       const { page, limit, skip, take } = parsePagination(req.query);
 
       const where: Prisma.OrgMemberWhereInput = {
-        orgId,
-        deletedAt: null,
-        roles: staffMemberRoleFilter(),
+        ...staffMemberWhere(orgId),
       };
 
       if (status && ['ACTIVE', 'SUSPENDED', 'DISABLED'].includes(status)) {
@@ -366,13 +388,18 @@ export class TenantAccessControlController {
         roleCodeRaw &&
         (PROVISION_MEMBER_ROLE_CODES as readonly string[]).includes(roleCodeRaw)
       ) {
-        where.roles = {
-          some: {
-            deletedAt: null,
-            isActive: true,
-            roleCode: roleCodeRaw,
+        where.AND = [
+          ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+          {
+            roles: {
+              some: {
+                deletedAt: null,
+                isActive: true,
+                roleCode: roleCodeRaw,
+              },
+            },
           },
-        };
+        ];
       }
 
       if (search) {
@@ -384,11 +411,7 @@ export class TenantAccessControlController {
         ];
       }
 
-      const staffScope: Prisma.OrgMemberWhereInput = {
-        orgId,
-        deletedAt: null,
-        roles: staffMemberRoleFilter(),
-      };
+      const staffScope = staffMemberWhere(orgId);
 
       const [rows, total, activeCount, suspendedCount, roleAssignments] = await Promise.all([
         this.prisma.orgMember.findMany({
@@ -408,7 +431,7 @@ export class TenantAccessControlController {
             deletedAt: null,
             isActive: true,
             roleCode: { in: [...PROVISION_MEMBER_ROLE_CODES] },
-            orgMember: { orgId, deletedAt: null },
+            orgMember: staffScope,
           },
         }),
       ]);
@@ -459,7 +482,7 @@ export class TenantAccessControlController {
         }
 
         const existing = await this.prisma.orgMember.findFirst({
-          where: { id: recordId!, orgId, deletedAt: null },
+          where: { id: recordId!, ...staffMemberWhere(orgId) },
           select: {
             id: true,
             adminId: true,
@@ -542,6 +565,18 @@ export class TenantAccessControlController {
               value.roleCodes as string[],
               actorAdminId
             );
+
+            const consoleRoleName = pickConsoleRoleName(value.roleCodes as string[]);
+            const consoleRole = await tx.mngRoles.findFirst({
+              where: { roleName: consoleRoleName, deletedAt: null },
+              select: { roleId: true },
+            });
+            if (consoleRole) {
+              await tx.admin.update({
+                where: { id: existing.adminId },
+                data: { roleId: consoleRole.roleId, updatedBy: actorAdminId },
+              });
+            }
           }
           if (value.stationIds) {
             await syncStationScopes(tx, orgId, recordId!, value.stationIds as string[]);
@@ -608,9 +643,19 @@ export class TenantAccessControlController {
 
       const existingAdmin = await this.prisma.admin.findFirst({
         where: { username, deletedAt: null },
-        select: { id: true },
+        select: { id: true, fullName: true },
       });
       if (existingAdmin) {
+        const alreadyMember = await this.prisma.orgMember.findFirst({
+          where: { orgId, adminId: existingAdmin.id, deletedAt: null },
+          select: { id: true },
+        });
+        if (alreadyMember) {
+          return responseError(res, 409, {
+            code: 'MEMBER_EXISTS',
+            message: `Username "${username}" is already a team member of this organization. Open that member to edit, or choose a different username.`,
+          });
+        }
         return responseError(res, 409, {
           code: 'USERNAME_EXISTS',
           message: consoleUsernameTakenMessage(username),
@@ -700,7 +745,7 @@ export class TenantAccessControlController {
       }
 
       const existing = await this.prisma.orgMember.findFirst({
-        where: { id: idParam, orgId, deletedAt: null },
+        where: { id: idParam, ...staffMemberWhere(orgId) },
         select: { id: true, adminId: true },
       });
 
@@ -747,7 +792,7 @@ export class TenantAccessControlController {
       }
 
       const existing = await this.prisma.orgMember.findFirst({
-        where: { id: idParam, orgId, deletedAt: null },
+        where: { id: idParam, ...staffMemberWhere(orgId) },
         select: { id: true, adminId: true },
       });
       if (!existing) {

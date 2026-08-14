@@ -115,7 +115,7 @@ else → max(1, plan.maxDevices ?? 1)
 `hotspot/login.html` immediately redirects to:
 
 ```text
-https://portal.../auth?mac=$(mac)&ip=$(ip)&nas_ip=$(hostname)
+https://portal.../auth?mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(identity)
   &link-login=$(link-login-esc)
   &link-login-only=$(link-login-only-esc)
   &link-logout=$(link-logout-esc)
