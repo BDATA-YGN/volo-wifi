@@ -5,14 +5,13 @@ import { Card, Col, Row, Statistic } from "antd";
 import {
   DollarOutlined,
   PercentageOutlined,
-  ShoppingCartOutlined,
   TeamOutlined,
   UserOutlined,
   WifiOutlined,
 } from "@ant-design/icons";
 import { KpiDeltaText } from "@/features/wifi/shared/components/KpiDeltaText";
 import type { PartnerAnalyticsSummary } from "../types";
-import { formatBytes, formatDuration, formatMoney, percentChange } from "../utils";
+import { formatBytes, formatMoney, percentChange } from "../utils";
 
 type Props = {
   summary: PartnerAnalyticsSummary;
@@ -79,10 +78,9 @@ const PartnersKpiCards: React.FC<Props> = ({
     <Col xs={24} sm={12} lg={6}>
       <KpiCard
         loading={loading}
-        title="Orders"
-        value={summary.ordersCount}
-        delta={percentChange(summary.ordersCount, previous.ordersCount)}
-        prefix={<ShoppingCartOutlined style={{ color: "#1677ff" }} />}
+        title="Total tokens"
+        value={summary.itemsCount}
+        delta={percentChange(summary.itemsCount, previous.itemsCount)}
       />
     </Col>
     <Col xs={24} sm={12} lg={6}>
@@ -97,14 +95,6 @@ const PartnersKpiCards: React.FC<Props> = ({
     <Col xs={24} sm={12} lg={6}>
       <KpiCard
         loading={loading}
-        title="Net revenue"
-        value={formatMoney(summary.netRevenue, currency)}
-        delta={percentChange(summary.netRevenue, previous.netRevenue)}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
         title="WiFi sessions"
         value={summary.sessionsCount}
         delta={percentChange(summary.sessionsCount, previous.sessionsCount)}
@@ -114,25 +104,9 @@ const PartnersKpiCards: React.FC<Props> = ({
     <Col xs={24} sm={12} lg={6}>
       <KpiCard
         loading={loading}
-        title="Tokens sold"
-        value={summary.itemsCount}
-        delta={percentChange(summary.itemsCount, previous.itemsCount)}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
         title="Data transferred"
         value={formatBytes(summary.totalBytes)}
         delta={percentChange(summary.totalBytes, previous.totalBytes)}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
-        title="Session time"
-        value={formatDuration(summary.totalSessionTimeSec)}
-        delta={percentChange(summary.totalSessionTimeSec, previous.totalSessionTimeSec)}
       />
     </Col>
   </Row>

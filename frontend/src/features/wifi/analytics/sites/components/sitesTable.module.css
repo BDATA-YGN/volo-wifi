@@ -1,0 +1,11 @@
+.sitesTable :global(.ant-table-cell) {
+  padding: 10px 14px !important;
+}
+
+.sitesTable :global(.ant-table-thead > tr > th) {
+  padding: 10px 14px !important;
+}
+
+.sitesTable :global(.ant-table-summary > tr > td) {
+  padding: 10px 14px !important;
+}

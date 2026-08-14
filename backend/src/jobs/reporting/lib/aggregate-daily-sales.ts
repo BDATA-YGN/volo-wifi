@@ -126,7 +126,7 @@ export async function aggregateDailySalesForDate(
     await tx.dailySalesStat.deleteMany({
       where: {
         ...(orgIdFilter ? { orgId: orgIdFilter } : {}),
-        date: bucket,
+        date: { gte: dayStart, lte: dayEnd },
       },
     });
 
@@ -151,7 +151,7 @@ export async function aggregateDailySalesForDate(
   });
 
   logger.info(
-    `[reporting] daily sales ${bucket.toISOString().slice(0, 10)}: ${buckets.size} buckets from ${orders.length} orders`
+    `[reporting] daily sales ${bucket.toISOString()}: ${buckets.size} buckets from ${orders.length} orders`
   );
   return buckets.size;
 }

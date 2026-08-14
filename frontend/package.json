@@ -28,6 +28,7 @@
     "cookies-next": "^5.1.0",
     "dayjs": "^1.11.13",
     "dompurify": "^3.4.2",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "flat": "^6.0.1",
     "highlight.js": "^11.11.1",

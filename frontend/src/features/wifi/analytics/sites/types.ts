@@ -38,6 +38,7 @@ export type SiteAnalyticsSummary = {
 export type SiteDailyPoint = {
   date: string;
   ordersCount: number;
+  itemsCount: number;
   revenue: number;
   commission: number;
   sessionsCount: number;
@@ -91,6 +92,7 @@ export type SiteTierRow = {
   commission: number;
   sessionsCount: number;
   totalBytes: number;
+  byPlan: SitePlanBreakdown[];
 };
 
 export type SiteAnalyticsData = {
@@ -103,6 +105,12 @@ export type SiteAnalyticsData = {
   planTotals: SitePlanBreakdown[];
   pagination: { page: number; limit: number; total: number } | null;
   dataSource: "aggregated" | "live";
+  statsCoverage: {
+    daysInPeriod: number;
+    daysWithSalesStats: number;
+    daysWithUsageStats: number;
+    lastAggregatedAt: string | null;
+  } | null;
   periodFrom: string;
   periodTo: string;
   preset: PeriodPreset | null;

@@ -155,6 +155,7 @@ const SignInPage: React.FC = () => {
           size="large"
           placeholder={t("placeholder_email")}
           autoComplete="username"
+          autoFocus
           inputMode="text"
           lang="en"
           onChange={(e) => setAsciiField("email", e.target.value)}

@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from '@/generated/prisma/client';
 import { logger } from '@/logging/logger';
-import { previousCalendarMonth, previousCalendarYear, startOfUtcDay } from './dates';
+import { appCalendarMonthRange, appNow, previousCalendarMonth, previousCalendarYear } from '@/utils/app-time';
 
 type DimKey = string;
 
@@ -21,9 +21,7 @@ export async function rollupMonthlySales(
   month: number,
   orgIdFilter?: string
 ): Promise<number> {
-  const monthStart = startOfUtcDay(new Date(Date.UTC(year, month - 1, 1)));
-  const monthEnd = startOfUtcDay(new Date(Date.UTC(year, month, 0)));
-  monthEnd.setUTCHours(23, 59, 59, 999);
+  const { from: monthStart, to: monthEnd } = appCalendarMonthRange(year, month);
 
   const dailies = await prisma.dailySalesStat.findMany({
     where: {
@@ -210,9 +208,7 @@ export async function rollupPreviousClosedPeriods(prisma: PrismaClient): Promise
   const { year, month } = previousCalendarMonth();
   await rollupMonthlySales(prisma, year, month);
 
-  const now = new Date();
-  if (now.getUTCMonth() === 0) {
-    const prevYear = previousCalendarYear(now);
-    await rollupYearlySales(prisma, prevYear);
+  if (appNow().month() === 0) {
+    await rollupYearlySales(prisma, previousCalendarYear());
   }
 }

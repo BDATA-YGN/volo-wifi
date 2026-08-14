@@ -77,9 +77,26 @@ export class AnalyticsPartnersController {
 
       if (req.query.formOptions === 'true') {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
-        const [memberships, resellers, org] = await Promise.all([
+        const [memberships, resellers, stations, stationSizes, org] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgIdParam ? loadResellerPicker(this.prisma, orgIdParam) : Promise.resolve([]),
+          orgIdParam
+            ? this.prisma.wifiStation.findMany({
+                where: { orgId: orgIdParam, deletedAt: null },
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  stationSizeId: true,
+                },
+                orderBy: { name: 'asc' },
+              })
+            : Promise.resolve([]),
+          this.prisma.stationSize.findMany({
+            where: { isActive: true },
+            select: { id: true, code: true, name: true, sortOrder: true },
+            orderBy: { sortOrder: 'asc' },
+          }),
           orgIdParam
             ? this.prisma.org.findUnique({
                 where: { id: orgIdParam },
@@ -88,12 +105,17 @@ export class AnalyticsPartnersController {
             : Promise.resolve(null),
         ]);
 
+        const canSwitchOrg = canSwitchOrgContext(req.user!);
         return responseSuccess(res, {
           message: 'Success',
           data: {
             memberships,
             resellers,
+            stations,
+            stationSizes,
             currency: org?.currency ?? 'MMK',
+            canSwitchOrg,
+            requiresOrgSelection: canSwitchOrg || (!orgIdParam && memberships.length !== 1),
           },
         });
       }
@@ -109,14 +131,15 @@ export class AnalyticsPartnersController {
 
       const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
       if (!orgIdParam) {
+        const canSwitchOrg = canSwitchOrgContext(req.user!);
         return responseSuccess(res, {
           message: 'Organization required',
           data: null,
           meta: {
             memberships,
-            requiresOrgSelection: canSwitchOrgContext(req.user!) || memberships.length > 1,
-            canSwitchOrg: canSwitchOrgContext(req.user!),
-            orgId: memberships.length === 1 ? memberships[0].id : undefined,
+            requiresOrgSelection: canSwitchOrg || memberships.length > 1,
+            canSwitchOrg,
+            orgId: canSwitchOrg ? undefined : memberships.length === 1 ? memberships[0].id : undefined,
           },
         });
       }
@@ -146,9 +169,15 @@ export class AnalyticsPartnersController {
       }
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
-      const analytics = await buildPartnerAnalytics(this.prisma, orgIdParam, periodFrom, periodTo, {
-        resellerId,
-      });
+      const source = preset === 'today' ? 'live' : 'aggregated';
+      const analytics = await buildPartnerAnalytics(
+        this.prisma,
+        orgIdParam,
+        periodFrom,
+        periodTo,
+        { resellerId },
+        { source }
+      );
 
       const org = await this.prisma.org.findUnique({
         where: { id: orgIdParam },
@@ -182,6 +211,7 @@ export class AnalyticsPartnersController {
           memberships,
           orgId: orgIdParam,
           requiresOrgSelection: false,
+          canSwitchOrg: canSwitchOrgContext(req.user!),
         },
       });
     }),

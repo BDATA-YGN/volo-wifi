@@ -219,6 +219,18 @@
   height: 1.375rem;
 }
 
+.mobileShell :global(.ant-select-selection-placeholder),
+.mobileShell :global(.ant-input::placeholder),
+.mobileShell :global(.ant-input-number-input::placeholder) {
+  color: var(--mobile-muted) !important;
+  opacity: 1 !important;
+}
+
+.mobileShell :global(.ant-form-item-extra),
+.mobileShell :global(.ant-form-item-explain) {
+  color: var(--mobile-muted) !important;
+}
+
 .themeSegmented {
   display: grid;
   grid-template-columns: 1fr 1fr;

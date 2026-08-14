@@ -15,6 +15,11 @@ import {
 } from "@/features/wifi/commerce/access-tokens/utils";
 import { formatWifiDateTime } from "@/features/wifi/shared/format";
 import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
+import {
+  MobileDrawerBody,
+  mobileDrawerStyleProps,
+  useMobileDrawerChrome,
+} from "@/features/mobile/shared/components/MobileDrawerChrome";
 import styles from "./partner.module.css";
 
 type Props = {
@@ -32,6 +37,7 @@ export default function PartnerTokenDetailDrawer({
   onClose,
   loadToken,
 }: Props) {
+  const { colorScheme } = useMobileDrawerChrome("partner");
   const [detail, setDetail] = useState<AccessTokenDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -57,8 +63,6 @@ export default function PartnerTokenDetailDrawer({
   const row = detail;
   const radiusSessions = row?.radiusSessions ?? [];
   const captiveSessions = row?.captiveSessions ?? [];
-  const sessionsMeta = row?.sessionsMeta ?? null;
-  const hasAnySessions = radiusSessions.length > 0 || captiveSessions.length > 0;
 
   return (
     <Drawer
@@ -68,8 +72,11 @@ export default function PartnerTokenDetailDrawer({
       destroyOnClose
       size="auto"
       placement="bottom"
-      styles={{ body: { paddingBottom: "1.5rem", maxHeight: "85vh", overflowY: "auto" } }}
+      styles={mobileDrawerStyleProps(colorScheme, {
+        body: { maxHeight: "85vh", overflowY: "auto" },
+      })}
     >
+      <MobileDrawerBody actor="partner">
       <Spin spinning={loading}>
         {row ? (
           <div className={styles.detailStack}>
@@ -108,9 +115,6 @@ export default function PartnerTokenDetailDrawer({
 
             <section>
               <h3 className={styles.sectionTitle}>Network sessions</h3>
-              <p className={styles.detailSectionHint}>
-                MAC, IP, login/logout, duration, and data from RADIUS accounting
-              </p>
               {radiusSessions.length > 0 ? (
                 <div className={styles.sessionStack}>
                   {radiusSessions.map((s) => (
@@ -118,15 +122,12 @@ export default function PartnerTokenDetailDrawer({
                   ))}
                 </div>
               ) : (
-                <p className={styles.listSecondary}>No RADIUS sessions in live store.</p>
+                <p className={styles.listSecondary}>No record.</p>
               )}
             </section>
 
             <section>
               <h3 className={styles.sectionTitle}>Captive portal logins</h3>
-              <p className={styles.detailSectionHint}>
-                Portal handoff IP / MAC at login (no data usage)
-              </p>
               {captiveSessions.length > 0 ? (
                 <div className={styles.sessionStack}>
                   {captiveSessions.map((s) => (
@@ -134,28 +135,13 @@ export default function PartnerTokenDetailDrawer({
                   ))}
                 </div>
               ) : (
-                <p className={styles.listSecondary}>No captive portal logins recorded.</p>
+                <p className={styles.listSecondary}>No record.</p>
               )}
             </section>
-
-            {!hasAnySessions ? (
-              <div className={styles.detailEmptySessions}>
-                <p>
-                  {sessionsMeta?.emptyStateMessage ??
-                    "No portal or network sessions recorded yet."}
-                </p>
-                {sessionsMeta && row.activatedAt ? (
-                  <p className={styles.listSecondary}>
-                    Retention: captive {sessionsMeta.captiveRetentionDays}d · RADIUS hot{" "}
-                    {sessionsMeta.radiusHotRetentionDays}d · archive{" "}
-                    {sessionsMeta.radiusArchiveRetentionDays}d.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
           </div>
         ) : null}
       </Spin>
+      </MobileDrawerBody>
     </Drawer>
   );
 }

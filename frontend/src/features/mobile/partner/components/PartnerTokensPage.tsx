@@ -16,6 +16,13 @@ import { formatWifiDateTime } from "@/features/wifi/shared/format";
 import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
 import { usePartnerAuthRedirect } from "../hooks/usePartnerAuthRedirect";
 import PartnerTokenDetailDrawer from "./PartnerTokenDetailDrawer";
+import {
+  MobileDrawerBody,
+  MobileDrawerFooter,
+  MobileDrawerSubmitButton,
+  mobileDrawerStyleProps,
+  useMobileDrawerChrome,
+} from "@/features/mobile/shared/components/MobileDrawerChrome";
 import styles from "./partner.module.css";
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
@@ -36,6 +43,7 @@ function maskSoldToken(token: string | null | undefined): string {
 
 export default function PartnerTokensPage() {
   const { message } = App.useApp();
+  const { colorScheme } = useMobileDrawerChrome("partner");
   const [initDone, setInitDone] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saleResult, setSaleResult] = useState<IssueTokenResult | null>(null);
@@ -191,7 +199,7 @@ export default function PartnerTokensPage() {
         </div>
       )}
 
-      {canSell ? (
+      {canSell && !drawerOpen && !saleResult ? (
         <button type="button" className={styles.fab} onClick={() => setDrawerOpen(true)}>
           Sell token
         </button>
@@ -215,8 +223,24 @@ export default function PartnerTokensPage() {
         destroyOnClose
         size="auto"
         placement="bottom"
+        styles={mobileDrawerStyleProps(colorScheme, {
+          body: { paddingBottom: 0, maxHeight: "85vh", overflowY: "auto" },
+        })}
+        footer={
+          <MobileDrawerFooter actor="partner">
+            <MobileDrawerSubmitButton
+              type="submit"
+              form="partner-sell-token-form"
+              disabled={selling || sellablePlans.length === 0 || !orgId || !resellerId}
+            >
+              {selling ? "Selling…" : "Confirm sale"}
+            </MobileDrawerSubmitButton>
+          </MobileDrawerFooter>
+        }
       >
+        <MobileDrawerBody actor="partner">
         <Form
+          id="partner-sell-token-form"
           form={form}
           layout="vertical"
           initialValues={{ quantity: 1, paymentMethod: "CASH", discount: 0 }}
@@ -274,16 +298,8 @@ export default function PartnerTokensPage() {
               <p className={styles.saleTotalValue}>{formatMoney(lineTotal, currency)}</p>
             </div>
           ) : null}
-
-          <button
-            type="submit"
-            className={styles.fab}
-            style={{ position: "static", width: "100%", marginTop: "0.75rem" }}
-            disabled={selling || sellablePlans.length === 0}
-          >
-            {selling ? "Selling…" : "Confirm sale"}
-          </button>
         </Form>
+        </MobileDrawerBody>
       </Drawer>
     </div>
   );

@@ -18,36 +18,29 @@ export function applyAppTimezone(tz: string = process.env.TZ || APP_TIMEZONE): s
   return resolved;
 }
 
+function bizTz(): string {
+  return APP_TIMEZONE;
+}
+
 export function appNow(): dayjs.Dayjs {
-  return dayjs().tz(process.env.TZ || APP_TIMEZONE);
+  return dayjs().tz(bizTz());
 }
 
 /** Calendar day key in app timezone (`YYYY-MM-DD`). */
 export function appDayKey(date: Date): string {
-  return dayjs(date)
-    .tz(process.env.TZ || APP_TIMEZONE)
-    .format('YYYY-MM-DD');
+  return dayjs(date).tz(bizTz()).format('YYYY-MM-DD');
 }
 
 export function startOfAppDay(date: Date): Date {
-  return dayjs(date)
-    .tz(process.env.TZ || APP_TIMEZONE)
-    .startOf('day')
-    .toDate();
+  return dayjs(date).tz(bizTz()).startOf('day').toDate();
 }
 
 export function endOfAppDay(date: Date): Date {
-  return dayjs(date)
-    .tz(process.env.TZ || APP_TIMEZONE)
-    .endOf('day')
-    .toDate();
+  return dayjs(date).tz(bizTz()).endOf('day').toDate();
 }
 
 export function addAppDays(date: Date, days: number): Date {
-  return dayjs(date)
-    .tz(process.env.TZ || APP_TIMEZONE)
-    .add(days, 'day')
-    .toDate();
+  return dayjs(date).tz(bizTz()).add(days, 'day').toDate();
 }
 
 export function appDayBucket(date: Date): Date {
@@ -57,8 +50,8 @@ export function appDayBucket(date: Date): Date {
 /** Inclusive list of app-timezone day buckets from `from` through `to`. */
 export function eachAppDay(from: Date, to: Date): Date[] {
   const days: Date[] = [];
-  let cursor = dayjs(from).tz(process.env.TZ || APP_TIMEZONE).startOf('day');
-  const end = dayjs(to).tz(process.env.TZ || APP_TIMEZONE).startOf('day');
+  let cursor = dayjs(from).tz(bizTz()).startOf('day');
+  const end = dayjs(to).tz(bizTz()).startOf('day');
   while (cursor.isBefore(end) || cursor.isSame(end, 'day')) {
     days.push(cursor.toDate());
     cursor = cursor.add(1, 'day');
@@ -67,19 +60,31 @@ export function eachAppDay(from: Date, to: Date): Date[] {
 }
 
 export function previousCalendarMonth(ref = new Date()): { year: number; month: number } {
-  const d = dayjs(ref).tz(process.env.TZ || APP_TIMEZONE).subtract(1, 'month');
+  const d = dayjs(ref).tz(bizTz()).subtract(1, 'month');
   return { year: d.year(), month: d.month() + 1 };
 }
 
 export function previousCalendarYear(ref = new Date()): number {
-  return dayjs(ref).tz(process.env.TZ || APP_TIMEZONE).year() - 1;
+  return dayjs(ref).tz(bizTz()).year() - 1;
 }
 
 export function startOfAppMonth(date: Date = new Date()): Date {
-  return dayjs(date)
-    .tz(process.env.TZ || APP_TIMEZONE)
-    .startOf('month')
-    .toDate();
+  return dayjs(date).tz(bizTz()).startOf('month').toDate();
+}
+
+export function endOfAppMonth(date: Date = new Date()): Date {
+  return dayjs(date).tz(bizTz()).endOf('month').toDate();
+}
+
+/** Inclusive Asia/Yangon bounds for a calendar month (`month` is 1–12). */
+export function appCalendarMonthRange(
+  year: number,
+  month: number
+): { from: Date; to: Date } {
+  const start = dayjs
+    .tz(`${year}-${String(month).padStart(2, '0')}-01`, bizTz())
+    .startOf('month');
+  return { from: start.toDate(), to: start.endOf('month').toDate() };
 }
 
 export function resolvePeriodFromPresetDays(

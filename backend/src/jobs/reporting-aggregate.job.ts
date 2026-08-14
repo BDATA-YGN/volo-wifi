@@ -5,6 +5,7 @@ import { APP_TIMEZONE } from '@/utils/app-time';
 import { aggregateDailyRadiusForDate } from './reporting/lib/aggregate-daily-radius';
 import { aggregateDailySalesForDate } from './reporting/lib/aggregate-daily-sales';
 import { addUtcDays, eachUtcDay, startOfUtcDay } from './reporting/lib/dates';
+import { findDaysNeedingRebuild } from './reporting/lib/find-unaggregated-days';
 import { rollupPreviousClosedPeriods } from './reporting/lib/rollup-periods';
 import {
   AGGREGATE_DEFAULTS,
@@ -36,10 +37,18 @@ export async function runReportingAggregateTick(): Promise<void> {
 
     const today = startOfUtcDay(new Date());
     const from = addUtcDays(today, -(cfg.lookbackDays - 1));
-    const days = eachUtcDay(from, today);
+    const lookbackDays = eachUtcDay(from, today);
+    const lookbackKeys = new Set(lookbackDays.map((d) => d.toISOString()));
+
+    const backfillFrom = addUtcDays(today, -(cfg.backfillDays - 1));
+    const staleDays = (await findDaysNeedingRebuild(prisma, backfillFrom, today))
+      .filter((day) => !lookbackKeys.has(day.toISOString()))
+      .slice(0, cfg.backfillBatch);
+
+    const days = [...lookbackDays, ...staleDays];
 
     logger.info(
-      `[reporting-aggregate] Tick start (${days.length} UTC days, lookback=${cfg.lookbackDays})`
+      `[reporting-aggregate] Tick start (lookback=${lookbackDays.length}d, backfill=${staleDays.length}d, window=${cfg.backfillDays}d)`
     );
 
     let salesBuckets = 0;

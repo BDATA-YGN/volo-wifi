@@ -15,6 +15,7 @@ import {
   type ResellerContext,
 } from '@/features/wifi/commerce/shared/resolve-reseller';
 import { loadPricingReadiness } from '@/features/wifi/commerce/shared/resolve-retail-price';
+import { aggregatePlanSales } from '@/features/wifi/commerce/shared/plan-sales';
 import { startOfAppDay, APP_TIMEZONE } from '@/utils/app-time';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -103,6 +104,7 @@ async function buildDashboard(
     revenueMonthAgg,
     recentOrders,
     pricing,
+    salesTodayByPlan,
   ] = await Promise.all([
     prisma.credential.count({
       where: { orgId, resellerId, deletedAt: null, status: 'SOLD' },
@@ -154,13 +156,20 @@ async function buildDashboard(
         currency: true,
         soldAt: true,
         createdAt: true,
-        station: { select: { code: true, name: true } },
+        station: { select: { id: true, code: true, name: true } },
         _count: { select: { items: true } },
       },
       orderBy: [{ soldAt: 'desc' }, { createdAt: 'desc' }],
       take: 8,
     }),
     loadPricingReadiness(prisma, orgId, resellerId, entitledPlanIds, mappedStationIds),
+    aggregatePlanSales(prisma, {
+      orgId,
+      resellerId,
+      soldFrom: todayStart,
+      plans: reseller.planEntitlements.map((pe) => pe.plan),
+      stations: reseller.resellerStations.map((rs) => rs.station),
+    }),
   ]);
 
   const stationCount = reseller.resellerStations.length;
@@ -203,8 +212,11 @@ async function buildDashboard(
       credentialsIssued: credentialsSold + credentialsActive,
       ordersToday,
       revenueToday: Number(revenueTodayAgg._sum.total ?? 0),
+      tokensToday: salesTodayByPlan.tokenCount,
       ordersMonth,
       revenueMonth: Number(revenueMonthAgg._sum.total ?? 0),
+      salesByPlanToday: salesTodayByPlan.rows,
+      salesByStationToday: salesTodayByPlan.byStation,
     },
     readiness: {
       hasSites,

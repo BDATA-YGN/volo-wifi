@@ -11,7 +11,6 @@ import type {
   SiteAnalyticsTab,
   SitesFormOptions,
 } from "./types";
-import { DEFAULT_PRESET, DEFAULT_SITES_PAGE, DEFAULT_SITES_PAGE_SIZE } from "./constant";
 
 const emptyFormOptions: SitesFormOptions = {
   memberships: [],
@@ -29,20 +28,12 @@ type ScopeParams = {
   periodTo?: string;
 };
 
-function buildParams(
-  scope: ScopeParams,
-  view: SiteAnalyticsTab,
-  page?: number,
-  limit?: number
-): SiteAnalyticsParams {
+function buildParams(scope: ScopeParams, view: SiteAnalyticsTab): SiteAnalyticsParams {
   return {
     orgId: scope.orgId,
     stationId: scope.stationId,
     stationSizeId: scope.stationSizeId,
     view,
-    ...(view === "sites"
-      ? { page: page ?? DEFAULT_SITES_PAGE, limit: limit ?? DEFAULT_SITES_PAGE_SIZE }
-      : {}),
     ...(scope.periodFrom && scope.periodTo
       ? { periodFrom: scope.periodFrom, periodTo: scope.periodTo }
       : { preset: scope.preset }),
@@ -51,18 +42,20 @@ function buildParams(
 
 export function useAnalyticsSites(options: {
   tab: SiteAnalyticsTab;
-  page: number;
-  pageSize: number;
+  period: PeriodPreset;
+  periodFrom?: string;
+  periodTo?: string;
 }) {
-  const { tab, page, pageSize } = options;
+  const { tab, period: preset, periodFrom, periodTo } = options;
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [stationId, setStationId] = useState<string | undefined>(undefined);
   const [stationSizeId, setStationSizeId] = useState<string | undefined>(undefined);
-  const [preset, setPreset] = useState<PeriodPreset>(DEFAULT_PRESET);
   const [customPeriod, setCustomPeriod] = useState<{
     periodFrom?: string;
     periodTo?: string;
-  }>({});
+  }>(() =>
+    periodFrom && periodTo ? { periodFrom, periodTo } : {}
+  );
   const [formOptions, setFormOptions] = useState<SitesFormOptions>(emptyFormOptions);
 
   const scope: ScopeParams = {
@@ -92,10 +85,10 @@ export function useAnalyticsSites(options: {
   );
 
   const sitesReq = useRequest(
-    () => Query.loadAnalytics(buildParams(scope, "sites", page, pageSize)),
+    () => Query.loadAnalytics(buildParams(scope, "sites")),
     {
       ready: Boolean(orgId) && tab === "sites",
-      refreshDeps: [...periodDeps, page, pageSize],
+      refreshDeps: periodDeps,
     }
   );
 
@@ -134,7 +127,6 @@ export function useAnalyticsSites(options: {
       setOrgId(id);
       setStationId(undefined);
       setStationSizeId(undefined);
-      setCustomPeriod({});
       void loadFormOptions(id);
     },
     [loadFormOptions]
@@ -149,8 +141,7 @@ export function useAnalyticsSites(options: {
     setStationId(undefined);
   }, []);
 
-  const selectPreset = useCallback((value: PeriodPreset) => {
-    setPreset(value);
+  const selectPreset = useCallback((_value: PeriodPreset) => {
     setCustomPeriod({});
   }, []);
 

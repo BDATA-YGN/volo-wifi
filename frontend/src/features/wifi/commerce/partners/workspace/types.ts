@@ -42,7 +42,24 @@ export type WorkspaceRecentOrder = {
   soldAt: string | null;
   createdAt: string;
   itemCount: number;
-  station: { code: string; name: string } | null;
+  station: { id: string; code: string; name: string } | null;
+};
+
+export type WorkspacePlanSales = {
+  planId: string;
+  planCode: string;
+  planName: string;
+  tokenCount: number;
+  amount: number;
+};
+
+export type WorkspaceStationSales = {
+  stationId: string;
+  stationCode: string;
+  stationName: string;
+  tokenCount: number;
+  amount: number;
+  plans: WorkspacePlanSales[];
 };
 
 export type WorkspaceStats = {
@@ -53,8 +70,11 @@ export type WorkspaceStats = {
   credentialsIssued: number;
   ordersToday: number;
   revenueToday: number;
+  tokensToday?: number;
   ordersMonth: number;
   revenueMonth: number;
+  salesByPlanToday?: WorkspacePlanSales[];
+  salesByStationToday?: WorkspaceStationSales[];
 };
 
 export type WorkspaceReadiness = {

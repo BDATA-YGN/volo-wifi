@@ -152,6 +152,23 @@
   cursor: not-allowed;
 }
 
+.drawerPortalTheme[data-actor="partner"][data-theme="dark"] .drawerSubmitBtn,
+.drawerFooter[data-actor="partner"][data-theme="dark"] .drawerSubmitBtn {
+  color: #0f172a;
+}
+
+.drawerPortalTheme :global(.ant-select-selection-placeholder),
+.drawerPortalTheme :global(.ant-input::placeholder),
+.drawerPortalTheme :global(.ant-input-number-input::placeholder) {
+  color: var(--mobile-muted) !important;
+  opacity: 1 !important;
+}
+
+.drawerPortalTheme :global(.ant-form-item-extra),
+.drawerPortalTheme :global(.ant-form-item-explain) {
+  color: var(--mobile-muted) !important;
+}
+
 .drawerHint {
   margin: 0 0 1.125rem;
   font-size: 0.875rem;

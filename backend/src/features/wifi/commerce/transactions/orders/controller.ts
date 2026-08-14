@@ -6,7 +6,8 @@ import { AuthenticatedRequest } from '@/interfaces/express.interface';
 import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import { isUndefinedOrUndefinedString } from '@/utils/string-utils';
-import { startOfAppDay, startOfAppMonth } from '@/utils/app-time';
+import { startOfAppDay, startOfAppMonth, addAppDays } from '@/utils/app-time';
+import { aggregatePlanSales } from '@/features/wifi/commerce/shared/plan-sales';
 import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
@@ -344,6 +345,7 @@ export class CommerceTransactionsOrdersController {
         const { page, limit, skip, take } = parsePagination(req.query);
         const todayStart = startOfUtcDay();
         const monthStart = startOfUtcMonth();
+        const last7DaysStart = startOfAppDay(addAppDays(new Date(), -6));
 
         const baseWhere: Prisma.SaleOrderWhereInput =
           scope.mode === 'partner'
@@ -362,6 +364,7 @@ export class CommerceTransactionsOrdersController {
           monthRevenue,
           memberships,
           resellers,
+          planSalesLast7Days,
         ] = await Promise.all([
           this.prisma.saleOrder.findMany({
             where,
@@ -394,6 +397,11 @@ export class CommerceTransactionsOrdersController {
           scope.mode === 'org'
             ? loadResellerPicker(this.prisma, scope.orgId)
             : Promise.resolve(undefined),
+          aggregatePlanSales(this.prisma, {
+            orgId: scope.orgId,
+            resellerId: scope.resellerId ?? null,
+            soldFrom: last7DaysStart,
+          }),
         ]);
 
         const statusCounts = Object.fromEntries(
@@ -430,6 +438,10 @@ export class CommerceTransactionsOrdersController {
             todayRevenue: decimalToNumber(todayRevenue._sum.total),
             monthRevenue: decimalToNumber(monthRevenue._sum.total),
             currency,
+            salesByPlanLast7Days: planSalesLast7Days.rows,
+            tokensLast7Days: planSalesLast7Days.tokenCount,
+            revenueLast7Days: planSalesLast7Days.amount,
+            salesByStationLast7Days: planSalesLast7Days.byStation,
             memberships,
             resellers,
           },

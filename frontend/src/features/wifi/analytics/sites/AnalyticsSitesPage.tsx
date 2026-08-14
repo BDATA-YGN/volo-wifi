@@ -3,43 +3,55 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Tabs, Tag, Typography, theme } from "antd";
-import { MapPin, X } from "lucide-react";
+import { Alert, Card, Typography, theme } from "antd";
+import { MapPin } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
-import InsightsToolbar from "@/features/wifi/commerce/partners/insights/components/InsightsToolbar";
 import {
   needsOrgSelection,
   shouldShowOrgSwitcher,
 } from "@/features/wifi/shared/hooks/useWifiOrgScope";
 import { useAnalyticsSites } from "./useAnalyticsSites";
 import type { PeriodPreset, SiteAnalyticsTab } from "./types";
-import {
-  DEFAULT_SITES_PAGE,
-  DEFAULT_SITES_PAGE_SIZE,
-  DEFAULT_TAB,
-  PERIOD_PRESETS,
-  SITE_ANALYTICS_TABS,
-} from "./constant";
-import SitesFilterBar from "./components/SitesFilterBar";
+import { DEFAULT_TAB, DEFAULT_PERIOD, isTodayRange, todayRange, rangeFromPeriodPreset } from "./constant";
+import SitesToolbar from "./components/SitesToolbar";
 import SitesKpiCards from "./components/SitesKpiCards";
 import SitesTrendChart from "./components/SitesTrendChart";
 import SitesTable from "./components/SitesTable";
 import SitesTierTable from "./components/SitesTierTable";
-import { STATION_STATUS_COLOR, formatMoney } from "./utils";
+import { formatMoney } from "./utils";
 
-const { Title, Paragraph, Text } = Typography;
+const { Title, Text } = Typography;
 
 function parseTab(value: string | null): SiteAnalyticsTab {
   if (value === "sites" || value === "tiers" || value === "stats") return value;
   return DEFAULT_TAB;
 }
 
-function parsePositiveInt(value: string | null, fallback: number): number {
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : fallback;
+function parsePeriod(value: string | null): PeriodPreset {
+  if (value === "today" || value === "7d" || value === "30d" || value === "90d") return value;
+  return DEFAULT_PERIOD;
+}
+
+function parseRangeFromSearch(searchParams: URLSearchParams): {
+  range: [Dayjs, Dayjs];
+  custom: boolean;
+} {
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+  if (from && to) {
+    const start = dayjs(from);
+    const end = dayjs(to);
+    if (start.isValid() && end.isValid()) {
+      const range: [Dayjs, Dayjs] = [start.startOf("day"), end.endOf("day")];
+      return { range, custom: !isTodayRange(range[0], range[1]) };
+    }
+  }
+  const period = parsePeriod(searchParams.get("period"));
+  const range = rangeFromPeriodPreset(period);
+  return { range, custom: period !== "today" };
 }
 
 const AnalyticsSitesPage: React.FC = () => {
@@ -49,11 +61,16 @@ const AnalyticsSitesPage: React.FC = () => {
   const searchParams = useSearchParams();
 
   const tab = parseTab(searchParams.get("tab"));
-  const page = parsePositiveInt(searchParams.get("page"), DEFAULT_SITES_PAGE);
-  const pageSize = parsePositiveInt(searchParams.get("pageSize"), DEFAULT_SITES_PAGE_SIZE);
+  const period = parsePeriod(searchParams.get("period"));
+  const initialRange = parseRangeFromSearch(searchParams);
 
   const [initDone, setInitDone] = useState(false);
-  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [hideZeroSales, setHideZeroSalesState] = useState(
+    () => searchParams.get("hideZero") === "1"
+  );
+  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>(
+    initialRange.range
+  );
 
   const replaceParams = useCallback(
     (patch: Record<string, string | null | undefined>) => {
@@ -69,24 +86,20 @@ const AnalyticsSitesPage: React.FC = () => {
   );
 
   const setTab = useCallback(
-    (nextTab: string) => {
-      const parsed = parseTab(nextTab);
+    (nextTab: SiteAnalyticsTab) => {
       replaceParams({
-        tab: parsed,
-        page: parsed === "sites" ? String(DEFAULT_SITES_PAGE) : null,
-        pageSize: parsed === "sites" ? String(DEFAULT_SITES_PAGE_SIZE) : null,
+        tab: nextTab,
+        page: null,
+        pageSize: null,
       });
     },
     [replaceParams]
   );
 
-  const setSitesPagination = useCallback(
-    (nextPage: number, nextPageSize: number) => {
-      replaceParams({
-        tab: "sites",
-        page: String(nextPage),
-        pageSize: String(nextPageSize),
-      });
+  const setHideZeroSales = useCallback(
+    (hide: boolean) => {
+      setHideZeroSalesState(hide);
+      replaceParams({ hideZero: hide ? "1" : null });
     },
     [replaceParams]
   );
@@ -97,20 +110,19 @@ const AnalyticsSitesPage: React.FC = () => {
     loading,
     error,
     orgId,
-    stationId,
-    stationSizeId,
-    preset,
     formOptions,
     selectOrg,
-    selectStation,
-    selectStationSize,
     selectPreset,
     selectCustomPeriod,
     clearCustomPeriod,
-    clearFilters,
     refresh,
     loadFormOptions,
-  } = useAnalyticsSites({ tab, page, pageSize });
+  } = useAnalyticsSites({
+    tab,
+    period: initialRange.custom ? "today" : period,
+    periodFrom: initialRange.custom ? initialRange.range[0].toISOString() : undefined,
+    periodTo: initialRange.custom ? initialRange.range[1].toISOString() : undefined,
+  });
 
   useEffect(() => {
     void loadFormOptions().then(() => setInitDone(true));
@@ -145,14 +157,16 @@ const AnalyticsSitesPage: React.FC = () => {
   }, [meta?.orgId, meta?.canSwitchOrg, formOptions.canSwitchOrg, orgId, selectOrg]);
 
   useEffect(() => {
-    if (!searchParams.get("tab")) {
-      replaceParams({ tab: DEFAULT_TAB });
+    const patch: Record<string, string | null | undefined> = {};
+    if (!searchParams.get("tab")) patch.tab = DEFAULT_TAB;
+    if (!searchParams.get("from") && !searchParams.get("to") && !searchParams.get("period")) {
+      patch.period = DEFAULT_PERIOD;
     }
+    if (Object.keys(patch).length > 0) replaceParams(patch);
   }, [replaceParams, searchParams]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
   const stations = formOptions.stations;
-  const stationSizes = formOptions.stationSizes;
   const orgScopeMeta = {
     canSwitchOrg: meta?.canSwitchOrg ?? formOptions.canSwitchOrg,
     requiresOrgSelection: meta?.requiresOrgSelection ?? formOptions.requiresOrgSelection,
@@ -160,47 +174,42 @@ const AnalyticsSitesPage: React.FC = () => {
   const showOrgSwitcher = shouldShowOrgSwitcher(memberships, orgScopeMeta);
   const needsOrg = needsOrgSelection(orgId, orgScopeMeta, memberships.length);
   const currency = analytics?.org.currency ?? formOptions.currency;
-  const singleSite = Boolean(stationId);
-
-  const scopedSite = useMemo(() => {
-    if (!stationId) return null;
-    return (
-      analytics?.bySite.find((s) => s.stationId === stationId) ??
-      stations.find((s) => s.id === stationId) ??
-      null
-    );
-  }, [stationId, analytics?.bySite, stations]);
 
   const periodLabel = useMemo(() => {
     if (!analytics) return null;
     return `${dayjs(analytics.periodFrom).format("D MMM YYYY")} – ${dayjs(analytics.periodTo).format("D MMM YYYY")}`;
   }, [analytics]);
 
-  const handlePresetChange = (value: string) => {
-    setCustomRange(null);
-    clearCustomPeriod();
-    selectPreset(value as PeriodPreset);
-    if (tab === "sites") {
-      replaceParams({ page: String(DEFAULT_SITES_PAGE) });
-    }
-  };
+  const visibleSites = useMemo(() => {
+    const rows = analytics?.bySite ?? [];
+    return hideZeroSales ? rows.filter((row) => row.itemsCount > 0) : rows;
+  }, [analytics?.bySite, hideZeroSales]);
+
+  const visibleTiers = useMemo(() => {
+    const rows = analytics?.byTier ?? [];
+    return hideZeroSales ? rows.filter((row) => row.itemsCount > 0) : rows;
+  }, [analytics?.byTier, hideZeroSales]);
 
   const handleCustomRangeChange = (range: [Dayjs | null, Dayjs | null] | null) => {
-    setCustomRange(range);
-    if (range?.[0] && range?.[1]) {
-      selectCustomPeriod(
-        range[0].startOf("day").toISOString(),
-        range[1].endOf("day").toISOString()
-      );
-    } else {
-      clearCustomPeriod();
-    }
-    if (tab === "sites") {
-      replaceParams({ page: String(DEFAULT_SITES_PAGE) });
-    }
-  };
+    const next = range?.[0] && range?.[1] ? range : todayRange();
+    const from = next[0]!.startOf("day");
+    const to = next[1]!.endOf("day");
+    setCustomRange([from, to]);
 
-  const sitesTotal = analytics?.pagination?.total ?? analytics?.bySite?.length ?? 0;
+    if (isTodayRange(from, to)) {
+      clearCustomPeriod();
+      selectPreset("today");
+      replaceParams({ period: "today", from: null, to: null });
+      return;
+    }
+
+    selectCustomPeriod(from.toISOString(), to.toISOString());
+    replaceParams({
+      period: null,
+      from: from.format("YYYY-MM-DD"),
+      to: to.format("YYYY-MM-DD"),
+    });
+  };
 
   return (
     <div className="p-0">
@@ -214,15 +223,6 @@ const AnalyticsSitesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Site-level sales and WiFi usage — revenue, sessions, and data transfer by location and
-            capacity tier from daily stats and{" "}
-            <Link href="/wifi/commerce/transactions/orders">Orders</Link>. Manage sites in{" "}
-            <Link href="/wifi/sites">Site Directory</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
@@ -274,203 +274,124 @@ const AnalyticsSitesPage: React.FC = () => {
 
           {orgId && !needsOrg ? (
             <>
-              {analytics ? (
-                <Card
-                  styles={{ body: { padding: 20 } }}
-                  style={{ borderRadius: token.borderRadiusLG }}
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <Card
+                styles={{ body: { padding: 20 } }}
+                style={{ borderRadius: token.borderRadiusLG }}
+              >
+                {analytics ? (
+                  <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <Title level={4} style={{ margin: 0 }}>
-                        {scopedSite?.name ??
-                          (stationSizeId
-                            ? (stationSizes.find((t) => t.id === stationSizeId)?.name ??
-                              "Tier overview")
-                            : "All sites")}
+                        All sites
                       </Title>
-                      <Paragraph type="secondary" style={{ marginBottom: 8, marginTop: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 13 }}>
                         {analytics.org.name}
                         {periodLabel ? ` · ${periodLabel}` : ""}
-                      </Paragraph>
-                      <div className="flex flex-wrap gap-2">
-                        <Tag style={{ fontFamily: "monospace" }}>{analytics.org.code}</Tag>
-                        <Tag>{currency}</Tag>
-                        {scopedSite ? (
-                          <>
-                            <Tag style={{ fontFamily: "monospace" }}>{scopedSite.code}</Tag>
-                            <Tag color={STATION_STATUS_COLOR[scopedSite.status] ?? "default"}>
-                              {scopedSite.status}
-                            </Tag>
-                            {"stationSizeName" in scopedSite && scopedSite.stationSizeName ? (
-                              <Tag>{scopedSite.stationSizeName}</Tag>
-                            ) : null}
-                          </>
-                        ) : stationSizeId ? (
-                          <Tag color="purple">
-                            {stationSizes.find((t) => t.id === stationSizeId)?.name ??
-                              "Tier filter"}
-                          </Tag>
-                        ) : (
-                          <Tag color="blue">
-                            {analytics.summary.siteCount} site
-                            {analytics.summary.siteCount === 1 ? "" : "s"}
-                          </Tag>
-                        )}
-                        {stationId || stationSizeId ? (
-                          <Button
-                            type="link"
-                            size="small"
-                            icon={<X size={14} />}
-                            onClick={clearFilters}
-                            style={{ padding: 0, height: "auto" }}
-                          >
-                            Clear filters
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Text type="secondary" style={{ fontSize: 12, display: "block" }}>
-                        Period revenue
+                        {` · ${analytics.summary.siteCount} site${
+                          analytics.summary.siteCount === 1 ? "" : "s"
+                        }`}
                       </Text>
+                    </div>
+                    <div className="sm:text-right">
                       <Title level={3} style={{ margin: 0 }}>
                         {formatMoney(analytics.summary.revenue, currency)}
                       </Title>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        {analytics.summary.ordersCount} order
-                        {analytics.summary.ordersCount === 1 ? "" : "s"}
-                        {!singleSite
-                          ? ` · ${analytics.summary.activeSiteCount} active site${
-                              analytics.summary.activeSiteCount === 1 ? "" : "s"
-                            }`
-                          : ""}
+                        {analytics.summary.itemsCount.toLocaleString()} tokens
+                        {` · ${analytics.summary.activeSiteCount} active`}
                       </Text>
                     </div>
                   </div>
-                </Card>
-              ) : null}
+                ) : null}
 
-              <Card
-                styles={{ body: { padding: 16 } }}
-                style={{ borderRadius: token.borderRadiusLG }}
-              >
-                <InsightsToolbar
-                  preset={preset}
-                  presets={PERIOD_PRESETS}
+                <SitesToolbar
+                  tab={tab}
                   customRange={customRange}
                   dataSource={analytics?.dataSource}
+                  hideZeroSales={hideZeroSales}
                   loading={loading}
-                  onPresetChange={handlePresetChange}
+                  onTabChange={setTab}
                   onCustomRangeChange={handleCustomRangeChange}
+                  onHideZeroSalesChange={setHideZeroSales}
                   onRefresh={refresh}
                 />
               </Card>
 
-              {!singleSite ? (
-                <SitesFilterBar
-                  stations={stations}
-                  stationSizes={stationSizes}
-                  stationId={stationId}
-                  stationSizeId={stationSizeId}
-                  loading={loading}
-                  onStationChange={(id) => {
-                    selectStation(id);
-                    if (tab === "sites") replaceParams({ page: String(DEFAULT_SITES_PAGE) });
-                  }}
-                  onStationSizeChange={(id) => {
-                    selectStationSize(id);
-                    if (tab === "sites") replaceParams({ page: String(DEFAULT_SITES_PAGE) });
-                  }}
+              {analytics?.dataSource === "aggregated" &&
+              analytics.statsCoverage &&
+              analytics.statsCoverage.daysWithSalesStats < analytics.statsCoverage.daysInPeriod ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  title="Daily stats are still catching up"
+                  description={`Stats cover ${analytics.statsCoverage.daysWithSalesStats} of ${analytics.statsCoverage.daysInPeriod} days in this period. The hourly aggregate job backfills missing days in batches.`}
                 />
               ) : null}
 
-              <Tabs
-                activeKey={tab}
-                onChange={setTab}
-                destroyOnHidden
-                items={SITE_ANALYTICS_TABS.map((item) => ({
-                  key: item.key,
-                  label: item.label,
-                  children:
-                    item.key === "stats" ? (
-                      analytics && tab === "stats" ? (
-                        <div className="flex flex-col gap-4 pt-2">
-                          <SitesKpiCards
-                            summary={analytics.summary}
-                            previous={analytics.previousSummary}
-                            currency={currency}
-                            loading={loading}
-                            singleSite={singleSite}
-                          />
-                          <SitesTrendChart
-                            points={analytics.dailyTrend}
-                            currency={currency}
-                            loading={loading}
-                            showActiveSites={!singleSite}
-                          />
-                        </div>
-                      ) : loading ? (
-                        <Card loading style={{ marginTop: 8 }} />
-                      ) : (
-                        <Alert
-                          className="mt-2"
-                          type="info"
-                          showIcon
-                          title="No analytics data"
-                          description="There is no sales or usage activity for the selected period and filters."
-                        />
-                      )
-                    ) : item.key === "sites" ? (
-                      analytics && tab === "sites" ? (
-                        <div className="pt-2">
-                          <SitesTable
-                            rows={analytics.bySite}
-                            plans={analytics.plans ?? []}
-                            planTotals={analytics.planTotals ?? []}
-                            currency={currency}
-                            loading={loading}
-                            page={analytics.pagination?.page ?? page}
-                            pageSize={analytics.pagination?.limit ?? pageSize}
-                            total={sitesTotal}
-                            onPageChange={setSitesPagination}
-                            selectedStationId={stationId}
-                            onSelectSite={(id) => selectStation(id)}
-                          />
-                        </div>
-                      ) : loading ? (
-                        <Card loading style={{ marginTop: 8 }} />
-                      ) : (
-                        <Alert
-                          className="mt-2"
-                          type="info"
-                          showIcon
-                          title="No site performance data"
-                          description="There is no site sales activity for the selected period and filters."
-                        />
-                      )
-                    ) : analytics && tab === "tiers" ? (
-                      <div className="pt-2">
-                        <SitesTierTable
-                          rows={analytics.byTier}
-                          currency={currency}
-                          loading={loading}
-                          selectedTierId={stationSizeId}
-                          onSelectTier={(id) => selectStationSize(id)}
-                        />
-                      </div>
-                    ) : loading ? (
-                      <Card loading style={{ marginTop: 8 }} />
-                    ) : (
-                      <Alert
-                        className="mt-2"
-                        type="info"
-                        showIcon
-                        title="No tier performance data"
-                        description="There is no tier sales activity for the selected period and filters."
-                      />
-                    ),
-                }))}
-              />
+              {tab === "stats" ? (
+                analytics ? (
+                  <div className="flex flex-col gap-4">
+                    <SitesKpiCards
+                      summary={analytics.summary}
+                      previous={analytics.previousSummary}
+                      currency={currency}
+                      loading={loading}
+                    />
+                    <SitesTrendChart
+                      points={analytics.dailyTrend}
+                      currency={currency}
+                      loading={loading}
+                    />
+                  </div>
+                ) : loading ? (
+                  <Card loading />
+                ) : (
+                  <Alert
+                    type="info"
+                    showIcon
+                    title="No analytics data"
+                    description="There is no sales or usage activity for the selected period and filters."
+                  />
+                )
+              ) : tab === "sites" ? (
+                analytics ? (
+                  <SitesTable
+                    rows={visibleSites}
+                    plans={analytics.plans ?? []}
+                    planTotals={hideZeroSales ? undefined : analytics.planTotals ?? []}
+                    loading={loading}
+                    exportSubtitle={[analytics.org.name, periodLabel].filter(Boolean).join(" · ")}
+                    exportFilename={`site-performance_${dayjs(analytics.periodFrom).format("YYYY-MM-DD")}_${dayjs(analytics.periodTo).format("YYYY-MM-DD")}`}
+                  />
+                ) : loading ? (
+                  <Card loading />
+                ) : (
+                  <Alert
+                    type="info"
+                    showIcon
+                    title="No site performance data"
+                    description="There is no site sales activity for the selected period and filters."
+                  />
+                )
+              ) : analytics ? (
+                <SitesTierTable
+                  rows={visibleTiers}
+                  plans={analytics.plans ?? []}
+                    planTotals={hideZeroSales ? undefined : analytics.planTotals ?? []}
+                    loading={loading}
+                    exportSubtitle={[analytics.org.name, periodLabel].filter(Boolean).join(" · ")}
+                  exportFilename={`tier-performance_${dayjs(analytics.periodFrom).format("YYYY-MM-DD")}_${dayjs(analytics.periodTo).format("YYYY-MM-DD")}`}
+                />
+              ) : loading ? (
+                <Card loading />
+              ) : (
+                <Alert
+                  type="info"
+                  showIcon
+                  title="No tier performance data"
+                  description="There is no tier sales activity for the selected period and filters."
+                />
+              )}
             </>
           ) : initDone && orgId && !loading && !needsOrg && !error && stations.length > 0 ? (
             <Alert

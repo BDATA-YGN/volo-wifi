@@ -17,6 +17,7 @@ import {
   buildSiteAnalytics,
   resolvePeriodFromPreset,
   type SiteAnalyticsPayload,
+  type SiteAnalyticsSource,
   type SiteAnalyticsView,
 } from './build-site-analytics';
 
@@ -198,6 +199,7 @@ export class AnalyticsSitesController {
       }
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
+      const source: SiteAnalyticsSource = preset === 'today' ? 'live' : 'aggregated';
       const [analytics, org] = await Promise.all([
         buildSiteAnalytics(
           this.prisma,
@@ -205,7 +207,7 @@ export class AnalyticsSitesController {
           periodFrom,
           periodTo,
           { stationId, stationSizeId },
-          { view, page, limit }
+          { view, page, limit, source }
         ),
         this.prisma.org.findUnique({
           where: { id: orgIdParam },

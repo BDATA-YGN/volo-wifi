@@ -104,7 +104,7 @@ export async function aggregateDailyRadiusForDate(
     await tx.dailyRadiusUsageStat.deleteMany({
       where: {
         ...(orgIdFilter ? { orgId: orgIdFilter } : {}),
-        date: bucket,
+        date: { gte: dayStart, lte: dayEnd },
       },
     });
 
@@ -128,7 +128,7 @@ export async function aggregateDailyRadiusForDate(
   });
 
   logger.info(
-    `[reporting] daily radius ${bucket.toISOString().slice(0, 10)}: ${buckets.size} buckets from ${sessions.length} sessions`
+    `[reporting] daily radius ${bucket.toISOString()}: ${buckets.size} buckets from ${sessions.length} sessions`
   );
   return buckets.size;
 }

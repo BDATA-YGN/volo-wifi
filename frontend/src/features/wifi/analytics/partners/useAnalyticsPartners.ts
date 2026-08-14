@@ -15,26 +15,38 @@ import { DEFAULT_PRESET } from "./constant";
 const emptyFormOptions: PartnersFormOptions = {
   memberships: [],
   resellers: [],
+  stations: [],
+  stationSizes: [],
   currency: "MMK",
 };
 
-export function useAnalyticsPartners() {
+export function useAnalyticsPartners(options?: {
+  periodFrom?: string;
+  periodTo?: string;
+}) {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [resellerId, setResellerId] = useState<string | undefined>(undefined);
   const [preset, setPreset] = useState<PeriodPreset>(DEFAULT_PRESET);
   const [customPeriod, setCustomPeriod] = useState<{
     periodFrom?: string;
     periodTo?: string;
-  }>({});
+  }>(() =>
+    options?.periodFrom && options?.periodTo
+      ? { periodFrom: options.periodFrom, periodTo: options.periodTo }
+      : {}
+  );
   const [formOptions, setFormOptions] = useState<PartnersFormOptions>(emptyFormOptions);
 
   const params: PartnerAnalyticsParams = {
     orgId,
     resellerId,
-    ...(customPeriod.periodFrom && customPeriod.periodTo ? customPeriod : { preset }),
+    ...(customPeriod.periodFrom && customPeriod.periodTo
+      ? customPeriod
+      : { preset }),
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
+    ready: Boolean(orgId),
     refreshDeps: [orgId, resellerId, preset, customPeriod.periodFrom, customPeriod.periodTo],
   });
 
@@ -45,7 +57,12 @@ export function useAnalyticsPartners() {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as PartnersFormOptions;
     setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
+    if (
+      !targetOrgId &&
+      !opts.canSwitchOrg &&
+      !opts.requiresOrgSelection &&
+      opts.memberships.length === 1
+    ) {
       setOrgId(opts.memberships[0].id);
     }
     return opts;
@@ -55,7 +72,6 @@ export function useAnalyticsPartners() {
     (id: string) => {
       setOrgId(id);
       setResellerId(undefined);
-      setCustomPeriod({});
       void loadFormOptions(id);
     },
     [loadFormOptions]

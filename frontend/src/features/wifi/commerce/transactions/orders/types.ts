@@ -84,6 +84,31 @@ export type OrdersFormOptions = {
   stations: StationOption[];
 };
 
+export type OrderPlanSales = {
+  planId: string;
+  planCode: string;
+  planName: string;
+  tokenCount: number;
+  amount: number;
+};
+
+export type OrderStationDaySales = {
+  date: string;
+  tokenCount: number;
+  amount: number;
+  plans?: OrderPlanSales[];
+};
+
+export type OrderStationSales = {
+  stationId: string;
+  stationCode: string;
+  stationName: string;
+  tokenCount: number;
+  amount: number;
+  plans: OrderPlanSales[];
+  days?: OrderStationDaySales[];
+};
+
 export type OrdersMeta = {
   page?: number;
   limit?: number;
@@ -99,6 +124,10 @@ export type OrdersMeta = {
   todayRevenue?: number;
   monthRevenue?: number;
   currency?: string;
+  salesByPlanLast7Days?: OrderPlanSales[];
+  tokensLast7Days?: number;
+  revenueLast7Days?: number;
+  salesByStationLast7Days?: OrderStationSales[];
   memberships?: OrgMembershipOption[];
   resellers?: ResellerPickerOption[];
 };

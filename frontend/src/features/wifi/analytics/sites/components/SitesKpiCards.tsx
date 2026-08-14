@@ -6,12 +6,11 @@ import {
   DollarOutlined,
   EnvironmentOutlined,
   PercentageOutlined,
-  ShoppingCartOutlined,
   WifiOutlined,
 } from "@ant-design/icons";
 import { KpiDeltaText } from "@/features/wifi/shared/components/KpiDeltaText";
 import type { SiteAnalyticsSummary } from "../types";
-import { formatBytes, formatDuration, formatMoney, percentChange } from "../utils";
+import { formatBytes, formatMoney, percentChange } from "../utils";
 
 type Props = {
   summary: SiteAnalyticsSummary;
@@ -78,10 +77,9 @@ const SitesKpiCards: React.FC<Props> = ({
     <Col xs={24} sm={12} lg={6}>
       <KpiCard
         loading={loading}
-        title="Orders"
-        value={summary.ordersCount}
-        delta={percentChange(summary.ordersCount, previous.ordersCount)}
-        prefix={<ShoppingCartOutlined style={{ color: "#1677ff" }} />}
+        title="Total tokens"
+        value={summary.itemsCount}
+        delta={percentChange(summary.itemsCount, previous.itemsCount)}
       />
     </Col>
     <Col xs={24} sm={12} lg={6}>
@@ -105,25 +103,9 @@ const SitesKpiCards: React.FC<Props> = ({
     <Col xs={24} sm={12} lg={6}>
       <KpiCard
         loading={loading}
-        title="Tokens sold"
-        value={summary.itemsCount}
-        delta={percentChange(summary.itemsCount, previous.itemsCount)}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
         title="Data transferred"
         value={formatBytes(summary.totalBytes)}
         delta={percentChange(summary.totalBytes, previous.totalBytes)}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
-        title="Session time"
-        value={formatDuration(summary.totalSessionTimeSec)}
-        delta={percentChange(summary.totalSessionTimeSec, previous.totalSessionTimeSec)}
       />
     </Col>
   </Row>
