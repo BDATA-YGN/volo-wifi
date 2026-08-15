@@ -4,7 +4,12 @@ import { apiClient } from "@/lib/restapi/apiClient";
 import { handleApiError } from "@/common/exceptions/handleApiError";
 import type { CommonResponse } from "@/common/interface/interface";
 import { ANALYTICS_SITES_API } from "./constant";
-import type { SiteAnalyticsData, SiteAnalyticsParams, SitesFormOptions } from "./types";
+import type {
+  SiteAnalyticsData,
+  SiteAnalyticsParams,
+  SiteDetailData,
+  SitesFormOptions,
+} from "./types";
 
 export type SiteAnalyticsResponse = CommonResponse & {
   data: SiteAnalyticsData | null;
@@ -26,6 +31,26 @@ export const loadAnalytics = async (
         view: params?.view || undefined,
         page: params?.page || undefined,
         limit: params?.limit || undefined,
+      },
+    });
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const loadSiteDetail = async (
+  params: SiteAnalyticsParams & { stationId: string }
+): Promise<CommonResponse & { data: SiteDetailData }> => {
+  try {
+    const res = await apiClient.get(ANALYTICS_SITES_API.listOrDetails(), {
+      params: {
+        orgId: params.orgId || undefined,
+        stationId: params.stationId,
+        view: "detail",
+        preset: params.preset || undefined,
+        periodFrom: params.periodFrom || undefined,
+        periodTo: params.periodTo || undefined,
       },
     });
     return res.data;

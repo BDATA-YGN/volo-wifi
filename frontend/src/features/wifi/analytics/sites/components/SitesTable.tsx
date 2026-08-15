@@ -19,6 +19,7 @@ type Props = {
   loading?: boolean;
   exportSubtitle?: string;
   exportFilename?: string;
+  onSiteClick?: (row: SiteRow) => void;
 };
 
 function formatAmount(amount: number): string {
@@ -41,6 +42,7 @@ const SitesTable: React.FC<Props> = ({
   loading,
   exportSubtitle,
   exportFilename = "site-performance",
+  onSiteClick,
 }) => {
   const totals = useMemo(() => {
     if (planTotals && planTotals.length > 0) {
@@ -176,7 +178,9 @@ const SitesTable: React.FC<Props> = ({
         render: (_, row) => (
           <div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <Text strong>{row.name}</Text>
+              <Text strong style={onSiteClick ? { color: "var(--ant-color-primary)" } : undefined}>
+                {row.name}
+              </Text>
               <Tag
                 color={resolveTierColor(row.stationSizeCode, row.stationSizeName)}
                 title={row.stationSizeName}
@@ -233,7 +237,7 @@ const SitesTable: React.FC<Props> = ({
         ],
       },
     ];
-  }, [plans]);
+  }, [plans, onSiteClick]);
 
   const scrollX = 220 + plans.length * 216 + 228;
 
@@ -254,6 +258,14 @@ const SitesTable: React.FC<Props> = ({
         pagination={false}
         showSorterTooltip={false}
         scroll={{ x: scrollX }}
+        onRow={
+          onSiteClick
+            ? (row) => ({
+                onClick: () => onSiteClick(row),
+                style: { cursor: "pointer" },
+              })
+            : undefined
+        }
         onChange={(_pagination, _filters, _sorter, extra) => {
           setExportRows(extra.currentDataSource as SiteRow[]);
         }}

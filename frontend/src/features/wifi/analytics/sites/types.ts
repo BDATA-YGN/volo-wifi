@@ -138,6 +138,32 @@ export type SiteAnalyticsMeta = {
   pagination?: { page: number; limit: number; total: number } | null;
 };
 
+export type SitePartnerRow = {
+  resellerId: string | null;
+  code: string;
+  name: string;
+  status: string;
+  assigned: boolean;
+  ordersCount: number;
+  tokensCount: number;
+  revenue: number;
+  commission: number;
+  netRevenue: number;
+};
+
+export type SiteDetailData = {
+  site: SiteRow;
+  byPlan: SitePlanBreakdown[];
+  byPartner: SitePartnerRow[];
+  assignedPartnerCount: number;
+  sellingPartnerCount: number;
+  dataSource: "aggregated" | "live";
+  periodFrom: string;
+  periodTo: string;
+  preset: PeriodPreset | null;
+  org: { id: string; name: string; code: string; currency: string };
+};
+
 export type SiteAnalyticsParams = {
   orgId?: string;
   stationId?: string;
@@ -145,7 +171,7 @@ export type SiteAnalyticsParams = {
   preset?: PeriodPreset;
   periodFrom?: string;
   periodTo?: string;
-  view?: SiteAnalyticsTab;
+  view?: SiteAnalyticsTab | "detail";
   page?: number;
   limit?: number;
 };

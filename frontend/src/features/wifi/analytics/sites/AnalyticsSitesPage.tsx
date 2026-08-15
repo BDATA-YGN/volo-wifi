@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Alert, Card, Typography, theme } from "antd";
+import { useRequest } from "ahooks";
 import { MapPin } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 
@@ -14,13 +15,15 @@ import {
   shouldShowOrgSwitcher,
 } from "@/features/wifi/shared/hooks/useWifiOrgScope";
 import { useAnalyticsSites } from "./useAnalyticsSites";
-import type { PeriodPreset, SiteAnalyticsTab } from "./types";
+import * as Query from "./query";
+import type { PeriodPreset, SiteAnalyticsTab, SiteDetailData, SiteOption, SiteRow } from "./types";
 import { DEFAULT_TAB, DEFAULT_PERIOD, isTodayRange, todayRange, rangeFromPeriodPreset } from "./constant";
 import SitesToolbar from "./components/SitesToolbar";
 import SitesKpiCards from "./components/SitesKpiCards";
 import SitesTrendChart from "./components/SitesTrendChart";
 import SitesTable from "./components/SitesTable";
 import SitesTierTable from "./components/SitesTierTable";
+import SiteDetailModal from "./components/SiteDetailModal";
 import { formatMoney } from "./utils";
 
 const { Title, Text } = Typography;
@@ -28,6 +31,11 @@ const { Title, Text } = Typography;
 function parseTab(value: string | null): SiteAnalyticsTab {
   if (value === "sites" || value === "tiers" || value === "stats") return value;
   return DEFAULT_TAB;
+}
+
+function parseIdList(value: string | null): string[] {
+  if (!value) return [];
+  return [...new Set(value.split(",").map((id) => id.trim()).filter(Boolean))];
 }
 
 function parsePeriod(value: string | null): PeriodPreset {
@@ -62,7 +70,10 @@ const AnalyticsSitesPage: React.FC = () => {
 
   const tab = parseTab(searchParams.get("tab"));
   const period = parsePeriod(searchParams.get("period"));
+  const selectedSiteIds = parseIdList(searchParams.get("sites"));
+  const selectedTierIds = parseIdList(searchParams.get("tiers"));
   const initialRange = parseRangeFromSearch(searchParams);
+  const [selectedSite, setSelectedSite] = useState<SiteRow | null>(null);
 
   const [initDone, setInitDone] = useState(false);
   const [hideZeroSales, setHideZeroSalesState] = useState(
@@ -104,6 +115,13 @@ const AnalyticsSitesPage: React.FC = () => {
     [replaceParams]
   );
 
+  const setSelectedSiteIds = useCallback(
+    (ids: string[]) => {
+      replaceParams({ sites: ids.length > 0 ? ids.join(",") : null });
+    },
+    [replaceParams]
+  );
+
   const {
     analytics,
     meta,
@@ -123,6 +141,55 @@ const AnalyticsSitesPage: React.FC = () => {
     periodFrom: initialRange.custom ? initialRange.range[0].toISOString() : undefined,
     periodTo: initialRange.custom ? initialRange.range[1].toISOString() : undefined,
   });
+
+  const setSelectedTierIds = useCallback(
+    (ids: string[]) => {
+      const nextSites =
+        ids.length === 0
+          ? selectedSiteIds
+          : selectedSiteIds.filter((siteId) => {
+              const site = (formOptions.stations ?? []).find((s) => s.id === siteId);
+              return site ? ids.includes(site.stationSizeId) : false;
+            });
+      replaceParams({
+        tiers: ids.length > 0 ? ids.join(",") : null,
+        sites: nextSites.length > 0 ? nextSites.join(",") : null,
+      });
+    },
+    [replaceParams, selectedSiteIds, formOptions.stations]
+  );
+
+  const detailPeriod = initialRange.custom
+    ? {
+        periodFrom: initialRange.range[0].toISOString(),
+        periodTo: initialRange.range[1].toISOString(),
+      }
+    : { preset: period };
+
+  const {
+    data: detailRes,
+    loading: detailLoading,
+    error: detailError,
+  } = useRequest(
+    () =>
+      Query.loadSiteDetail({
+        orgId,
+        stationId: selectedSite!.stationId,
+        ...detailPeriod,
+      }),
+    {
+      ready: Boolean(orgId && selectedSite),
+      refreshDeps: [
+        orgId,
+        selectedSite?.stationId,
+        period,
+        initialRange.custom,
+        initialRange.range[0].toISOString(),
+        initialRange.range[1].toISOString(),
+      ],
+    }
+  );
+  const siteDetail = (detailRes?.data ?? null) as SiteDetailData | null;
 
   useEffect(() => {
     void loadFormOptions().then(() => setInitDone(true));
@@ -180,15 +247,44 @@ const AnalyticsSitesPage: React.FC = () => {
     return `${dayjs(analytics.periodFrom).format("D MMM YYYY")} – ${dayjs(analytics.periodTo).format("D MMM YYYY")}`;
   }, [analytics]);
 
+  const siteFilterOptions = useMemo<SiteOption[]>(() => {
+    const fromForm = formOptions.stations ?? [];
+    if (fromForm.length > 0) return fromForm;
+    return (analytics?.bySite ?? []).map((row) => ({
+      id: row.stationId,
+      code: row.code,
+      name: row.name,
+      status: row.status,
+      stationSizeId: row.stationSizeId,
+      stationSizeCode: row.stationSizeCode,
+      stationSizeName: row.stationSizeName,
+    }));
+  }, [formOptions.stations, analytics?.bySite]);
+
+  const filtersActive = selectedSiteIds.length > 0 || selectedTierIds.length > 0;
+
   const visibleSites = useMemo(() => {
-    const rows = analytics?.bySite ?? [];
-    return hideZeroSales ? rows.filter((row) => row.itemsCount > 0) : rows;
-  }, [analytics?.bySite, hideZeroSales]);
+    return (analytics?.bySite ?? []).filter((row) => {
+      if (hideZeroSales && row.itemsCount <= 0) return false;
+      if (selectedSiteIds.length > 0 && !selectedSiteIds.includes(row.stationId)) return false;
+      if (selectedTierIds.length > 0 && !selectedTierIds.includes(row.stationSizeId)) return false;
+      return true;
+    });
+  }, [analytics?.bySite, hideZeroSales, selectedSiteIds, selectedTierIds]);
 
   const visibleTiers = useMemo(() => {
-    const rows = analytics?.byTier ?? [];
-    return hideZeroSales ? rows.filter((row) => row.itemsCount > 0) : rows;
-  }, [analytics?.byTier, hideZeroSales]);
+    const selectedSiteTiers = new Set(
+      siteFilterOptions
+        .filter((site) => selectedSiteIds.includes(site.id))
+        .map((site) => site.stationSizeId)
+    );
+    return (analytics?.byTier ?? []).filter((row) => {
+      if (hideZeroSales && row.itemsCount <= 0) return false;
+      if (selectedTierIds.length > 0 && !selectedTierIds.includes(row.stationSizeId)) return false;
+      if (selectedSiteIds.length > 0 && !selectedSiteTiers.has(row.stationSizeId)) return false;
+      return true;
+    });
+  }, [analytics?.byTier, hideZeroSales, selectedTierIds, selectedSiteIds, siteFilterOptions]);
 
   const handleCustomRangeChange = (range: [Dayjs | null, Dayjs | null] | null) => {
     const next = range?.[0] && range?.[1] ? range : todayRange();
@@ -240,7 +336,11 @@ const AnalyticsSitesPage: React.FC = () => {
               value={orgId}
               required={needsOrg}
               loading={loading}
-              onChange={(id) => selectOrg(id)}
+              onChange={(id) => {
+                setSelectedSite(null);
+                replaceParams({ sites: null, tiers: null });
+                selectOrg(id);
+              }}
             />
           ) : null}
 
@@ -309,10 +409,16 @@ const AnalyticsSitesPage: React.FC = () => {
                   customRange={customRange}
                   dataSource={analytics?.dataSource}
                   hideZeroSales={hideZeroSales}
+                  stations={siteFilterOptions}
+                  stationSizes={formOptions.stationSizes ?? []}
+                  selectedSiteIds={selectedSiteIds}
+                  selectedTierIds={selectedTierIds}
                   loading={loading}
                   onTabChange={setTab}
                   onCustomRangeChange={handleCustomRangeChange}
                   onHideZeroSalesChange={setHideZeroSales}
+                  onSiteIdsChange={setSelectedSiteIds}
+                  onTierIdsChange={setSelectedTierIds}
                   onRefresh={refresh}
                 />
               </Card>
@@ -358,10 +464,13 @@ const AnalyticsSitesPage: React.FC = () => {
                   <SitesTable
                     rows={visibleSites}
                     plans={analytics.plans ?? []}
-                    planTotals={hideZeroSales ? undefined : analytics.planTotals ?? []}
+                    planTotals={
+                      hideZeroSales || filtersActive ? undefined : analytics.planTotals ?? []
+                    }
                     loading={loading}
                     exportSubtitle={[analytics.org.name, periodLabel].filter(Boolean).join(" · ")}
                     exportFilename={`site-performance_${dayjs(analytics.periodFrom).format("YYYY-MM-DD")}_${dayjs(analytics.periodTo).format("YYYY-MM-DD")}`}
+                    onSiteClick={setSelectedSite}
                   />
                 ) : loading ? (
                   <Card loading />
@@ -377,9 +486,11 @@ const AnalyticsSitesPage: React.FC = () => {
                 <SitesTierTable
                   rows={visibleTiers}
                   plans={analytics.plans ?? []}
-                    planTotals={hideZeroSales ? undefined : analytics.planTotals ?? []}
-                    loading={loading}
-                    exportSubtitle={[analytics.org.name, periodLabel].filter(Boolean).join(" · ")}
+                  planTotals={
+                    hideZeroSales || filtersActive ? undefined : analytics.planTotals ?? []
+                  }
+                  loading={loading}
+                  exportSubtitle={[analytics.org.name, periodLabel].filter(Boolean).join(" · ")}
                   exportFilename={`tier-performance_${dayjs(analytics.periodFrom).format("YYYY-MM-DD")}_${dayjs(analytics.periodTo).format("YYYY-MM-DD")}`}
                 />
               ) : loading ? (
@@ -403,6 +514,30 @@ const AnalyticsSitesPage: React.FC = () => {
           ) : null}
         </div>
       </div>
+
+      <SiteDetailModal
+        open={Boolean(selectedSite)}
+        loading={detailLoading}
+        error={detailError}
+        detail={
+          siteDetail ??
+          (selectedSite && analytics
+            ? {
+                site: selectedSite,
+                byPlan: selectedSite.byPlan ?? [],
+                byPartner: [],
+                assignedPartnerCount: 0,
+                sellingPartnerCount: 0,
+                dataSource: analytics.dataSource,
+                periodFrom: analytics.periodFrom,
+                periodTo: analytics.periodTo,
+                preset: analytics.preset,
+                org: analytics.org,
+              }
+            : null)
+        }
+        onClose={() => setSelectedSite(null)}
+      />
     </div>
   );
 };

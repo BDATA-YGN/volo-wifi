@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
 import * as Query from "./query";
 import type {
@@ -36,6 +36,7 @@ export function useAnalyticsPartners(options?: {
       : {}
   );
   const [formOptions, setFormOptions] = useState<PartnersFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const params: PartnerAnalyticsParams = {
     orgId,
@@ -54,14 +55,36 @@ export function useAnalyticsPartners(options?: {
   const meta = (data?.meta ?? {}) as PartnerAnalyticsMeta;
 
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as PartnersFormOptions;
-    setFormOptions(opts);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    setFormOptions((prev) => {
+      if (!targetOrgId) {
+        return {
+          ...prev,
+          memberships: opts.memberships ?? prev.memberships,
+          canSwitchOrg: opts.canSwitchOrg,
+          requiresOrgSelection: opts.requiresOrgSelection,
+          currency: opts.currency ?? prev.currency,
+        };
+      }
+      return {
+        memberships: opts.memberships ?? prev.memberships,
+        resellers: opts.resellers ?? [],
+        stations: opts.stations ?? [],
+        stationSizes: opts.stationSizes ?? [],
+        currency: opts.currency ?? prev.currency,
+        canSwitchOrg: opts.canSwitchOrg,
+        requiresOrgSelection: opts.requiresOrgSelection,
+      };
+    });
     if (
       !targetOrgId &&
       !opts.canSwitchOrg &&
       !opts.requiresOrgSelection &&
-      opts.memberships.length === 1
+      (opts.memberships?.length ?? 0) === 1
     ) {
       setOrgId(opts.memberships[0].id);
     }

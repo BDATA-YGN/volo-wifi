@@ -19,7 +19,7 @@ import {
   todayRange,
 } from "@/features/wifi/analytics/sites/constant";
 import { useAnalyticsPartners } from "./useAnalyticsPartners";
-import type { PartnerAnalyticsTab, PeriodPreset } from "./types";
+import type { PartnerAnalyticsTab, PartnerSiteOption, PeriodPreset } from "./types";
 import { DEFAULT_PERIOD, DEFAULT_TAB } from "./constant";
 import PartnersToolbar from "./components/PartnersToolbar";
 import PartnersKpiCards from "./components/PartnersKpiCards";
@@ -193,7 +193,8 @@ const AnalyticsPartnersPage: React.FC = () => {
   }, [replaceParams, searchParams]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
-  const resellers = formOptions.resellers;
+  const resellers = formOptions.resellers ?? [];
+  const hasPartnerRows = (analytics?.byPartner?.length ?? 0) > 0;
   const orgScopeMeta = {
     canSwitchOrg: meta?.canSwitchOrg ?? formOptions.canSwitchOrg,
     requiresOrgSelection: meta?.requiresOrgSelection ?? formOptions.requiresOrgSelection,
@@ -206,6 +207,24 @@ const AnalyticsPartnersPage: React.FC = () => {
     if (!analytics) return null;
     return `${dayjs(analytics.periodFrom).format("D MMM YYYY")} – ${dayjs(analytics.periodTo).format("D MMM YYYY")}`;
   }, [analytics]);
+
+  const siteFilterOptions = useMemo<PartnerSiteOption[]>(() => {
+    const fromForm = formOptions.stations ?? [];
+    if (fromForm.length > 0) return fromForm;
+    const byId = new Map<string, PartnerSiteOption>();
+    for (const row of analytics?.byPartner ?? []) {
+      for (const site of row.stations ?? []) {
+        if (byId.has(site.stationId)) continue;
+        byId.set(site.stationId, {
+          id: site.stationId,
+          code: site.name,
+          name: site.name,
+          stationSizeId: site.stationSizeId ?? "",
+        });
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [formOptions.stations, analytics?.byPartner]);
 
   const visiblePartners = useMemo(() => {
     const rows = analytics?.byPartner ?? [];
@@ -296,7 +315,12 @@ const AnalyticsPartnersPage: React.FC = () => {
             />
           ) : null}
 
-          {orgId && resellers.length === 0 && initDone && !loading && !needsOrg ? (
+          {orgId &&
+          resellers.length === 0 &&
+          !hasPartnerRows &&
+          initDone &&
+          !loading &&
+          !needsOrg ? (
             <Alert
               type="warning"
               showIcon
@@ -348,7 +372,7 @@ const AnalyticsPartnersPage: React.FC = () => {
                   customRange={customRange}
                   dataSource={analytics?.dataSource}
                   hideZeroSales={hideZeroSales}
-                  stations={formOptions.stations ?? []}
+                  stations={siteFilterOptions}
                   stationSizes={formOptions.stationSizes ?? []}
                   selectedSiteIds={selectedSiteIds}
                   selectedTierIds={selectedTierIds}

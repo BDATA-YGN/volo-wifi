@@ -20,6 +20,7 @@ import {
   type SiteAnalyticsSource,
   type SiteAnalyticsView,
 } from './build-site-analytics';
+import { buildSiteDetailAnalytics } from './build-site-detail';
 
 const ANALYTICS_VIEWS: SiteAnalyticsView[] = ['stats', 'sites', 'tiers'];
 const DEFAULT_VIEW: SiteAnalyticsView = 'stats';
@@ -174,6 +175,7 @@ export class AnalyticsSitesController {
         typeof req.query.stationSizeId === 'string' ? req.query.stationSizeId.trim() : undefined;
 
       const viewParam = typeof req.query.view === 'string' ? req.query.view.trim() : '';
+      const isDetailView = viewParam === 'detail';
       const view = (ANALYTICS_VIEWS as string[]).includes(viewParam)
         ? (viewParam as SiteAnalyticsView)
         : DEFAULT_VIEW;
@@ -200,6 +202,56 @@ export class AnalyticsSitesController {
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
       const source: SiteAnalyticsSource = preset === 'today' ? 'live' : 'aggregated';
+
+      if (isDetailView) {
+        if (!stationId) {
+          return responseError(res, 400, {
+            code: 'STATION_REQUIRED',
+            message: 'Site detail requires a stationId.',
+          });
+        }
+        const detail = await buildSiteDetailAnalytics(
+          this.prisma,
+          orgIdParam,
+          stationId,
+          periodFrom,
+          periodTo,
+          source
+        );
+        if (!detail) {
+          return responseError(res, 404, {
+            code: 'STATION_NOT_FOUND',
+            message: 'Site not found in this organization.',
+          });
+        }
+        const org = await this.prisma.org.findUnique({
+          where: { id: orgIdParam },
+          select: { id: true, name: true, code: true, currency: true },
+        });
+        if (!org) {
+          return responseError(res, 404, {
+            code: 'ORG_NOT_FOUND',
+            message: 'Organization not found.',
+          });
+        }
+        return responseSuccess(res, {
+          message: 'Success',
+          data: {
+            ...detail,
+            periodFrom: periodFrom.toISOString(),
+            periodTo: periodTo.toISOString(),
+            preset,
+            org,
+          },
+          meta: {
+            memberships,
+            orgId: orgIdParam,
+            requiresOrgSelection: false,
+            canSwitchOrg: canSwitchOrgContext(req.user!),
+            view: 'detail',
+          },
+        });
+      }
       const [analytics, org] = await Promise.all([
         buildSiteAnalytics(
           this.prisma,
