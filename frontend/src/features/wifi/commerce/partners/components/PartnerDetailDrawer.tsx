@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   Alert,
   Button,
@@ -191,9 +190,7 @@ const PartnerDetailDrawer: React.FC<Props> = ({
                 title="Setup incomplete"
                 description={
                   <span>
-                    Partners need at least one mapped site and one sellable plan. Prices resolve as{" "}
-                    <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link> priority:
-                    Reseller → Site → Organization default.
+                    Partners need at least one mapped site and one sellable plan.
                   </span>
                 }
               />

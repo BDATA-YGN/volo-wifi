@@ -17,6 +17,10 @@ import {
 } from '@/features/wifi/shared/resolve-org';
 import { USER_STATUSES, type UserStatus } from './constants';
 import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
+import {
   CommercePartnersCreateSchema,
   CommercePartnersUpdateSchema,
   CommercePartnersResetPasswordSchema,
@@ -229,7 +233,8 @@ async function loadSalesCountsByReseller(
 
 function buildListWhere(
   orgId: string,
-  query: AuthenticatedRequest['query']
+  query: AuthenticatedRequest['query'],
+  allowedStationIds: string[] | null = null
 ): Prisma.ResellerWhereInput {
   const where: Prisma.ResellerWhereInput = { orgId, deletedAt: null };
   const search = typeof query.search === 'string' ? query.search.trim() : '';
@@ -241,8 +246,16 @@ function buildListWhere(
   }
 
   if (stationId) {
+    if (allowedStationIds && !allowedStationIds.includes(stationId)) {
+      where.id = { in: [] };
+    } else {
+      where.resellerStations = {
+        some: { stationId, deletedAt: null },
+      };
+    }
+  } else if (allowedStationIds) {
     where.resellerStations = {
-      some: { stationId, deletedAt: null },
+      some: { stationId: { in: allowedStationIds }, deletedAt: null },
     };
   }
 
@@ -264,10 +277,14 @@ function buildListWhere(
 async function validateStationIds(
   prisma: PrismaClient,
   orgId: string,
-  stationIds: string[]
+  stationIds: string[],
+  allowedStationIds: string[] | null = null
 ): Promise<string | null> {
   if (stationIds.length === 0) return null;
   const unique = [...new Set(stationIds)];
+  if (allowedStationIds && unique.some((id) => !allowedStationIds.includes(id))) {
+    return 'One or more selected sites are not on your allow-list.';
+  }
   const count = await prisma.wifiStation.count({
     where: { orgId, deletedAt: null, id: { in: unique } },
   });
@@ -275,6 +292,17 @@ async function validateStationIds(
     return 'One or more selected sites are invalid or belong to another tenant.';
   }
   return null;
+}
+
+function mergeStationIdsForAllowList(
+  submittedIds: string[],
+  existingIds: string[],
+  allowedStationIds: string[] | null
+): string[] {
+  if (!allowedStationIds) return [...new Set(submittedIds)];
+  const preserved = existingIds.filter((id) => !allowedStationIds.includes(id));
+  const scoped = submittedIds.filter((id) => allowedStationIds.includes(id));
+  return [...new Set([...preserved, ...scoped])];
 }
 
 async function validatePlanEntitlements(
@@ -456,11 +484,14 @@ export class CommercePartnersController {
           }
         }
 
+        const allowedStationIds = orgId
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!)
+          : null;
         const [memberships, stations, plans, existingResellers] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgId
             ? this.prisma.wifiStation.findMany({
-                where: { orgId, deletedAt: null },
+                where: { orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
                 select: stationBriefSelect,
                 orderBy: { name: 'asc' },
               })
@@ -523,7 +554,13 @@ export class CommercePartnersController {
         return responseSuccess(res, { message: 'Success', data: detail });
       }
 
-      const where = buildListWhere(orgId, req.query);
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
+      const where = buildListWhere(orgId, req.query, allowedStationIds);
       const { page, limit, skip, take } = parsePagination(req.query);
 
       const [rows, total, activeCount, suspendedCount, disabledCount, memberships] =
@@ -600,6 +637,13 @@ export class CommercePartnersController {
         });
       }
 
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
+
       if (isUpdate) {
         const existing = await this.prisma.reseller.findFirst({
           where: { id: recordId!, orgId, deletedAt: null },
@@ -624,7 +668,21 @@ export class CommercePartnersController {
         }
 
         if (value.stationIds !== undefined) {
-          const stationError = await validateStationIds(this.prisma, orgId, value.stationIds);
+          const existingMappings = await this.prisma.resellerStation.findMany({
+            where: { resellerId: existing.id, deletedAt: null },
+            select: { stationId: true },
+          });
+          value.stationIds = mergeStationIdsForAllowList(
+            value.stationIds,
+            existingMappings.map((row) => row.stationId),
+            allowedStationIds
+          );
+          const stationError = await validateStationIds(
+            this.prisma,
+            orgId,
+            value.stationIds.filter((id) => !allowedStationIds || allowedStationIds.includes(id)),
+            allowedStationIds
+          );
           if (stationError) {
             return responseError(res, 400, { code: 'VALIDATION_ERROR', message: stationError });
           }
@@ -673,7 +731,12 @@ export class CommercePartnersController {
       const stationIds: string[] = value.stationIds ?? [];
       const planEntitlements: PlanEntitlementInput[] = value.planEntitlements ?? [];
 
-      const stationError = await validateStationIds(this.prisma, orgId, stationIds);
+      const stationError = await validateStationIds(
+        this.prisma,
+        orgId,
+        stationIds,
+        allowedStationIds
+      );
       if (stationError) {
         return responseError(res, 400, { code: 'VALIDATION_ERROR', message: stationError });
       }

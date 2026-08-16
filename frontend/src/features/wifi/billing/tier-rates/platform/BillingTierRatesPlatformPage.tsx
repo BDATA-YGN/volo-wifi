@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Button, Card, Col, Row, Tabs, Typography, theme } from "antd";
+import { Alert, App, Button, Card, Col, Row, Tabs, theme } from "antd";
 import { ArrowRightOutlined, DollarOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -15,7 +15,7 @@ import TierRatesMatrixTable from "./components/TierRatesMatrixTable";
 import RateHistoryTable from "./components/RateHistoryTable";
 import SetRateFormDrawer from "./components/SetRateFormDrawer";
 
-const { Paragraph } = Typography;
+
 
 const BillingTierRatesPlatformPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -113,14 +113,6 @@ const BillingTierRatesPlatformPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Set the default monthly license price per capacity tier. These platform rates apply to
-            all tenants unless overridden on Tenant Tier Rates, and drive tenant registration and
-            monthly SaaS invoicing.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

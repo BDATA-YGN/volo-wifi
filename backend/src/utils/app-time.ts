@@ -59,6 +59,27 @@ export function eachAppDay(from: Date, to: Date): Date[] {
   return days;
 }
 
+export function isSameAppDay(a: Date, b: Date): boolean {
+  return appDayKey(a) === appDayKey(b);
+}
+
+/** Hour bucket key in app timezone (`YYYY-MM-DDTHH:00:00`, no offset). */
+export function appHourKey(date: Date): string {
+  return dayjs(date).tz(bizTz()).format('YYYY-MM-DDTHH:00:00');
+}
+
+/** Inclusive list of app-timezone hour buckets from `from` through `to`. */
+export function eachAppHour(from: Date, to: Date): Date[] {
+  const hours: Date[] = [];
+  let cursor = dayjs(from).tz(bizTz()).startOf('hour');
+  const end = dayjs(to).tz(bizTz()).startOf('hour');
+  while (cursor.isBefore(end) || cursor.isSame(end, 'hour')) {
+    hours.push(cursor.toDate());
+    cursor = cursor.add(1, 'hour');
+  }
+  return hours;
+}
+
 export function previousCalendarMonth(ref = new Date()): { year: number; month: number } {
   const d = dayjs(ref).tz(bizTz()).subtract(1, 'month');
   return { year: d.year(), month: d.month() + 1 };

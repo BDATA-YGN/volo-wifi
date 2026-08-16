@@ -10,13 +10,16 @@ import {
   Select,
   Switch,
   Tag,
+  Transfer,
   Typography,
 } from "antd";
+import type { TransferProps } from "antd";
 import type {
   AccessControlFormOptions,
   MemberCreateFormValues,
   OrgMemberRecord,
   ProvisionMemberRoleCode,
+  StationOption,
 } from "../types";
 import {
   formatMemberRoleLabel,
@@ -33,6 +36,42 @@ import {
 import { useDrawerFormSync } from "@/features/wifi/shared/hooks";
 
 const { Text } = Typography;
+
+type SiteTransferItem = {
+  key: string;
+  title: string;
+  description?: string;
+  disabled?: boolean;
+};
+
+type SitesTransferProps = {
+  value?: string[];
+  onChange?: (next: string[]) => void;
+  dataSource: SiteTransferItem[];
+};
+
+const SitesTransfer: React.FC<SitesTransferProps> = ({ value, onChange, dataSource }) => {
+  const handleChange: TransferProps["onChange"] = (nextTargetKeys) => {
+    onChange?.(nextTargetKeys.map(String));
+  };
+
+  return (
+    <Transfer
+      dataSource={dataSource}
+      titles={["Available sites", "Allowed sites"]}
+      targetKeys={value ?? []}
+      onChange={handleChange}
+      render={(item) => item.title}
+      showSearch
+      filterOption={(input, item) =>
+        (item.title ?? "").toLowerCase().includes(input.toLowerCase()) ||
+        (item.description ?? "").toLowerCase().includes(input.toLowerCase())
+      }
+      styles={{ section: { width: 280, height: 300 } }}
+      oneWay={false}
+    />
+  );
+};
 
 type Props = {
   open: boolean;
@@ -144,12 +183,29 @@ const MemberFormDrawer: React.FC<Props> = ({
   const showPrimaryToggle =
     Boolean(editing) && (memberHasOrgAdminRole(editing!) || roleCode === "ORG_ADMIN");
 
+  const siteTransferData: SiteTransferItem[] = useMemo(() => {
+    const byId = new Map<string, StationOption>();
+    for (const station of formOptions.stations) {
+      byId.set(station.id, station);
+    }
+    for (const scope of editing?.stationScopes ?? []) {
+      if (scope.station) byId.set(scope.station.id, scope.station);
+    }
+    return [...byId.values()].map((station) => ({
+      key: station.id,
+      title: `${station.code} — ${station.name}`,
+      description: station.status,
+      disabled: station.status === "DISABLED",
+    }));
+  }, [formOptions.stations, editing?.stationScopes]);
+
   const handleFinish = async (values: MemberCreateFormValues) => {
     const { confirmPassword: _confirm, password: nextPassword, ...rest } = values;
     const canBePrimary = rest.roleCode === "ORG_ADMIN";
     const payload: MemberCreateFormValues = {
       ...rest,
       isPrimary: canBePrimary ? Boolean(rest.isPrimary) : false,
+      stationIds: rest.roleCode === "STATION_OPS" ? rest.stationIds ?? [] : [],
       ...(nextPassword && nextPassword.trim() ? { password: nextPassword.trim() } : {}),
     };
     if (editing) {
@@ -242,7 +298,7 @@ const MemberFormDrawer: React.FC<Props> = ({
   return (
     <Drawer
       title={editing ? `Edit ${editing.admin.fullName}` : "Provision team member"}
-      size={520}
+      size={720}
       open={open}
       onClose={onClose}
       destroyOnHidden
@@ -346,22 +402,15 @@ const MemberFormDrawer: React.FC<Props> = ({
             </Text>
           ) : null}
 
-          <Form.Item name="stationIds" label="Site allow-list">
-            <Select
-              mode="multiple"
-              allowClear
-              placeholder="All sites (no restriction)"
-              optionFilterProp="label"
-              options={formOptions.stations.map((s) => ({
-                value: s.id,
-                label: `${s.name} (${s.code})`,
-              }))}
-            />
-          </Form.Item>
-
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Leave site allow-list empty to grant org-wide site access according to role.
-          </Text>
+          {roleCode === "STATION_OPS" ? (
+            <Form.Item
+              name="stationIds"
+              label="Site allow-list"
+              extra="Left = available · Right = allowed. Leave the right list empty for org-wide access."
+            >
+              <SitesTransfer dataSource={siteTransferData} />
+            </Form.Item>
+          ) : null}
         </Form>
       ) : null}
     </Drawer>

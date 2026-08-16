@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Alert, Card, Typography, theme } from "antd";
 import { useRequest } from "ahooks";
@@ -353,25 +352,6 @@ const AnalyticsSitesPage: React.FC = () => {
             />
           ) : null}
 
-          {orgId &&
-          stations.length === 0 &&
-          !analytics?.bySite?.length &&
-          initDone &&
-          !loading &&
-          !needsOrg ? (
-            <Alert
-              type="warning"
-              showIcon
-              title="No sites configured"
-              description={
-                <span>
-                  Create WiFi sites in <Link href="/wifi/sites">Site Directory</Link> before
-                  viewing analytics.
-                </span>
-              }
-            />
-          ) : null}
-
           {orgId && !needsOrg ? (
             <>
               <Card
@@ -447,6 +427,7 @@ const AnalyticsSitesPage: React.FC = () => {
                       points={analytics.dailyTrend}
                       currency={currency}
                       loading={loading}
+                      grain={analytics.trendGrain === "hour" ? "hour" : "day"}
                     />
                   </div>
                 ) : loading ? (

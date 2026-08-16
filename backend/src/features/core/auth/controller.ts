@@ -27,6 +27,7 @@ import {
 } from '@/features/core/auth/login-lockout.service';
 import { resolveClientIp, resolveRequestClientIp, resolveUserAgent } from '@/utils/request-ip';
 import { assertOrgMembershipAllowsConsoleAccess } from '@/features/wifi/shared/org-membership-auth';
+import { loadAdminSiteAllowList } from '@/features/wifi/shared/resolve-station-scope';
 import {
   cookieNamesForProfile,
   resolveConsoleAuthProfile,
@@ -209,9 +210,12 @@ export class Controller {
       }
       delete user.password;
 
+      const wifiSiteAllowList = await loadAdminSiteAllowList(prisma, user.id);
+
       const resp = {
         ...user,
         emailAccount,
+        wifiSiteAllowList,
         mapRoleSettings: fetchRoles.filter(r => r.mngRoleSettings !== null).map(role => ({
           id: role.id,
           roleId: role.roleId,

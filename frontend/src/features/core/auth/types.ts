@@ -46,6 +46,7 @@ export interface LoginResponse {
       syncEnabled: boolean;
     };
     mapRoleSettings: MapRoleSetting[];
+    wifiSiteAllowList?: { orgId: string; orgCode: string; stationIds: string[] }[];
   }
   
   export interface MapRoleSetting {

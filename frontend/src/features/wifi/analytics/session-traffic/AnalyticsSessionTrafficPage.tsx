@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Activity, X } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -118,15 +117,6 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            RADIUS session and bandwidth analytics — sessions started in the selected period,
-            upload/download volume, and live active sessions. Monitor real-time connections in{" "}
-            <Link href="/wifi/network/radius/live-sessions">Live Sessions</Link> or review usage by
-            site in <Link href="/wifi/analytics/sites">Site Analytics</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

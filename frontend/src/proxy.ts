@@ -15,6 +15,7 @@ import { isCaptivePortalPath, isCaptiveHost } from "@/features/captive-portal/su
 import * as lzString from 'lz-string';
 import { withForwardedClientIpHeaders } from "@/lib/http/client-ip";
 import { CONSOLE_LOGIN_PATH } from "@/lib/auth/console-paths";
+import { isRouteAccessible } from "@/lib/auth/route-access";
 
 function nextWithClientIp(request: NextRequest): NextResponse {
   return NextResponse.next({
@@ -151,34 +152,6 @@ export async function proxy(request: NextRequest) {
   return nextWithClientIp(request);
 }
 
-/** Routes available to every authenticated user, regardless of role permissions. */
-const ALWAYS_ALLOWED_PREFIXES = ["/", "/home", "/profile", "/timeline"];
-
-function isRouteAccessible(path: string, userRoles: any): boolean {
-  if (ALWAYS_ALLOWED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) {
-    return true;
-  }
-
-  if (!userRoles) return false;
-
-  const pathAliases =
-    path === "/" || path === ""
-      ? ["/", "/dashboard"]
-      : path === "/dashboard"
-        ? ["/dashboard", "/"]
-        : [path];
-
-  for (const p of pathAliases) {
-    if (userRoles[p]?.access) return true;
-  }
-
-  return Object.entries(userRoles).some(([routePath, config]: [string, any]) => {
-    if (!config.access) return false;
-    const routePattern = routePath.replace(/\[\w+\]/g, '[^/]+').replace(/\*/g, '.*');
-    const regex = new RegExp(`^${routePattern}$`);
-    return regex.test(path) || path.startsWith(routePath);
-  });
-}
 
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)']

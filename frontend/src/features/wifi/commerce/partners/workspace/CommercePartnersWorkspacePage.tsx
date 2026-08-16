@@ -71,7 +71,6 @@ const CommercePartnersWorkspacePage: React.FC = () => {
     dashboard?.mode === "preview" || Boolean(meta?.requiresResellerSelection);
   const needsPartner =
     Boolean(meta?.requiresResellerSelection) && !resellerId && Boolean(orgId);
-  const isPreview = dashboard?.mode === "preview";
 
   return (
     <div className="p-0">
@@ -85,14 +84,6 @@ const CommercePartnersWorkspacePage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {isPreview
-              ? "Preview a partner's home screen — the same view a logged-in reseller sees for daily sales and token issuance."
-              : "Your partner home — mapped sites, sellable plans, and quick access to token sales."}
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
@@ -164,15 +155,6 @@ const CommercePartnersWorkspacePage: React.FC = () => {
 
           {dashboard ? (
             <>
-              {isPreview ? (
-                <Alert
-                  type="info"
-                  showIcon
-                  title="Admin preview mode"
-                  description="You are viewing this workspace as a tenant administrator, not as the linked partner account."
-                />
-              ) : null}
-
               <Card
                 styles={{ body: { padding: 20 } }}
                 style={{ borderRadius: token.borderRadiusLG }}

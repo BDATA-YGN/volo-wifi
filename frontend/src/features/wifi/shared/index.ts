@@ -1,6 +1,12 @@
 export { WifiModulePage } from "./WifiModulePage";
 export type { WifiModulePageProps } from "./WifiModulePage";
 export { buildWifiApiRoutes } from "./utils";
+export {
+  allowedStationIdsFromSession,
+  filterBySiteAllowList,
+  sessionStationAllowList,
+} from "./site-allow-list";
+export type { WifiSiteAllowListEntry } from "./site-allow-list";
 export { TIER_CODE_COLORS, resolveTierColor } from "./tier-colors";
 export type { WifiListParams } from "./types";
 export {

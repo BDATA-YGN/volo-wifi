@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Alert, Card, Typography, theme } from "antd";
+import { Alert, Card, theme } from "antd";
 import { ShieldCheck } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -17,8 +17,6 @@ import AuthEventsStats from "./components/AuthEventsStats";
 import AuthEventsToolbar from "./components/AuthEventsToolbar";
 import AuthEventsTable from "./components/AuthEventsTable";
 import AuthEventDetailDrawer from "./components/AuthEventDetailDrawer";
-
-const { Paragraph, Text } = Typography;
 
 const emptyFormOptions: AuthEventsFormOptions = {
   orgs: [],
@@ -86,14 +84,6 @@ const NetworkRadiusAuthEventsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            FreeRADIUS post-auth log from <Text code>radpostauth</Text>, enriched with captive
-            portal and RADIUS session context when available — accept/reject outcomes, client MAC,
-            NAS identifier, and site. Filter by station to see which store is being probed.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

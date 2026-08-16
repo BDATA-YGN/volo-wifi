@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { Ticket } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -16,8 +15,6 @@ import VoucherRunsTable from "./components/VoucherRunsTable";
 import VoucherRunFormDrawer from "./components/VoucherRunFormDrawer";
 import VoucherRunDetailDrawer from "./components/VoucherRunDetailDrawer";
 import { canCancelVoucherRun } from "./utils";
-
-const { Paragraph } = Typography;
 
 const AccessVoucherRunsPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -122,18 +119,6 @@ const AccessVoucherRunsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Bulk voucher generation for organization admins — create batches of prepaid tokens
-            tied to a{" "}
-            <Link href="/wifi/catalog/service-plans">service plan</Link>. Reseller point-of-sale
-            flows are separate.
-            {canViewAllOrgs
-              ? " Developer mode can browse every tenant; pick an organization filter to narrow the list."
-              : null}
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
@@ -168,21 +153,6 @@ const AccessVoucherRunsPage: React.FC = () => {
 
           {contextReady ? (
             <>
-              {noPlans ? (
-                <Alert
-                  type="warning"
-                  showIcon
-                  message="No service plans available"
-                  description={
-                    <span>
-                      Create internet plans on{" "}
-                      <Link href="/wifi/catalog/service-plans">Service Plans</Link> before
-                      generating vouchers.
-                    </span>
-                  }
-                />
-              ) : null}
-
               <VoucherRunsStats meta={meta} loading={loading} />
 
               <Card
@@ -281,6 +251,7 @@ const AccessVoucherRunsPage: React.FC = () => {
       <VoucherRunFormDrawer
         open={drawerOpen}
         saving={saving}
+        orgId={orgId}
         formOptions={formOptions}
         showOrgInLabels={showAllOrgLabels}
         onClose={() => setDrawerOpen(false)}

@@ -40,7 +40,7 @@ import StepOwner from "./components/StepOwner";
 import StepReview from "./components/StepReview";
 import RegistrationSuccess from "./components/RegistrationSuccess";
 
-const { Title, Paragraph } = Typography;
+const { Title } = Typography;
 const { useBreakpoint } = Grid;
 
 const STEP_FIELDS: (keyof TenantRegistrationFormValues)[][] = [
@@ -183,13 +183,9 @@ const TenantRegistrationPage: React.FC = () => {
   return (
     <Spin spinning={prereqLoading} indicator={<LoadingOutlined />}>
       <div className="mb-6">
-        <Title level={4} style={{ marginBottom: 4 }}>
+        <Title level={4} style={{ marginBottom: 0 }}>
           Tenant Registration
         </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 720 }}>
-          Onboard a new WiFi tenant with organization profile, active subscription, and primary owner
-          account — Step 1 of the platform lifecycle.
-        </Paragraph>
       </div>
 
       <PrerequisitesAlert prerequisites={prerequisites} loading={prereqLoading} />

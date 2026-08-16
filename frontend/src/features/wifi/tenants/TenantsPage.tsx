@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { Building2 } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -13,8 +13,6 @@ import TenantsToolbar from "./components/TenantsToolbar";
 import TenantsTable from "./components/TenantsTable";
 import TenantDetailDrawer from "./components/TenantDetailDrawer";
 import TenantEditDrawer from "./components/TenantEditDrawer";
-
-const { Paragraph } = Typography;
 
 const TenantsPage: React.FC = () => {
   const { message } = App.useApp();
@@ -105,13 +103,6 @@ const TenantsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Platform-wide tenant directory — organizations, subscription status, licensed site
-            usage, and member counts. New tenants are provisioned via Tenant Registration.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

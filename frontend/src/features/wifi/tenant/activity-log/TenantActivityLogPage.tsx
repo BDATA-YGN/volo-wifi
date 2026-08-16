@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Alert, Card, Typography, theme } from "antd";
+import { Alert, Card, theme } from "antd";
 import { ScrollText } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -13,7 +13,7 @@ import ActivityLogToolbar from "./components/ActivityLogToolbar";
 import ActivityLogTable from "./components/ActivityLogTable";
 import ActivityLogDetailDrawer from "./components/ActivityLogDetailDrawer";
 
-const { Paragraph } = Typography;
+
 
 const TenantActivityLogPage: React.FC = () => {
   const { token } = theme.useToken();
@@ -79,14 +79,6 @@ const TenantActivityLogPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            {canViewAllOrgs
-              ? "Platform audit trail across all tenants. Clear the organization filter to see every org, or pick one tenant to narrow the feed."
-              : "Immutable audit trail for your organization — who did what, on which entity, and when. Filter by time window, action type, or search actors and metadata."}
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

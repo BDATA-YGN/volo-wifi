@@ -10,6 +10,10 @@ import { isUndefinedOrUndefinedString } from '@/utils/string-utils';
 import { appDayKey, startOfAppDay } from '@/utils/app-time';
 import { isDeveloperAdmin, resolveOrgIdForAdmin } from '@/features/wifi/shared/resolve-org';
 import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
+import {
   loadOrgMembershipsForAdmin,
   loadResellerPicker,
   resolveDirectReseller,
@@ -495,7 +499,8 @@ function queryResellerParams(query: AuthenticatedRequest['query']) {
 async function loadSellableCatalog(
   prisma: PrismaClient,
   orgId: string,
-  resellerId: string
+  resellerId: string,
+  allowedStationIds: string[] | null = null
 ) {
   const [stations, entitlements, org] = await Promise.all([
     prisma.resellerStation.findMany({
@@ -525,7 +530,10 @@ async function loadSellableCatalog(
 
   const stationRows = stations
     .map((s) => s.station)
-    .filter((s) => s.status !== 'DISABLED');
+    .filter(
+      (s) =>
+        s.status !== 'DISABLED' && (!allowedStationIds || allowedStationIds.includes(s.id))
+    );
 
   const plans = await Promise.all(
     entitlements.map(async (ent) => {
@@ -562,10 +570,19 @@ async function loadSellableCatalog(
 }
 
 /** Org-wide plan/site filters when no partner is selected (admin list-all view). */
-async function loadOrgFilterCatalog(prisma: PrismaClient, orgId: string) {
+async function loadOrgFilterCatalog(
+  prisma: PrismaClient,
+  orgId: string,
+  allowedStationIds: string[] | null = null
+) {
   const [stations, plans, org] = await Promise.all([
     prisma.wifiStation.findMany({
-      where: { orgId, deletedAt: null, status: { not: 'DISABLED' } },
+      where: {
+        orgId,
+        deletedAt: null,
+        status: { not: 'DISABLED' },
+        ...stationPkScope(allowedStationIds),
+      },
       select: { id: true, code: true, name: true, status: true },
       orderBy: { name: 'asc' },
     }),
@@ -706,7 +723,8 @@ async function resolveAccessTokensListScope(
 function buildListWhere(
   orgId: string,
   resellerId: string | null,
-  query: AuthenticatedRequest['query']
+  query: AuthenticatedRequest['query'],
+  allowedStationIds: string[] | null = null
 ): Prisma.CredentialWhereInput {
   const where: Prisma.CredentialWhereInput = {
     orgId,
@@ -727,7 +745,14 @@ function buildListWhere(
     where.status = status as CredentialStatus;
   }
   if (planId) where.planId = planId;
-  if (stationId) where.stationId = stationId;
+  if (stationId) {
+    where.stationId =
+      allowedStationIds && !allowedStationIds.includes(stationId)
+        ? { in: [] }
+        : stationId;
+  } else if (allowedStationIds) {
+    where.stationId = { in: allowedStationIds };
+  }
 
   if (search) {
     where.OR = [
@@ -771,15 +796,27 @@ export class CommerceAccessTokensController {
             });
           }
 
+          const allowedStationIds = await resolveAllowedStationIds(
+            this.prisma,
+            adminId,
+            scope.orgId,
+            req.user!
+          );
           const catalog = scope.resellerId
-            ? await loadSellableCatalog(this.prisma, scope.orgId, scope.resellerId)
-            : await loadOrgFilterCatalog(this.prisma, scope.orgId);
+            ? await loadSellableCatalog(
+                this.prisma,
+                scope.orgId,
+                scope.resellerId,
+                allowedStationIds
+              )
+            : await loadOrgFilterCatalog(this.prisma, scope.orgId, allowedStationIds);
 
           const memberships =
             scope.memberships ??
             (await loadOrgMembershipsForAdmin(this.prisma, adminId, req.user!));
-          const resellers =
-            scope.resellers ?? (await loadResellerPicker(this.prisma, scope.orgId));
+          const resellers = allowedStationIds
+            ? await loadResellerPicker(this.prisma, scope.orgId, allowedStationIds)
+            : (scope.resellers ?? (await loadResellerPicker(this.prisma, scope.orgId)));
 
           return responseSuccess(res, {
             message: 'Success',
@@ -825,6 +862,12 @@ export class CommerceAccessTokensController {
         const { orgId, resellerId, mode, partnerLocked } = scope;
         const permissionCtx: CredentialPermissionContext = { mode, isDeveloper };
         const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          orgId,
+          req.user!
+        );
 
         if (!isUndefinedOrUndefinedString(req.params?.id)) {
           const idParam = req.params.id as string | string[];
@@ -836,6 +879,7 @@ export class CommerceAccessTokensController {
               orgId,
               deletedAt: null,
               ...(resellerId ? { resellerId } : {}),
+              ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
             },
             select: credentialSelect,
           });
@@ -870,12 +914,13 @@ export class CommerceAccessTokensController {
           });
         }
 
-        const where = buildListWhere(orgId, resellerId, req.query);
+        const where = buildListWhere(orgId, resellerId, req.query, allowedStationIds);
         const { page, limit, skip, take } = parsePagination(req.query);
         const todayStart = startOfUtcDay();
         const saleWhere = {
           orgId,
           ...(resellerId ? { resellerId } : {}),
+          ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
           soldAt: { gte: todayStart },
           status: 'PAID' as const,
         };
@@ -884,6 +929,7 @@ export class CommerceAccessTokensController {
           deletedAt: null,
           type: 'VOUCHER_TOKEN',
           ...(resellerId ? { resellerId } : {}),
+          ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
         };
 
         const [
@@ -915,16 +961,18 @@ export class CommerceAccessTokensController {
             _sum: { total: true },
           }),
           resellerId
-            ? loadSellableCatalog(this.prisma, orgId, resellerId)
-            : loadOrgFilterCatalog(this.prisma, orgId),
+            ? loadSellableCatalog(this.prisma, orgId, resellerId, allowedStationIds)
+            : loadOrgFilterCatalog(this.prisma, orgId, allowedStationIds),
           scope.memberships ??
             (mode === 'preview'
               ? loadOrgMembershipsForAdmin(this.prisma, adminId, req.user!)
               : Promise.resolve(undefined)),
-          scope.resellers ??
-            (mode === 'preview'
-              ? loadResellerPicker(this.prisma, orgId)
-              : Promise.resolve(undefined)),
+          allowedStationIds
+            ? loadResellerPicker(this.prisma, orgId, allowedStationIds)
+            : scope.resellers ??
+              (mode === 'preview'
+                ? loadResellerPicker(this.prisma, orgId)
+                : Promise.resolve(undefined)),
         ]);
 
         const statusCounts = Object.fromEntries(
@@ -1066,6 +1114,19 @@ export class CommerceAccessTokensController {
           },
           select: { id: true },
         });
+
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          orgId,
+          req.user!
+        );
+        if (allowedStationIds && !allowedStationIds.includes(value.stationId)) {
+          return responseError(res, 403, {
+            code: 'SITE_NOT_ALLOWED',
+            message: 'This site is not on your allow-list.',
+          });
+        }
 
         if (!stationMapped) {
           return responseError(res, 400, {

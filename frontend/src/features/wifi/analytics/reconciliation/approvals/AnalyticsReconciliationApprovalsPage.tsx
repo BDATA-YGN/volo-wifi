@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { ClipboardCheck, X } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -133,14 +132,6 @@ const AnalyticsReconciliationApprovalsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Attestation workflow — track station sign-offs, organization approvals, and sealed
-            postings across settlement periods. Review cash totals in{" "}
-            <Link href="/wifi/analytics/reconciliation/settlements">Settlements</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

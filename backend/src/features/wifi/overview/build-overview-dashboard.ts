@@ -46,24 +46,21 @@ export type OverviewSitePulse = {
   todayBytes: number;
 };
 
-export type OverviewRecentOrder = {
-  orderId: string;
-  orderNo: string;
-  stationCode: string | null;
-  resellerCode: string | null;
-  total: number;
-  currency: string;
-  soldAt: string | null;
+export type OverviewSessionHealth = {
+  stationId: string;
+  code: string;
+  name: string;
+  liveSessions: number;
+  stalledSessions: number;
+  todaySessions: number;
 };
 
-export type OverviewRecentSession = {
-  sessionId: string;
-  userName: string | null;
-  stationCode: string | null;
-  status: string;
-  startedAt: string;
-  totalBytes: number;
-  isStalled: boolean;
+export type OverviewPartnerSales = {
+  resellerId: string;
+  code: string;
+  name: string;
+  orders: number;
+  revenue: number;
 };
 
 export type OverviewContext = {
@@ -76,8 +73,8 @@ export type OverviewDashboardPayload = {
   summary: OverviewSummary;
   trend7d: OverviewTrendPoint[];
   topSites: OverviewSitePulse[];
-  recentOrders: OverviewRecentOrder[];
-  recentSessions: OverviewRecentSession[];
+  sessionHealth: OverviewSessionHealth[];
+  partnerSales: OverviewPartnerSales[];
   context: OverviewContext;
   generatedAt: string;
 };
@@ -156,77 +153,88 @@ export async function buildOverviewDashboard(
   orgId: string,
   adminId: string,
   isDeveloper: boolean,
-  consoleRole: string
+  consoleRole: string,
+  allowedStationIds: string[] | null = null
 ): Promise<OverviewDashboardPayload> {
   const now = new Date();
   const today = startOfAppDay(now);
   const trendFrom = addAppDays(today, -(TREND_DAYS - 1));
-
-  const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const paidTodayWhere: Prisma.SaleOrderWhereInput = {
+    orgId,
+    status: 'PAID',
+    ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
+    OR: [{ soldAt: { gte: today } }, { soldAt: null, createdAt: { gte: today } }],
+  };
 
   const [
     activeSessions,
-    stalledSessions,
     todayUsageAgg,
     weekSalesRows,
     weekUsageRows,
-    todayOrders,
-    weekOrderAgg,
+    todayOrderAgg,
     todayPayments,
     pendingApprovals,
     siteCount,
     partnerCount,
     license,
     topSiteStats,
-    recentOrders,
-    recentSessions,
+    partnerSalesRows,
+    todayUsageBySite,
     orgRoleCodes,
     stations,
   ] = await Promise.all([
     prisma.radiusSession.findMany({
-      where: { orgId, status: { in: ['START', 'INTERIM'] } },
-      select: { id: true, totalBytes: true, stationId: true },
-    }),
-    prisma.radiusSession.findMany({
-      where: { orgId, status: { in: ['START', 'INTERIM'] } },
-      select: { startedAt: true, lastInterimAt: true },
+      where: {
+        orgId,
+        status: { in: ['START', 'INTERIM'] },
+        ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
+      },
+      select: {
+        id: true,
+        totalBytes: true,
+        stationId: true,
+        startedAt: true,
+        lastInterimAt: true,
+      },
     }),
     prisma.dailyRadiusUsageStat.aggregate({
-      where: { orgId, deletedAt: null, date: today },
+      where: {
+        orgId,
+        deletedAt: null,
+        date: today,
+        ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
+      },
       _sum: { sessionsCount: true, totalBytes: true },
     }),
     prisma.dailySalesStat.findMany({
-      where: { orgId, deletedAt: null, date: { gte: trendFrom, lte: today } },
+      where: {
+        orgId,
+        deletedAt: null,
+        date: { gte: trendFrom, lte: today },
+        ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
+      },
       select: { date: true, ordersCount: true, revenue: true },
     }),
     prisma.dailyRadiusUsageStat.findMany({
-      where: { orgId, deletedAt: null, date: { gte: trendFrom, lte: today } },
+      where: {
+        orgId,
+        deletedAt: null,
+        date: { gte: trendFrom, lte: today },
+        ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
+      },
       select: { date: true, sessionsCount: true, totalBytes: true },
     }),
-    prisma.saleOrder.count({
-      where: {
-        orgId,
-        status: 'PAID',
-        OR: [
-          { soldAt: { gte: today } },
-          { soldAt: null, createdAt: { gte: today } },
-        ],
-      },
-    }),
     prisma.saleOrder.aggregate({
-      where: {
-        orgId,
-        status: 'PAID',
-        OR: [
-          { soldAt: { gte: trendFrom } },
-          { soldAt: null, createdAt: { gte: trendFrom } },
-        ],
-      },
+      where: paidTodayWhere,
       _count: { id: true },
       _sum: { total: true },
     }),
     prisma.payment.count({
-      where: { orgId, paidAt: { gte: today } },
+      where: {
+        orgId,
+        paidAt: { gte: today },
+        ...(allowedStationIds ? { order: { stationId: { in: allowedStationIds } } } : {}),
+      },
     }),
     prisma.rptFinSettlement.count({
       where: {
@@ -235,8 +243,22 @@ export async function buildOverviewDashboard(
         status: { in: ['DECLARED', 'STATION_ATTESTED', 'ORG_APPROVED'] },
       },
     }),
-    prisma.wifiStation.count({ where: { orgId, deletedAt: null } }),
-    prisma.reseller.count({ where: { orgId, deletedAt: null } }),
+    prisma.wifiStation.count({
+      where: {
+        orgId,
+        deletedAt: null,
+        ...(allowedStationIds ? { id: { in: allowedStationIds } } : {}),
+      },
+    }),
+    prisma.reseller.count({
+      where: {
+        orgId,
+        deletedAt: null,
+        ...(allowedStationIds
+          ? { resellerStations: { some: { stationId: { in: allowedStationIds }, deletedAt: null } } }
+          : {}),
+      },
+    }),
     prisma.orgLicense.findUnique({
       where: { orgId },
       select: {
@@ -247,56 +269,55 @@ export async function buildOverviewDashboard(
     }),
     prisma.dailyRadiusUsageStat.groupBy({
       by: ['stationId'],
-      where: { orgId, deletedAt: null, date: today, stationId: { not: null } },
+      where: {
+        orgId,
+        deletedAt: null,
+        date: today,
+        stationId: allowedStationIds ? { in: allowedStationIds } : { not: null },
+      },
       _sum: { sessionsCount: true, totalBytes: true },
       orderBy: { _sum: { sessionsCount: 'desc' } },
       take: 8,
     }),
-    prisma.saleOrder.findMany({
+    prisma.saleOrder.groupBy({
+      by: ['resellerId'],
       where: {
-        orgId,
-        status: 'PAID',
-        OR: [
-          { soldAt: { gte: windowStart } },
-          { soldAt: null, createdAt: { gte: windowStart } },
-        ],
+        ...paidTodayWhere,
+        resellerId: { not: null },
       },
-      select: {
-        id: true,
-        orderNo: true,
-        total: true,
-        currency: true,
-        soldAt: true,
-        station: { select: { code: true } },
-        reseller: { select: { code: true } },
-      },
-      orderBy: [{ soldAt: 'desc' }, { createdAt: 'desc' }],
+      _count: { id: true },
+      _sum: { total: true },
+      orderBy: { _sum: { total: 'desc' } },
       take: 8,
     }),
-    prisma.radiusSession.findMany({
-      where: { orgId, startedAt: { gte: windowStart } },
-      select: {
-        id: true,
-        userName: true,
-        status: true,
-        startedAt: true,
-        lastInterimAt: true,
-        totalBytes: true,
-        station: { select: { code: true } },
+    prisma.dailyRadiusUsageStat.groupBy({
+      by: ['stationId'],
+      where: {
+        orgId,
+        deletedAt: null,
+        date: today,
+        stationId: allowedStationIds ? { in: allowedStationIds } : { not: null },
       },
-      orderBy: { startedAt: 'desc' },
-      take: 8,
+      _sum: { sessionsCount: true },
     }),
     loadOrgRoleCodes(prisma, adminId, orgId, isDeveloper),
     prisma.wifiStation.findMany({
-      where: { orgId, deletedAt: null },
+      where: {
+        orgId,
+        deletedAt: null,
+        ...(allowedStationIds ? { id: { in: allowedStationIds } } : {}),
+      },
       select: { id: true, code: true, name: true },
     }),
   ]);
 
-  const todayRevenueAgg = await prisma.dailySalesStat.aggregate({
-    where: { orgId, deletedAt: null, date: today },
-    _sum: { revenue: true, ordersCount: true },
+  const todaySalesBySite = await prisma.saleOrder.groupBy({
+    by: ['stationId'],
+    where: {
+      ...paidTodayWhere,
+      stationId: { not: null },
+    },
+    _sum: { total: true },
   });
 
   const activeBytes = activeSessions.reduce(
@@ -305,9 +326,17 @@ export async function buildOverviewDashboard(
   );
 
   const activeByStation = new Map<string, number>();
+  const stalledByStation = new Map<string, number>();
+  let stalledSessionCount = 0;
   for (const s of activeSessions) {
     if (s.stationId) {
       activeByStation.set(s.stationId, (activeByStation.get(s.stationId) ?? 0) + 1);
+    }
+    if (isSessionStalled(s.startedAt, s.lastInterimAt, now)) {
+      stalledSessionCount += 1;
+      if (s.stationId) {
+        stalledByStation.set(s.stationId, (stalledByStation.get(s.stationId) ?? 0) + 1);
+      }
     }
   }
 
@@ -344,23 +373,11 @@ export async function buildOverviewDashboard(
   }
 
   const stationMap = new Map(stations.map((s) => [s.id, s]));
-  const topSiteIds = topSiteStats
-    .map((r) => r.stationId)
-    .filter((id): id is string => Boolean(id));
-
-  const todayRevenueBySite = await prisma.dailySalesStat.groupBy({
-    by: ['stationId'],
-    where: {
-      orgId,
-      deletedAt: null,
-      date: today,
-      stationId: { in: topSiteIds.length > 0 ? topSiteIds : ['__none__'] },
-    },
-    _sum: { revenue: true },
-  });
 
   const revenueBySite = new Map(
-    todayRevenueBySite.map((r) => [r.stationId, decimalToNumber(r._sum.revenue)])
+    todaySalesBySite
+      .filter((r) => r.stationId)
+      .map((r) => [r.stationId as string, decimalToNumber(r._sum.total)])
   );
 
   const topSites: OverviewSitePulse[] = topSiteStats
@@ -378,23 +395,76 @@ export async function buildOverviewDashboard(
       };
     });
 
+  const todaySessionsBySite = new Map(
+    todayUsageBySite
+      .filter((row) => row.stationId)
+      .map((row) => [row.stationId as string, row._sum.sessionsCount ?? 0])
+  );
+
+  const healthIds = new Set<string>([
+    ...activeByStation.keys(),
+    ...stalledByStation.keys(),
+    ...todaySessionsBySite.keys(),
+  ]);
+
+  const sessionHealth: OverviewSessionHealth[] = [...healthIds]
+    .map((stationId) => {
+      const station = stationMap.get(stationId);
+      return {
+        stationId,
+        code: station?.code ?? '—',
+        name: station?.name ?? 'Unknown site',
+        liveSessions: activeByStation.get(stationId) ?? 0,
+        stalledSessions: stalledByStation.get(stationId) ?? 0,
+        todaySessions: todaySessionsBySite.get(stationId) ?? 0,
+      };
+    })
+    .sort((a, b) => {
+      if (b.stalledSessions !== a.stalledSessions) return b.stalledSessions - a.stalledSessions;
+      if (b.liveSessions !== a.liveSessions) return b.liveSessions - a.liveSessions;
+      return b.todaySessions - a.todaySessions;
+    })
+    .slice(0, 8);
+
+  const partnerIds = partnerSalesRows
+    .map((row) => row.resellerId)
+    .filter((id): id is string => Boolean(id));
+  const partners =
+    partnerIds.length > 0
+      ? await prisma.reseller.findMany({
+          where: { id: { in: partnerIds }, orgId, deletedAt: null },
+          select: { id: true, code: true, name: true },
+        })
+      : [];
+  const partnerMap = new Map(partners.map((p) => [p.id, p]));
+  const partnerSales: OverviewPartnerSales[] = partnerSalesRows
+    .filter((row) => row.resellerId)
+    .map((row) => {
+      const partner = partnerMap.get(row.resellerId!);
+      return {
+        resellerId: row.resellerId!,
+        code: partner?.code ?? '—',
+        name: partner?.name ?? 'Unknown partner',
+        orders: row._count.id,
+        revenue: decimalToNumber(row._sum.total),
+      };
+    });
+
   const persona = resolvePersona(consoleRole, orgRoleCodes);
 
   return {
     summary: {
       activeSessions: activeSessions.length,
       activeBytes,
-      stalledSessions: stalledSessions.filter((s) =>
-        isSessionStalled(s.startedAt, s.lastInterimAt, now)
-      ).length,
+      stalledSessions: stalledSessionCount,
       todaySessions: todayUsageAgg._sum.sessionsCount ?? 0,
       todayBytes: bigintToNumber(todayUsageAgg._sum.totalBytes),
-      todayOrders: todayOrders,
-      todayRevenue: decimalToNumber(todayRevenueAgg._sum.revenue),
+      todayOrders: todayOrderAgg._count.id,
+      todayRevenue: decimalToNumber(todayOrderAgg._sum.total),
       todayPayments,
-      weekRevenue: decimalToNumber(weekOrderAgg._sum.total),
-      weekOrders: weekOrderAgg._count.id,
-      weekSessions: weekUsageRows.reduce((sum, r) => sum + r.sessionsCount, 0),
+      weekRevenue: Math.round(trend7d.reduce((sum, p) => sum + p.revenue, 0) * 100) / 100,
+      weekOrders: trend7d.reduce((sum, p) => sum + p.orders, 0),
+      weekSessions: trend7d.reduce((sum, p) => sum + p.sessions, 0),
       pendingApprovals,
       siteCount,
       partnerCount,
@@ -404,24 +474,8 @@ export async function buildOverviewDashboard(
     },
     trend7d,
     topSites,
-    recentOrders: recentOrders.map((o) => ({
-      orderId: o.id,
-      orderNo: o.orderNo,
-      stationCode: o.station?.code ?? null,
-      resellerCode: o.reseller?.code ?? null,
-      total: decimalToNumber(o.total),
-      currency: o.currency,
-      soldAt: o.soldAt?.toISOString() ?? null,
-    })),
-    recentSessions: recentSessions.map((s) => ({
-      sessionId: s.id,
-      userName: s.userName,
-      stationCode: s.station?.code ?? null,
-      status: s.status,
-      startedAt: s.startedAt.toISOString(),
-      totalBytes: bigintToNumber(s.totalBytes),
-      isStalled: isSessionStalled(s.startedAt, s.lastInterimAt, now),
-    })),
+    sessionHealth,
+    partnerSales,
     context: {
       consoleRole,
       orgRoleCodes,

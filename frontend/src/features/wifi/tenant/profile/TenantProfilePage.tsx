@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Col, Row, Spin, Typography, theme } from "antd";
+import { Alert, App, Col, Row, Spin, theme } from "antd";
 import { Settings } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -14,7 +14,7 @@ import ProfileSettingsForm from "./components/ProfileSettingsForm";
 import SubscriptionSummaryCard from "./components/SubscriptionSummaryCard";
 import type { TenantProfileFormValues } from "./types";
 
-const { Paragraph } = Typography;
+
 
 const TenantProfilePage: React.FC = () => {
   const { message } = App.useApp();
@@ -62,13 +62,6 @@ const TenantProfilePage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Manage your organization profile — display name, regional defaults, captive portal
-            messaging, and entity code prefixes. Subscription limits are shown for reference.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

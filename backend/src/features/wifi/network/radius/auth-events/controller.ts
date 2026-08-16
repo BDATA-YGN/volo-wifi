@@ -13,6 +13,10 @@ import {
   toNetworkOrgMeta,
 } from '@/features/wifi/network/shared/resolve-network-org';
 import { sanitizeCaptiveClientIp } from '@/features/captive/utils/captive-client-ip';
+import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 
 type EventRow = {
   id: bigint;
@@ -209,10 +213,28 @@ function outcomeSql(outcome: string): Prisma.Sql | null {
   return null;
 }
 
+function stationAllowSql(
+  allowedStationIds: string[] | null,
+  requestedStationId = ''
+): Prisma.Sql | null {
+  if (requestedStationId) {
+    if (allowedStationIds && !allowedStationIds.includes(requestedStationId)) {
+      return Prisma.sql`FALSE`;
+    }
+    return Prisma.sql`(
+      cred.station_id = ${requestedStationId}
+      OR sess.station_id = ${requestedStationId}
+    )`;
+  }
+  if (!allowedStationIds) return null;
+  if (allowedStationIds.length === 0) return Prisma.sql`FALSE`;
+  return Prisma.sql`COALESCE(cred.station_id, sess.station_id) IN (${Prisma.join(allowedStationIds)})`;
+}
+
 function buildFilterSql(
   orgId: string,
   query: AuthenticatedRequest['query'],
-  opts?: { ignoreView?: boolean }
+  opts?: { ignoreView?: boolean; allowedStationIds?: string[] | null }
 ): Prisma.Sql {
   const parts: Prisma.Sql[] = [orgCredentialMatchSql(orgId)];
 
@@ -222,6 +244,7 @@ function buildFilterSql(
   const stationId = typeof query.stationId === 'string' ? query.stationId.trim() : '';
   const authFrom = parseDate(query.authFrom);
   const authTo = parseDate(query.authTo);
+  const stationPart = stationAllowSql(opts?.allowedStationIds ?? null, stationId);
 
   if (!opts?.ignoreView) {
     if (view === 'recent') {
@@ -238,12 +261,7 @@ function buildFilterSql(
   const outcomePart = outcome ? outcomeSql(outcome) : null;
   if (outcomePart) parts.push(outcomePart);
 
-  if (stationId) {
-    parts.push(Prisma.sql`(
-      cred.station_id = ${stationId}
-      OR sess.station_id = ${stationId}
-    )`);
-  }
+  if (stationPart) parts.push(stationPart);
 
   if (search) {
     const like = `%${search}%`;
@@ -297,10 +315,16 @@ export class NetworkRadiusAuthEventsController {
       }
 
       const { orgId } = scope;
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
 
       if (req.query.formOptions === 'true') {
         const stations = await this.prisma.wifiStation.findMany({
-          where: { orgId, deletedAt: null },
+          where: { orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
           select: stationSelect,
           orderBy: { name: 'asc' },
         });
@@ -325,6 +349,10 @@ export class NetworkRadiusAuthEventsController {
           });
         }
 
+        const detailStationSql = stationAllowSql(allowedStationIds);
+        const detailStationAnd = detailStationSql
+          ? Prisma.sql`AND ${detailStationSql}`
+          : Prisma.empty;
         const rows = await this.prisma.$queryRaw<EventRow[]>`
           SELECT
             ${eventSelectSql()}
@@ -332,6 +360,7 @@ export class NetworkRadiusAuthEventsController {
           ${eventJoinSql(orgId)}
           WHERE r.id = ${id}
             AND ${orgCredentialMatchSql(orgId)}
+            ${detailStationAnd}
           LIMIT 1
         `;
 
@@ -353,9 +382,11 @@ export class NetworkRadiusAuthEventsController {
       const view =
         typeof req.query.view === 'string' ? req.query.view.trim().toLowerCase() : 'recent';
       const { page, limit, skip, take } = parsePagination(req.query);
-      const filterSql = buildFilterSql(orgId, req.query);
+      const filterSql = buildFilterSql(orgId, req.query, { allowedStationIds });
       const todayStart = startOfToday();
       const recentSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const kpiStationSql = stationAllowSql(allowedStationIds);
+      const kpiStationAnd = kpiStationSql ? Prisma.sql`AND ${kpiStationSql}` : Prisma.empty;
 
       const [rows, totalRows, acceptTodayRows, rejectTodayRows, recentRows] = await Promise.all([
         this.prisma.$queryRaw<EventRow[]>`
@@ -377,22 +408,28 @@ export class NetworkRadiusAuthEventsController {
         this.prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT COUNT(*)::bigint AS count
           FROM radpostauth r
+          ${eventJoinSql(orgId)}
           WHERE ${orgCredentialMatchSql(orgId)}
             AND r.authdate >= ${todayStart}
             AND ${outcomeSql('ACCEPT')!}
+            ${kpiStationAnd}
         `,
         this.prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT COUNT(*)::bigint AS count
           FROM radpostauth r
+          ${eventJoinSql(orgId)}
           WHERE ${orgCredentialMatchSql(orgId)}
             AND r.authdate >= ${todayStart}
             AND ${outcomeSql('REJECT')!}
+            ${kpiStationAnd}
         `,
         this.prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT COUNT(*)::bigint AS count
           FROM radpostauth r
+          ${eventJoinSql(orgId)}
           WHERE ${orgCredentialMatchSql(orgId)}
             AND r.authdate >= ${recentSince}
+            ${kpiStationAnd}
         `,
       ]);
 

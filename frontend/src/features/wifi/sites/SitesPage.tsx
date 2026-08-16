@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { MapPin } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -17,7 +17,7 @@ import SitesTable from "./components/SitesTable";
 import SiteFormDrawer from "./components/SiteFormDrawer";
 import SiteDetailDrawer from "./components/SiteDetailDrawer";
 
-const { Paragraph } = Typography;
+
 
 const SitesPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -152,15 +152,6 @@ const SitesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            WiFi site directory for your tenant — each site requires a capacity tier that drives
-            monthly license billing. Configure platform tiers on{" "}
-            <Link href="/wifi/billing/capacity-tiers">Capacity Tiers</Link> before onboarding
-            sites.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

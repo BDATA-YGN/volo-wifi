@@ -63,10 +63,21 @@ export async function resolveRoleScopedReseller(
 
 export async function loadResellerPicker(
   prisma: PrismaClient,
-  orgId: string
+  orgId: string,
+  allowedStationIds?: string[] | null
 ): Promise<ResellerPickerRow[]> {
   return prisma.reseller.findMany({
-    where: { orgId, deletedAt: null },
+    where: {
+      orgId,
+      deletedAt: null,
+      ...(allowedStationIds
+        ? {
+            resellerStations: {
+              some: { stationId: { in: allowedStationIds }, deletedAt: null },
+            },
+          }
+        : {}),
+    },
     select: { id: true, code: true, name: true, status: true },
     orderBy: { name: 'asc' },
   });

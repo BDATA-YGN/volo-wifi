@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Scale, X } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -126,16 +125,6 @@ const AnalyticsReconciliationSettlementsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Cash reconciliation — partner-declared totals vs system-computed payments by site and
-            tender type. Review attestations in{" "}
-            <Link href="/wifi/analytics/reconciliation/approvals">Reconciliation Approvals</Link> or
-            payment activity in{" "}
-            <Link href="/wifi/commerce/transactions/payments">Payments</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

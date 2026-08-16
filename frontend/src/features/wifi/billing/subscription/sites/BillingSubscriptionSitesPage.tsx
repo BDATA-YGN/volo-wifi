@@ -3,16 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  Alert,
-  Button,
-  Card,
-  Input,
-  Segmented,
-  Switch,
-  Typography,
-  theme,
-} from "antd";
+import { Alert, Button, Card, Input, Segmented, Switch, theme } from "antd";
 import { ReloadOutlined, SearchOutlined, WifiOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -25,7 +16,7 @@ import TierSummaryCards from "./components/TierSummaryCards";
 import TierGroupCollapse from "./components/TierGroupCollapse";
 import LicensedSitesTable from "./components/LicensedSitesTable";
 
-const { Paragraph } = Typography;
+
 
 const BillingSubscriptionSitesPage: React.FC = () => {
   const { token } = theme.useToken();
@@ -80,13 +71,6 @@ const BillingSubscriptionSitesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Billable WiFi sites per tenant subscription, grouped by capacity tier. Active sites
-            count toward the licensed site limit and monthly SaaS invoice.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

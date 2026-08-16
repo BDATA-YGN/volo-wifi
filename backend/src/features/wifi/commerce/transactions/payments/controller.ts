@@ -12,6 +12,10 @@ import {
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
 import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
+import {
   loadResellerPicker,
   resolveCommerceScope,
   type CommerceScope,
@@ -192,7 +196,8 @@ function serializePaymentDetail(row: PaymentDetailRow) {
 
 function buildListWhere(
   scope: CommerceScope,
-  query: AuthenticatedRequest['query']
+  query: AuthenticatedRequest['query'],
+  allowedStationIds: string[] | null = null
 ): Prisma.PaymentWhereInput {
   const search = typeof query.search === 'string' ? query.search.trim() : '';
   const method = typeof query.method === 'string' ? query.method.trim().toUpperCase() : '';
@@ -203,7 +208,15 @@ function buildListWhere(
   let orderFilter: Prisma.SaleOrderWhereInput = orderScopeFilter(scope);
 
   if (stationId) {
-    orderFilter = { ...orderFilter, stationId };
+    orderFilter = {
+      ...orderFilter,
+      stationId:
+        allowedStationIds && !allowedStationIds.includes(stationId)
+          ? { in: [] }
+          : stationId,
+    };
+  } else if (allowedStationIds) {
+    orderFilter = { ...orderFilter, stationId: { in: allowedStationIds } };
   }
 
   if (orderStatus && (SALE_STATUSES as readonly string[]).includes(orderStatus)) {
@@ -235,24 +248,32 @@ function buildListWhere(
 
 
 /** Revenue / tender stats — only count payments for completed sales. */
-function statsPaymentWhere(scope: CommerceScope): Prisma.PaymentWhereInput {
+function statsPaymentWhere(
+  scope: CommerceScope,
+  allowedStationIds: string[] | null = null
+): Prisma.PaymentWhereInput {
   const orderFilter = orderScopeFilter(scope);
   return {
     orgId: scope.orgId,
     order: {
       ...(typeof orderFilter === 'object' ? orderFilter : {}),
       status: 'PAID',
+      ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
     },
   };
 }
 
-function refundedPaymentWhere(scope: CommerceScope): Prisma.PaymentWhereInput {
+function refundedPaymentWhere(
+  scope: CommerceScope,
+  allowedStationIds: string[] | null = null
+): Prisma.PaymentWhereInput {
   const orderFilter = orderScopeFilter(scope);
   return {
     orgId: scope.orgId,
     order: {
       ...(typeof orderFilter === 'object' ? orderFilter : {}),
       status: 'REFUNDED',
+      ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
     },
   };
 }
@@ -296,12 +317,17 @@ export class CommerceTransactionsPaymentsController {
           }
         }
 
+        const allowedStationIds = orgId
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!)
+          : null;
         const [memberships, resellers, stations] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
-          orgId ? loadResellerPicker(this.prisma, orgId) : Promise.resolve([]),
+          orgId
+            ? loadResellerPicker(this.prisma, orgId, allowedStationIds)
+            : Promise.resolve([]),
           orgId
             ? this.prisma.wifiStation.findMany({
-                where: { orgId, deletedAt: null },
+                where: { orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
                 select: { id: true, code: true, name: true, status: true },
                 orderBy: { name: 'asc' },
               })
@@ -328,6 +354,13 @@ export class CommerceTransactionsPaymentsController {
           });
         }
 
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          scope.orgId,
+          req.user!
+        );
+
         if (!isUndefinedOrUndefinedString(req.params?.id)) {
           const idParam = req.params.id as string | string[];
           const id = Array.isArray(idParam) ? idParam[0] : idParam;
@@ -336,7 +369,10 @@ export class CommerceTransactionsPaymentsController {
             where: {
               id,
               orgId: scope.orgId,
-              order: orderScopeFilter(scope),
+              order: {
+                ...orderScopeFilter(scope),
+                ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
+              },
             },
             select: paymentDetailSelect,
           });
@@ -354,12 +390,12 @@ export class CommerceTransactionsPaymentsController {
           });
         }
 
-        const where = buildListWhere(scope, req.query);
+        const where = buildListWhere(scope, req.query, allowedStationIds);
         const { page, limit, skip, take } = parsePagination(req.query);
         const todayStart = startOfUtcDay();
         const monthStart = startOfUtcMonth();
-        const baseWhere = statsPaymentWhere(scope);
-        const refundedWhere = refundedPaymentWhere(scope);
+        const baseWhere = statsPaymentWhere(scope, allowedStationIds);
+        const refundedWhere = refundedPaymentWhere(scope, allowedStationIds);
 
         const [
           rows,
@@ -424,7 +460,7 @@ export class CommerceTransactionsPaymentsController {
             ? loadOrgMembershipOptions(this.prisma, adminId, isDeveloper)
             : Promise.resolve(undefined),
           scope.mode === 'org'
-            ? loadResellerPicker(this.prisma, scope.orgId)
+            ? loadResellerPicker(this.prisma, scope.orgId, allowedStationIds)
             : Promise.resolve(undefined),
         ]);
 

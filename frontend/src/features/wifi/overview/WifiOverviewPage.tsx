@@ -88,13 +88,6 @@ const WifiOverviewPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Operational KPI dashboard — live sessions, commerce velocity, and reconciliation health.
-            Widgets adapt to your console permissions and organization role.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
@@ -211,8 +204,8 @@ const WifiOverviewPage: React.FC = () => {
 
               {showActivity ? (
                 <DashboardActivityFeed
-                  sessions={dashboard.recentSessions}
-                  orders={dashboard.recentOrders}
+                  sessionHealth={dashboard.sessionHealth}
+                  partnerSales={dashboard.partnerSales}
                   currency={currency}
                   loading={loading}
                 />

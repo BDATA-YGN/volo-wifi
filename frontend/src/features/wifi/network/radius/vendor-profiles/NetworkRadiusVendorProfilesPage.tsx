@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { ClusterOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -15,7 +15,7 @@ import VendorProfilesTable from "./components/VendorProfilesTable";
 import VendorProfileFormDrawer from "./components/VendorProfileFormDrawer";
 import VendorProfileDetailDrawer from "./components/VendorProfileDetailDrawer";
 
-const { Paragraph } = Typography;
+
 
 const NetworkRadiusVendorProfilesPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -136,13 +136,6 @@ const NetworkRadiusVendorProfilesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            RADIUS vendor capability profiles — define which FreeRADIUS attributes each NAS
-            vendor/model supports. Used by WiFi sites and plan RADIUS policies.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

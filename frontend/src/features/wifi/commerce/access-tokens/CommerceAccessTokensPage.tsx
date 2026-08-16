@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { KeyRound } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -22,8 +21,6 @@ import AccessTokensTable from "./components/AccessTokensTable";
 import IssueTokenDrawer from "./components/IssueTokenDrawer";
 import TokenDetailDrawer from "./components/TokenDetailDrawer";
 import IssueSuccessModal from "./components/IssueSuccessModal";
-
-const { Paragraph } = Typography;
 
 const CommerceAccessTokensPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -97,7 +94,6 @@ const CommerceAccessTokensPage: React.FC = () => {
   const partnerLocked = Boolean(meta?.partnerLocked || meta?.mode === "partner");
   const showPartnerFilter =
     Boolean(orgId) && (partnerLocked || meta?.mode === "preview" || resellers.length > 0);
-  const isPreview = meta?.mode === "preview";
   const canSell = Boolean(activeCatalog?.canSell) && Boolean(resellerId);
   const contextReady = Boolean(orgId) || meta?.mode === "partner" || Boolean(meta?.orgId);
 
@@ -209,13 +205,6 @@ const CommerceAccessTokensPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Partner point-of-sale — issue voucher tokens, record payment, and track credential
-            lifecycle. Requires mapped sites, plan entitlements, and retail pricing from Steps 3–4.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
@@ -253,23 +242,9 @@ const CommerceAccessTokensPage: React.FC = () => {
               title="Partner not ready to sell"
               description={
                 <span>
-                  Configure sites, plan entitlements, and pricing in{" "}
-                  <Link href="/wifi/commerce/partners">Partner Directory</Link> and{" "}
-                  <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link>.
+                  This partner needs mapped sites, sellable plans, and retail prices before tokens
+                  can be issued.
                 </span>
-              }
-            />
-          ) : null}
-
-          {isPreview && contextReady && !partnerLocked ? (
-            <Alert
-              type="info"
-              showIcon
-              title="Admin preview mode"
-              description={
-                resellerId
-                  ? "Issuing tokens on behalf of the selected partner. Clear the Partner filter to list all org tokens. Pause/unlock follow token status; revoke is only before use; revert to sold is developer-only."
-                  : "Showing all partners’ tokens. Select a partner in Filters to narrow the list or issue tokens."
               }
             />
           ) : null}

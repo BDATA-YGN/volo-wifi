@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Tag, Typography, theme } from "antd";
 import { BarChart3, X } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -89,15 +88,6 @@ const AnalyticsTenantsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Cross-tenant sales and WiFi usage summary — revenue, orders, commission, and sessions
-            aggregated from daily stats and{" "}
-            <Link href="/wifi/commerce/transactions/orders">Orders</Link>. Manage tenants in{" "}
-            <Link href="/wifi/tenant/profile">Tenant Profile</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

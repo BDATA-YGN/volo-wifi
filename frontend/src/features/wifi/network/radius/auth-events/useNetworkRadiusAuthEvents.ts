@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import { useNetworkOrgListState } from "@/features/wifi/network/shared/useNetworkOrgListState";
 import * as Query from "./query";
 import { AUTO_REFRESH_MS } from "./constant";
@@ -57,7 +58,14 @@ export function useNetworkRadiusAuthEvents(
 
   const loadFormOptions = useCallback(async () => {
     const res = await Query.loadFormOptions(orgId);
-    return res.data as AuthEventsFormOptions;
+    const opts = res.data as AuthEventsFormOptions;
+    return {
+      ...opts,
+      stations: filterBySiteAllowList(
+        opts.stations ?? [],
+        sessionStationAllowList(orgId)
+      ),
+    };
   }, [orgId]);
 
   const loadEvent = useCallback(

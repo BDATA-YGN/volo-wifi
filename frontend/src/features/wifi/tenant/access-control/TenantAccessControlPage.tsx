@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { Shield } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -17,7 +17,7 @@ import MemberFormDrawer from "./components/MemberFormDrawer";
 import MemberDetailDrawer from "./components/MemberDetailDrawer";
 import ResetPasswordModal from "./components/ResetPasswordModal";
 
-const { Paragraph } = Typography;
+
 
 const TenantAccessControlPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -202,13 +202,6 @@ const TenantAccessControlPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Provision internal console accounts for your organization — create or link admins,
-            assign membership roles, and optionally restrict access to specific sites.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

@@ -15,7 +15,7 @@ export const AccessVoucherRunsCreateSchema = Joi.object({
     .message('Prefix must be 2–12 uppercase letters or digits')
     .allow('', null),
   note: Joi.string().trim().max(500).allow('', null),
-  stationId: Joi.string().uuid().allow(null),
+  stationId: Joi.string().uuid().required(),
 }).unknown(false);
 
 export const AccessVoucherRunsUpdateSchema = Joi.object({

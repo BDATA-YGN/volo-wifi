@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Server, X } from "lucide-react";
 import dayjs from "dayjs";
@@ -95,15 +94,6 @@ const AnalyticsNasInventoryPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            NAS device fleet report — routers, access points, and RADIUS clients across your sites.
-            Manage hardware in <Link href="/wifi/network/nas-devices">NAS Devices</Link> or review
-            site roll-up in{" "}
-            <Link href="/wifi/analytics/site-inventory">Site Inventory</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

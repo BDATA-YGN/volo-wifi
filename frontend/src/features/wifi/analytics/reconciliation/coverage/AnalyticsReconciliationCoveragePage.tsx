@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Archive, X } from "lucide-react";
 import dayjs from "dayjs";
@@ -105,16 +104,6 @@ const AnalyticsReconciliationCoveragePage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Sealed period coverage — how far partner-site payment data is covered by postings and
-            eligible for purge. Review workflow in{" "}
-            <Link href="/wifi/analytics/reconciliation/approvals">Reconciliation Approvals</Link>{" "}
-            or cash totals in{" "}
-            <Link href="/wifi/analytics/reconciliation/settlements">Settlements</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

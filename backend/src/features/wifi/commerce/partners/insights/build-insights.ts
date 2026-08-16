@@ -109,7 +109,8 @@ async function aggregateFromDailyStats(
   orgId: string,
   resellerId: string,
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationIds?: string[]
 ): Promise<PartnerInsightsPayload | null> {
   const [salesRows, usageRows] = await Promise.all([
     prisma.dailySalesStat.findMany({
@@ -118,6 +119,7 @@ async function aggregateFromDailyStats(
         resellerId,
         deletedAt: null,
         date: { gte: periodFrom, lte: periodTo },
+        ...(stationIds ? { stationId: { in: stationIds } } : {}),
       },
       select: {
         date: true,
@@ -138,6 +140,7 @@ async function aggregateFromDailyStats(
         resellerId,
         deletedAt: null,
         date: { gte: periodFrom, lte: periodTo },
+        ...(stationIds ? { stationId: { in: stationIds } } : {}),
       },
       select: {
         date: true,
@@ -262,7 +265,8 @@ async function aggregateFromLiveOrders(
   orgId: string,
   resellerId: string,
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationIds?: string[]
 ): Promise<PartnerInsightsPayload> {
   const orders = await prisma.saleOrder.findMany({
     where: {
@@ -270,6 +274,7 @@ async function aggregateFromLiveOrders(
       resellerId,
       status: 'PAID',
       soldAt: { gte: periodFrom, lte: periodTo },
+      ...(stationIds ? { stationId: { in: stationIds } } : {}),
     },
     select: {
       id: true,
@@ -374,19 +379,21 @@ export async function buildPartnerInsights(
   orgId: string,
   resellerId: string,
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationIds?: string[]
 ): Promise<PartnerInsightsPayload> {
   const aggregated = await aggregateFromDailyStats(
     prisma,
     orgId,
     resellerId,
     periodFrom,
-    periodTo
+    periodTo,
+    stationIds
   );
 
   const current =
     aggregated ??
-    (await aggregateFromLiveOrders(prisma, orgId, resellerId, periodFrom, periodTo));
+    (await aggregateFromLiveOrders(prisma, orgId, resellerId, periodFrom, periodTo, stationIds));
 
   const prev = previousPeriod(periodFrom, periodTo);
   const prevAggregated = await aggregateFromDailyStats(
@@ -394,11 +401,13 @@ export async function buildPartnerInsights(
     orgId,
     resellerId,
     prev.from,
-    prev.to
+    prev.to,
+    stationIds
   );
   const previousSummary =
     prevAggregated?.summary ??
-    (await aggregateFromLiveOrders(prisma, orgId, resellerId, prev.from, prev.to)).summary;
+    (await aggregateFromLiveOrders(prisma, orgId, resellerId, prev.from, prev.to, stationIds))
+      .summary;
 
   return {
     ...current,

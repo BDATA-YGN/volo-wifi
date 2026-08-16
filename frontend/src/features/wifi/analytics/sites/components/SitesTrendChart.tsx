@@ -7,12 +7,23 @@ import dayjs from "dayjs";
 import type { SiteDailyPoint } from "../types";
 import { formatMoney } from "../utils";
 
+type TrendGrain = "day" | "hour";
+
 type Props = {
   points: SiteDailyPoint[];
   currency: string;
   loading?: boolean;
   showActiveSites?: boolean;
+  grain?: TrendGrain;
 };
+
+function formatTrendLabel(date: string, grain: TrendGrain) {
+  return grain === "hour" ? dayjs(date).format("HH:00") : dayjs(date).format("D/M");
+}
+
+function formatTrendTooltip(date: string, grain: TrendGrain) {
+  return grain === "hour" ? dayjs(date).format("D MMM, HH:00") : dayjs(date).format("D MMM");
+}
 
 const COLORS = {
   revenue: "#1677ff",
@@ -56,10 +67,16 @@ const SitesTrendChart: React.FC<Props> = ({
   currency,
   loading,
   showActiveSites = true,
+  grain = "day",
 }) => {
   const { token } = theme.useToken();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const showEveryNth = points.length > 14 ? Math.ceil(points.length / 10) : 1;
+  const showEveryNth =
+    grain === "hour"
+      ? 2
+      : points.length > 14
+        ? Math.ceil(points.length / 10)
+        : 1;
 
   const { revenueLine, tokenLine, activeLine } = useMemo(() => {
     const revenues = points.map((p) => p.revenue);
@@ -80,7 +97,7 @@ const SitesTrendChart: React.FC<Props> = ({
   const hoverX = hoverIndex != null ? revenueLine[hoverIndex]?.x : null;
 
   return (
-    <Card size="small" title="Daily trend" loading={loading} styles={{ body: { padding: 16 } }}>
+    <Card size="small" title={grain === "hour" ? "Hourly trend" : "Daily trend"} loading={loading} styles={{ body: { padding: 16 } }}>
       {points.length === 0 ? (
         <Empty description="No activity in this period" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
@@ -109,7 +126,7 @@ const SitesTrendChart: React.FC<Props> = ({
                 }}
               >
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                  {dayjs(hoverPoint.date).format("D MMM")}
+                  {formatTrendTooltip(hoverPoint.date, grain)}
                 </div>
                 <div>Revenue: {formatMoney(hoverPoint.revenue, currency)}</div>
                 <div>Total tokens: {(hoverPoint.itemsCount ?? 0).toLocaleString()}</div>
@@ -247,7 +264,7 @@ const SitesTrendChart: React.FC<Props> = ({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {dayjs(point.date).format("D/M")}
+                    {formatTrendLabel(point.date, grain)}
                   </WifiMutedText>
                 ) : null}
               </div>

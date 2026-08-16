@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Alert, App, Button, Card, Col, Row, Typography, theme } from "antd";
+import { Alert, App, Button, Card, Col, Row, theme } from "antd";
 import {
   ArrowRightOutlined,
   EditOutlined,
@@ -27,7 +27,7 @@ import StationUsagePanel from "./components/StationUsagePanel";
 import RecentHistoryPanel from "./components/RecentHistoryPanel";
 import EditSubscriptionDrawer from "./components/EditSubscriptionDrawer";
 
-const { Paragraph } = Typography;
+
 
 const BillingSubscriptionPage: React.FC = () => {
   const { message } = App.useApp();
@@ -115,13 +115,6 @@ const BillingSubscriptionPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Manage tenant SaaS subscriptions — licensed site limits, billing cycle, and status.
-            Usage is calculated from active WiFi sites against the subscription cap.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

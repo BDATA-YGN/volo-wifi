@@ -5,6 +5,7 @@ import { useRequest } from "ahooks";
 import dayjs from "dayjs";
 import type { CommonListResponse } from "@/common/interface/interface";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   VoucherBatchDetail,
@@ -72,8 +73,10 @@ export function useAccessVoucherRuns() {
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as VoucherRunsFormOptions;
+    const scopedOrgId = targetOrgId ?? opts.scopedOrgId ?? opts.memberships[0]?.id;
     setFormOptions({
       ...opts,
+      stations: filterBySiteAllowList(opts.stations ?? [], sessionStationAllowList(scopedOrgId)),
       stationSizes: opts.stationSizes ?? [],
       canViewAllOrgs: Boolean(opts.canViewAllOrgs),
     });
@@ -87,6 +90,10 @@ export function useAccessVoucherRuns() {
       const hydrated = withOrg.data as VoucherRunsFormOptions;
       setFormOptions({
         ...hydrated,
+        stations: filterBySiteAllowList(
+          hydrated.stations ?? [],
+          sessionStationAllowList(onlyOrgId)
+        ),
         stationSizes: hydrated.stationSizes ?? [],
         canViewAllOrgs: Boolean(hydrated.canViewAllOrgs),
       });

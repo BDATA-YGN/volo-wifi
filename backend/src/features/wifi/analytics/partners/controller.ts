@@ -13,6 +13,10 @@ import {
 } from '@/features/wifi/shared/resolve-org';
 import { DEFAULT_PRESET, PERIOD_PRESETS, type PeriodPreset } from './constants';
 import { AnalyticsPartnersQuerySchema } from './schema';
+import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
 import {
   buildPartnerAnalytics,
@@ -77,12 +81,17 @@ export class AnalyticsPartnersController {
 
       if (req.query.formOptions === 'true') {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+        const allowedStationIds = orgIdParam
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+          : null;
         const [memberships, resellers, stations, stationSizes, org] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
-          orgIdParam ? loadResellerPicker(this.prisma, orgIdParam) : Promise.resolve([]),
+          orgIdParam
+            ? loadResellerPicker(this.prisma, orgIdParam, allowedStationIds)
+            : Promise.resolve([]),
           orgIdParam
             ? this.prisma.wifiStation.findMany({
-                where: { orgId: orgIdParam, deletedAt: null },
+                where: { orgId: orgIdParam, deletedAt: null, ...stationPkScope(allowedStationIds) },
                 select: {
                   id: true,
                   code: true,
@@ -170,12 +179,18 @@ export class AnalyticsPartnersController {
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
       const source = preset === 'today' ? 'live' : 'aggregated';
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgIdParam,
+        req.user!
+      );
       const analytics = await buildPartnerAnalytics(
         this.prisma,
         orgIdParam,
         periodFrom,
         periodTo,
-        { resellerId },
+        { resellerId, stationIds: allowedStationIds ?? undefined },
         { source }
       );
 

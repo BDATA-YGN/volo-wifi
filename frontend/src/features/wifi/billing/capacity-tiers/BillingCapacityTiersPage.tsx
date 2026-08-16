@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Card, Col, Row, Typography, theme } from "antd";
+import { Alert, App, Card, Col, Row, theme } from "antd";
 import { AppstoreOutlined, ArrowRightOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -15,7 +15,7 @@ import CapacityTiersToolbar, { type TierStatusFilter } from "./components/Capaci
 import CapacityTiersTable from "./components/CapacityTiersTable";
 import CapacityTierFormDrawer from "./components/CapacityTierFormDrawer";
 
-const { Paragraph } = Typography;
+
 
 const BillingCapacityTiersPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -137,14 +137,6 @@ const BillingCapacityTiersPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Define platform-wide site capacity types used when assigning WiFi sites and calculating
-            monthly license invoices. Configure tiers here before setting platform rates and
-            onboarding tenants.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PeriodPreset,
@@ -126,7 +127,10 @@ export function useAnalyticsSites(options: {
       }
       return {
         memberships: opts.memberships ?? prev.memberships,
-        stations: opts.stations ?? [],
+        stations: filterBySiteAllowList(
+          opts.stations ?? [],
+          sessionStationAllowList(targetOrgId)
+        ),
         stationSizes: opts.stationSizes ?? [],
         currency: opts.currency ?? prev.currency,
         canSwitchOrg: opts.canSwitchOrg,

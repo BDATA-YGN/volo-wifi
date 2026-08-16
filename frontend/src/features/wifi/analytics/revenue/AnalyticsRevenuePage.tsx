@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { TrendingUp } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -96,15 +95,6 @@ const AnalyticsRevenuePage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Revenue and order trends — gross and net revenue, commission, payments, and order volume
-            from daily, monthly, and yearly stats plus live{" "}
-            <Link href="/wifi/commerce/transactions/orders">Orders</Link> and{" "}
-            <Link href="/wifi/commerce/transactions/payments">Payments</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

@@ -116,15 +116,6 @@ const AnalyticsServicePlansPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Service plan uptake and revenue — tokens sold, orders, commission, and WiFi usage by plan
-            and quota type from daily stats and{" "}
-            <Link href="/wifi/commerce/transactions/orders">Orders</Link>. Configure plans in{" "}
-            <Link href="/wifi/catalog/service-plans">Service Plans</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

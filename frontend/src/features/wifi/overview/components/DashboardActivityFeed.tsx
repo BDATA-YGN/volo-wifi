@@ -3,122 +3,124 @@
 import React from "react";
 import { Card, Col, Row, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { OverviewRecentOrder, OverviewRecentSession } from "../types";
-import { formatWifiTime } from "@/features/wifi/shared/format";
-import { formatBytes, formatMoney, formatSessionStatus } from "../utils";
+import type { OverviewPartnerSales, OverviewSessionHealth } from "../types";
+import { formatMoney } from "../utils";
 
 const { Text } = Typography;
 
 type Props = {
-  sessions: OverviewRecentSession[];
-  orders: OverviewRecentOrder[];
+  sessionHealth: OverviewSessionHealth[];
+  partnerSales: OverviewPartnerSales[];
   currency: string;
   loading?: boolean;
 };
 
 const DashboardActivityFeed: React.FC<Props> = ({
-  sessions,
-  orders,
+  sessionHealth,
+  partnerSales,
   currency,
   loading,
 }) => {
-  const sessionColumns: ColumnsType<OverviewRecentSession> = [
-    {
-      title: "User",
-      dataIndex: "userName",
-      key: "userName",
-      ellipsis: true,
-      render: (v: string | null) => v ?? "—",
-    },
+  const healthColumns: ColumnsType<OverviewSessionHealth> = [
     {
       title: "Site",
-      dataIndex: "stationCode",
-      key: "stationCode",
-      width: 80,
-      render: (v: string | null) => v ?? "—",
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      width: 90,
-      render: (status: string, row) => (
-        <Tag color={row.isStalled ? "warning" : undefined}>
-          {row.isStalled ? "Stalled" : formatSessionStatus(status)}
-        </Tag>
+      key: "name",
+      render: (_, row) => (
+        <div>
+          <Text strong style={{ fontSize: 13 }}>
+            {row.name}
+          </Text>
+          <div>
+            <Text code style={{ fontSize: 10 }}>
+              {row.code}
+            </Text>
+          </div>
+        </div>
       ),
     },
     {
-      title: "Started",
-      dataIndex: "startedAt",
-      key: "startedAt",
-      width: 80,
-      render: (v: string) => formatWifiTime(v),
+      title: "Live",
+      dataIndex: "liveSessions",
+      key: "liveSessions",
+      width: 72,
+      align: "right",
+      render: (n: number) => (n > 0 ? <Tag color="processing">{n}</Tag> : n),
     },
     {
-      title: "Traffic",
-      key: "totalBytes",
+      title: "Stalled",
+      dataIndex: "stalledSessions",
+      key: "stalledSessions",
       width: 80,
       align: "right",
-      render: (_, row) => formatBytes(row.totalBytes),
+      render: (n: number) => (n > 0 ? <Tag color="warning">{n}</Tag> : n),
+    },
+    {
+      title: "Today",
+      dataIndex: "todaySessions",
+      key: "todaySessions",
+      width: 72,
+      align: "right",
     },
   ];
 
-  const orderColumns: ColumnsType<OverviewRecentOrder> = [
+  const partnerColumns: ColumnsType<OverviewPartnerSales> = [
     {
-      title: "Order",
-      dataIndex: "orderNo",
-      key: "orderNo",
-      render: (v: string) => <Text code style={{ fontSize: 11 }}>{v}</Text>,
-    },
-    {
-      title: "Context",
-      key: "context",
+      title: "Partner",
+      key: "name",
       render: (_, row) => (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {row.resellerCode ?? "—"} · {row.stationCode ?? "—"}
-        </Text>
+        <div>
+          <Text strong style={{ fontSize: 13 }}>
+            {row.name}
+          </Text>
+          <div>
+            <Text code style={{ fontSize: 10 }}>
+              {row.code}
+            </Text>
+          </div>
+        </div>
       ),
     },
     {
-      title: "Total",
-      key: "total",
-      width: 100,
+      title: "Orders",
+      dataIndex: "orders",
+      key: "orders",
+      width: 80,
       align: "right",
-      render: (_, row) => formatMoney(row.total, row.currency || currency),
     },
     {
-      title: "Time",
-      key: "soldAt",
-      width: 70,
-      render: (_, row) =>
-        row.soldAt ? formatWifiTime(row.soldAt) : "—",
+      title: "Revenue",
+      key: "revenue",
+      width: 120,
+      align: "right",
+      render: (_, row) => formatMoney(row.revenue, currency),
     },
   ];
 
   return (
     <Row gutter={[16, 16]}>
       <Col xs={24} lg={12}>
-        <Card size="small" title="Recent sessions (24h)" styles={{ body: { padding: 0 } }}>
-          <Table<OverviewRecentSession>
+        <Card size="small" title="Session health by site" styles={{ body: { padding: 0 } }}>
+          <Table<OverviewSessionHealth>
             size="small"
-            rowKey="sessionId"
+            rowKey="stationId"
             loading={loading}
-            dataSource={sessions}
-            columns={sessionColumns}
+            dataSource={sessionHealth}
+            columns={healthColumns}
             pagination={false}
+            locale={{ emptyText: "No session activity" }}
           />
         </Card>
       </Col>
       <Col xs={24} lg={12}>
-        <Card size="small" title="Recent orders (24h)" styles={{ body: { padding: 0 } }}>
-          <Table<OverviewRecentOrder>
+        <Card size="small" title="Partner sales (today)" styles={{ body: { padding: 0 } }}>
+          <Table<OverviewPartnerSales>
             size="small"
-            rowKey="orderId"
+            rowKey="resellerId"
             loading={loading}
-            dataSource={orders}
-            columns={orderColumns}
+            dataSource={partnerSales}
+            columns={partnerColumns}
             pagination={false}
+            locale={{ emptyText: "No partner sales today" }}
           />
         </Card>
       </Col>

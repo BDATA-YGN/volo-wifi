@@ -1,14 +1,67 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Alert, Button, Descriptions, Drawer, Spin, Table, Tag, Typography } from "antd";
-import type { ColumnsType } from "antd/es/table";
-import { formatWifiDateTime, maskVoucherToken } from "@/features/wifi/shared/format";
-import type { VoucherBatchDetail, VoucherBatchRecord, VoucherCredentialPreview } from "../types";
-import { CREDENTIAL_STATUS_COLOR } from "../constant";
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, Button, Card, Col, Descriptions, Drawer, Row, Spin, Tag, Typography, theme } from "antd";
+import { formatWifiDateTime } from "@/features/wifi/shared/format";
+import { formatStatusLabel } from "@/features/wifi/commerce/access-tokens/utils";
+import type { VoucherBatchDetail, VoucherBatchRecord } from "../types";
+import {
+  CREDENTIAL_STATUS_BAR,
+  CREDENTIAL_STATUS_COLOR,
+  CREDENTIAL_STATUS_ORDER,
+} from "../constant";
 import { canCancelVoucherRun, redemptionPercent } from "../utils";
 
 const { Text, Title, Paragraph } = Typography;
+
+type StatusBucket = {
+  key: string;
+  label: string;
+  count: number;
+  share: number;
+  color: string;
+  bar: string;
+};
+
+function buildStatusBuckets(
+  quantity: number,
+  remaining: number,
+  stats: Record<string, number> | undefined
+): StatusBucket[] {
+  const issued = Math.max(quantity, 1);
+  const buckets: StatusBucket[] = [];
+
+  if (remaining > 0) {
+    buckets.push({
+      key: "AVAILABLE",
+      label: "Available",
+      count: remaining,
+      share: Math.round((remaining / issued) * 1000) / 10,
+      color: CREDENTIAL_STATUS_COLOR.AVAILABLE,
+      bar: CREDENTIAL_STATUS_BAR.AVAILABLE,
+    });
+  }
+
+  const entries = Object.entries(stats ?? {}).filter(([, count]) => count > 0);
+  entries.sort((a, b) => {
+    const ai = CREDENTIAL_STATUS_ORDER.indexOf(a[0] as (typeof CREDENTIAL_STATUS_ORDER)[number]);
+    const bi = CREDENTIAL_STATUS_ORDER.indexOf(b[0] as (typeof CREDENTIAL_STATUS_ORDER)[number]);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || b[1] - a[1];
+  });
+
+  for (const [status, count] of entries) {
+    buckets.push({
+      key: status,
+      label: formatStatusLabel(status),
+      count,
+      share: Math.round((count / issued) * 1000) / 10,
+      color: CREDENTIAL_STATUS_COLOR[status] ?? "default",
+      bar: CREDENTIAL_STATUS_BAR[status] ?? "#8c8c8c",
+    });
+  }
+
+  return buckets;
+}
 
 type Props = {
   open: boolean;
@@ -27,6 +80,7 @@ const VoucherRunDetailDrawer: React.FC<Props> = ({
   onCancel,
   loadRun,
 }) => {
+  const { token } = theme.useToken();
   const [run, setRun] = useState<VoucherBatchDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -51,26 +105,13 @@ const VoucherRunDetailDrawer: React.FC<Props> = ({
 
   const row = run;
   const pct = row ? redemptionPercent(row.issued, row.remainingQuantity) : 0;
-
-  const credentialColumns: ColumnsType<VoucherCredentialPreview> = [
-    {
-      title: "Token",
-      dataIndex: "token",
-      render: (token: string) => (
-        <Text copyable={token ? { text: token, tooltips: ["Copy code", "Copied"] } : false} code>
-          {maskVoucherToken(token)}
-        </Text>
-      ),
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      width: 100,
-      render: (status: string) => (
-        <Tag color={CREDENTIAL_STATUS_COLOR[status] ?? "default"}>{status}</Tag>
-      ),
-    },
-  ];
+  const buckets = useMemo(
+    () =>
+      row
+        ? buildStatusBuckets(row.quantity, row.remainingQuantity, row.credentialStats)
+        : [],
+    [row]
+  );
 
   return (
     <Drawer
@@ -129,40 +170,57 @@ const VoucherRunDetailDrawer: React.FC<Props> = ({
               </Descriptions.Item>
             </Descriptions>
 
-            {row.credentialStats ? (
-              <div className="mb-3 flex flex-wrap gap-2">
-                {Object.entries(row.credentialStats).map(([status, count]) => (
-                  <Tag key={status} color={CREDENTIAL_STATUS_COLOR[status] ?? "default"}>
-                    {status}: {count}
-                  </Tag>
-                ))}
-              </div>
-            ) : null}
-
-            <Paragraph strong style={{ fontSize: 13 }}>
-              Issued voucher codes
-              {row.credentialsTruncated ? (
-                <Text type="secondary">
-                  {" "}
-                  (showing first {row.credentials.length} of {row.credentialsTotal})
+            <div className="mb-1">
+              <Text strong>Status breakdown</Text>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  How this run’s {row.quantity.toLocaleString()} vouchers are used
                 </Text>
-              ) : null}
-            </Paragraph>
+              </div>
+            </div>
 
-            {(row.credentials ?? []).length === 0 ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                No codes sold yet — partners issue 6-character codes from Access Tokens when this
-                run has available capacity.
-              </Text>
+            {buckets.length > 0 ? (
+              <>
+                <div
+                  className="mb-3 mt-2 flex overflow-hidden"
+                  style={{ height: 12, borderRadius: token.borderRadiusSM, background: token.colorFillSecondary }}
+                >
+                  {buckets.map((bucket) => (
+                    <div
+                      key={bucket.key}
+                      title={`${bucket.label}: ${bucket.count.toLocaleString()} (${bucket.share}%)`}
+                      style={{
+                        width: `${Math.max(bucket.share, bucket.count > 0 ? 1.5 : 0)}%`,
+                        background: bucket.bar,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <Row gutter={[8, 8]}>
+                  {buckets.map((bucket) => (
+                    <Col xs={12} sm={8} key={bucket.key}>
+                      <Card size="small" styles={{ body: { padding: "10px 12px" } }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <Tag color={bucket.color} style={{ marginInlineEnd: 0 }}>
+                            {bucket.label}
+                          </Tag>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {bucket.share}%
+                          </Text>
+                        </div>
+                        <Title level={4} style={{ margin: "6px 0 0" }}>
+                          {bucket.count.toLocaleString()}
+                        </Title>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </>
             ) : (
-              <Table<VoucherCredentialPreview>
-                rowKey="id"
-                size="small"
-                pagination={false}
-                columns={credentialColumns}
-                dataSource={row.credentials ?? []}
-                scroll={{ y: 280 }}
-              />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                No tokens have been sold from this run yet.
+              </Text>
             )}
           </>
         ) : (

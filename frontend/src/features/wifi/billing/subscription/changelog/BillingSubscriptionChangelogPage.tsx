@@ -3,14 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  Alert,
-  Button,
-  Card,
-  Segmented,
-  Typography,
-  theme,
-} from "antd";
+import { Alert, Button, Card, Segmented, theme } from "antd";
 import { HistoryOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -23,7 +16,7 @@ import ChangelogFilters from "./components/ChangelogFilters";
 import ChangelogTable from "./components/ChangelogTable";
 import ChangelogTimeline from "./components/ChangelogTimeline";
 
-const { Paragraph } = Typography;
+
 
 const BillingSubscriptionChangelogPage: React.FC = () => {
   const { token } = theme.useToken();
@@ -83,13 +76,6 @@ const BillingSubscriptionChangelogPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Audit history for subscription changes — site limits, status updates, and tier-rate
-            adjustments. Entries are recorded automatically and cannot be edited here.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

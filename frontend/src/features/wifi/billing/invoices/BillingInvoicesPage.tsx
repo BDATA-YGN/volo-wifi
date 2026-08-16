@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import { useSearchParams } from "next/navigation";
-import { Alert, App, Button, Card, Typography, theme } from "antd";
+import { Alert, App, Button, Card, theme } from "antd";
 import { FileTextOutlined, ReloadOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -15,7 +15,7 @@ import InvoicesTable from "./components/InvoicesTable";
 import InvoiceDetailDrawer from "./components/InvoiceDetailDrawer";
 import RecordPaymentDrawer from "./components/RecordPaymentDrawer";
 
-const { Paragraph } = Typography;
+
 
 const BillingInvoicesPage: React.FC = () => {
   const { message } = App.useApp();
@@ -97,13 +97,6 @@ const BillingInvoicesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Monthly SaaS invoices for tenant subscriptions — one line item per active site capacity
-            tier. Track issuance, payments, and outstanding balances.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

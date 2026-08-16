@@ -22,12 +22,3 @@ export function formatBytes(bytes: number): string {
 export function formatPersona(persona: string): string {
   return PERSONA_LABELS[persona] ?? persona.replace(/_/g, " ");
 }
-
-export function formatSessionStatus(status: string): string {
-  const map: Record<string, string> = {
-    START: "Started",
-    INTERIM: "Interim",
-    STOP: "Stopped",
-  };
-  return map[status] ?? status;
-}

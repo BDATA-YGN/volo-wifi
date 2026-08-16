@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { KeyOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -14,7 +14,7 @@ import RadiusProfilesToolbar from "./components/RadiusProfilesToolbar";
 import RadiusProfilesTable from "./components/RadiusProfilesTable";
 import RadiusProfileFormDrawer from "./components/RadiusProfileFormDrawer";
 
-const { Paragraph } = Typography;
+
 
 const NetworkRadiusProfilesPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -119,13 +119,6 @@ const NetworkRadiusProfilesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Org-scoped FreeRADIUS servers (typically one or two per tenant). NAS devices select
-            which server to use; each device keeps its own NAS client short name and shared secret.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

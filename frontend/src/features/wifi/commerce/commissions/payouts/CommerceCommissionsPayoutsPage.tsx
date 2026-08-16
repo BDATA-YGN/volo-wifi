@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { HandCoins } from "lucide-react";
 import type { Dayjs } from "dayjs";
 
@@ -17,7 +17,7 @@ import PayoutsTable from "./components/PayoutsTable";
 import PayoutFormDrawer from "./components/PayoutFormDrawer";
 import PayoutDetailDrawer from "./components/PayoutDetailDrawer";
 
-const { Paragraph } = Typography;
+
 
 const CommerceCommissionsPayoutsPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -155,14 +155,6 @@ const CommerceCommissionsPayoutsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Partner commission payout workflow — generate drafts from paid sales, review against{" "}
-            <Link href="/wifi/commerce/commissions/rules">Commission Rules</Link>, approve, and
-            record when funds are transferred.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

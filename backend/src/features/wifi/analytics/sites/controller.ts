@@ -12,6 +12,10 @@ import {
 } from '@/features/wifi/shared/resolve-org';
 import { DEFAULT_PRESET, PERIOD_PRESETS, type PeriodPreset } from './constants';
 import { AnalyticsSitesQuerySchema } from './schema';
+import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
 import {
   buildSiteAnalytics,
@@ -84,11 +88,14 @@ export class AnalyticsSitesController {
 
       if (req.query.formOptions === 'true') {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+        const allowedStationIds = orgIdParam
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+          : null;
         const [memberships, stations, stationSizes, org] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgIdParam
             ? this.prisma.wifiStation.findMany({
-                where: { orgId: orgIdParam, deletedAt: null },
+                where: { orgId: orgIdParam, deletedAt: null, ...stationPkScope(allowedStationIds) },
                 select: {
                   id: true,
                   code: true,
@@ -187,12 +194,19 @@ export class AnalyticsSitesController {
           ? Math.min(Math.floor(limitRaw), 100)
           : DEFAULT_LIMIT;
 
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgIdParam,
+        req.user!
+      );
+
       if (stationId) {
         const station = await this.prisma.wifiStation.findFirst({
           where: { id: stationId, orgId: orgIdParam, deletedAt: null },
           select: { id: true },
         });
-        if (!station) {
+        if (!station || (allowedStationIds && !allowedStationIds.includes(station.id))) {
           return responseError(res, 400, {
             code: 'INVALID_STATION',
             message: 'Site not found in this organization.',
@@ -258,7 +272,7 @@ export class AnalyticsSitesController {
           orgIdParam,
           periodFrom,
           periodTo,
-          { stationId, stationSizeId },
+          { stationId, stationSizeId, allowedStationIds },
           { view, page, limit, source }
         ),
         this.prisma.org.findUnique({

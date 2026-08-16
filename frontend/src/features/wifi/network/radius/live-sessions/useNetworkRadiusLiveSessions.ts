@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import { useNetworkOrgListState } from "@/features/wifi/network/shared/useNetworkOrgListState";
 import * as Query from "./query";
 import { AUTO_REFRESH_MS } from "./constant";
@@ -55,8 +56,16 @@ export function useNetworkRadiusLiveSessions(
   const { orgId } = listState;
 
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
-    const res = await Query.loadFormOptions(targetOrgId ?? orgId);
-    return res.data as LiveSessionsFormOptions;
+    const scopedOrgId = targetOrgId ?? orgId;
+    const res = await Query.loadFormOptions(scopedOrgId);
+    const opts = res.data as LiveSessionsFormOptions;
+    return {
+      ...opts,
+      stations: filterBySiteAllowList(
+        opts.stations ?? [],
+        sessionStationAllowList(scopedOrgId)
+      ),
+    };
   }, [orgId]);
 
   const loadSession = useCallback(

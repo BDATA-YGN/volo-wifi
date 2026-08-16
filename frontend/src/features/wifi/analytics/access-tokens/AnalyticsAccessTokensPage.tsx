@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { KeyRound, X } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -108,16 +107,6 @@ const AnalyticsAccessTokensPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Access token lifecycle analytics — inventory, sold, activated, expired, revoked, and
-            archived credentials from the{" "}
-            <Link href="/wifi/commerce/access-tokens">Access Tokens</Link> ledger. Issue and manage
-            tokens from commerce or{" "}
-            <Link href="/wifi/access/voucher-runs">Voucher Runs</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

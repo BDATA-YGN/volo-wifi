@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Ticket, X } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
@@ -125,15 +124,6 @@ const AnalyticsVoucherRunsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Voucher batch utilization — runs created in the selected period with redemption
-            rates and credential status breakdown. Issue new batches from{" "}
-            <Link href="/wifi/access/voucher-runs">Voucher Runs</Link> or review token lifecycle in{" "}
-            <Link href="/wifi/analytics/access-tokens">Access Token Analytics</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

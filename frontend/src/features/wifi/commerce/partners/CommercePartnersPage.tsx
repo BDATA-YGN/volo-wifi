@@ -2,8 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { Handshake } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -16,8 +15,6 @@ import PartnersTable from "./components/PartnersTable";
 import PartnerFormDrawer from "./components/PartnerFormDrawer";
 import PartnerDetailDrawer from "./components/PartnerDetailDrawer";
 import PartnerResetPasswordModal from "./components/PartnerResetPasswordModal";
-
-const { Paragraph } = Typography;
 
 const CommercePartnersPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -74,8 +71,6 @@ const CommercePartnersPage: React.FC = () => {
   const memberships = meta?.memberships ?? formOptions.memberships;
   const showSwitcher = memberships.length > 1;
   const needsOrg = initDone && !orgId && memberships.length > 1;
-  const noSites = formOptions.stations.length === 0;
-  const noPlans = formOptions.plans.length === 0;
 
   const openCreate = () => {
     setEditing(null);
@@ -180,16 +175,6 @@ const CommercePartnersPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Onboard reseller partners with a console login, mapped sites, and sellable plans in one
-            step. Partners sign in with the PARTNER role and sell tokens under{" "}
-            <Link href="/wifi/commerce/access-tokens">Access Tokens</Link>. Set partner/site prices
-            under <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link> (organization
-            default, reseller, or site books).
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
@@ -222,35 +207,6 @@ const CommercePartnersPage: React.FC = () => {
 
           {orgId ? (
             <>
-              {noSites ? (
-                <Alert
-                  type="warning"
-                  showIcon
-                  title="No sites configured"
-                  description={
-                    <span>
-                      Partners need mapped WiFi sites for POS.{" "}
-                      <Link href="/wifi/sites">Open Site Directory</Link>
-                    </span>
-                  }
-                />
-              ) : null}
-
-              {noPlans ? (
-                <Alert
-                  type="warning"
-                  showIcon
-                  title="No service plans"
-                  description={
-                    <span>
-                      Create plans to assign sellable entitlements, then set prices in{" "}
-                      <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link>.{" "}
-                      <Link href="/wifi/catalog/service-plans">Open Service Plans</Link>
-                    </span>
-                  }
-                />
-              ) : null}
-
               <PartnersStats meta={meta} loading={loading} />
 
               <Card

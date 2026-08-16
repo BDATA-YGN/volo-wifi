@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Alert, Card, Typography, theme } from "antd";
+import { Alert, Card, theme } from "antd";
 import { Wifi } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -13,8 +13,6 @@ import LiveSessionsStats from "./components/LiveSessionsStats";
 import LiveSessionsToolbar from "./components/LiveSessionsToolbar";
 import LiveSessionsTable from "./components/LiveSessionsTable";
 import LiveSessionDetailDrawer from "./components/LiveSessionDetailDrawer";
-
-const { Paragraph } = Typography;
 
 const emptyFormOptions: LiveSessionsFormOptions = {
   orgs: [],
@@ -86,14 +84,6 @@ const NetworkRadiusLiveSessionsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Monitor active and recent RADIUS accounting sessions — subscriber identity, NAS
-            endpoints, usage counters, and session lifecycle. Data is read-only and updated from
-            FreeRADIUS accounting packets.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

@@ -1,6 +1,7 @@
 "use client";
 import DashLayout from "@/common/components/Layout";
 import MaintenanceGate from "@/common/components/MaintenanceGate";
+import RouteGuard from "@/common/components/RouteGuard";
 import React, { ReactNode, useEffect } from "react";
 import { useSocketStatus } from "@/lib/socket/SocketProvider";
 import { useGlobalAppSettings } from "@/features/system/app-setting/useGlobalAppSettings";
@@ -23,7 +24,9 @@ const RootLayout = ({ children }: { children: ReactNode }) => {
   return (
     <DashLayout>
       <AppSettingsStoreBootstrap />
-      <MaintenanceGate>{children}</MaintenanceGate>
+      <MaintenanceGate>
+        <RouteGuard>{children}</RouteGuard>
+      </MaintenanceGate>
     </DashLayout>
   );
 };

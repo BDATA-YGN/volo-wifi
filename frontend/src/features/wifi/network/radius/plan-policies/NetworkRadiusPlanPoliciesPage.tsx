@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { SafetyOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -19,7 +19,7 @@ import PlanPoliciesToolbar from "./components/PlanPoliciesToolbar";
 import PlanPoliciesTable from "./components/PlanPoliciesTable";
 import PlanPolicyFormDrawer from "./components/PlanPolicyFormDrawer";
 
-const { Paragraph } = Typography;
+
 
 const emptyFormOptions: PlanPoliciesFormOptions = {
   orgs: [],
@@ -147,13 +147,6 @@ const NetworkRadiusPlanPoliciesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Per-plan RADIUS reply policies — one row per plan + vendor profile + site set (global or
-            one-to-many sites). Edit a policy to manage sites and attribute rows together.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

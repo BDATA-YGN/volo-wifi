@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
 import type { CommonListResponse } from "@/common/interface/interface";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   AccessTokenDetail,
@@ -49,13 +50,32 @@ export function useCommerceAccessTokens() {
 
   const list = ((data as CommonListResponse | undefined)?.data ?? []) as AccessTokenRecord[];
   const meta = (data as CommonListResponse | undefined)?.meta as AccessTokensMeta | undefined;
-  const catalog = meta?.catalog ?? formOptions.catalog;
+  const rawCatalog = meta?.catalog ?? formOptions.catalog;
+  const catalog = rawCatalog
+    ? {
+        ...rawCatalog,
+        stations: filterBySiteAllowList(
+          rawCatalog.stations ?? [],
+          sessionStationAllowList(orgId)
+        ),
+      }
+    : rawCatalog;
 
   const loadFormOptions = useCallback(async (targetOrgId?: string, targetResellerId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId, targetResellerId);
     const opts = res.data as AccessTokensFormOptions;
     const bootstrap = res.meta as AccessTokensMeta | undefined;
-    setFormOptions(opts);
+    const scopedOrgId = targetOrgId ?? bootstrap?.orgId ?? opts.memberships[0]?.id;
+    const allowedIds = sessionStationAllowList(scopedOrgId);
+    setFormOptions({
+      ...opts,
+      catalog: opts.catalog
+        ? {
+            ...opts.catalog,
+            stations: filterBySiteAllowList(opts.catalog.stations ?? [], allowedIds),
+          }
+        : null,
+    });
     if (bootstrap?.orgId) {
       setOrgId(bootstrap.orgId);
     } else if (!targetOrgId && opts.memberships.length === 1) {

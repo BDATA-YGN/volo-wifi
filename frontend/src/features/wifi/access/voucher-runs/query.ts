@@ -5,6 +5,7 @@ import { handleApiError } from "@/common/exceptions/handleApiError";
 import type { CommonListResponse, CommonResponse } from "@/common/interface/interface";
 import { ACCESS_VOUCHER_RUNS_API } from "./constant";
 import type {
+  SitePlanBalance,
   VoucherRunFormValues,
   VoucherRunsFormOptions,
   VoucherRunsListParams,
@@ -50,6 +51,24 @@ export const loadFormOptions = async (
   try {
     const res = await apiClient.get(ACCESS_VOUCHER_RUNS_API.listOrDetails(), {
       params: { formOptions: "true", orgId: orgId || undefined },
+    });
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
+export const loadSiteBalance = async (
+  stationId: string,
+  orgId?: string
+): Promise<CommonResponse & { data: SitePlanBalance }> => {
+  try {
+    const res = await apiClient.get(ACCESS_VOUCHER_RUNS_API.listOrDetails(), {
+      params: {
+        siteBalance: "true",
+        stationId,
+        orgId: orgId || undefined,
+      },
     });
     return res.data;
   } catch (error) {

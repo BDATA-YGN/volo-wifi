@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Building2, X } from "lucide-react";
 import dayjs from "dayjs";
@@ -95,15 +94,6 @@ const AnalyticsSiteInventoryPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Site status roll-up — fleet inventory across capacity tiers, NAS devices, and RADIUS
-            readiness. Manage sites in <Link href="/wifi/sites">Sites</Link>, devices in{" "}
-            <Link href="/wifi/network/nas-devices">NAS Devices</Link>, or usage trends in{" "}
-            <Link href="/wifi/analytics/sites">Site Analytics</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

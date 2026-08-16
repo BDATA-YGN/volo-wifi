@@ -13,8 +13,11 @@ import {
   loadOrgMembershipOptions,
   resolveOrgIdForAdmin,
 } from '@/features/wifi/shared/resolve-org';
-import { CREDENTIAL_PREVIEW_LIMIT } from './constants';
 import { AccessVoucherRunsCreateSchema, AccessVoucherRunsUpdateSchema } from './schema';
+import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 
 const batchSelect = {
   id: true,
@@ -48,16 +51,6 @@ const batchSelect = {
     select: { id: true, fullName: true, username: true, email: true },
   },
 } satisfies Prisma.VoucherBatchSelect;
-
-const credentialBriefSelect = {
-  id: true,
-  token: true,
-  status: true,
-  createdAt: true,
-  soldAt: true,
-  activatedAt: true,
-  revokedAt: true,
-} satisfies Prisma.CredentialSelect;
 
 type BatchRow = Prisma.VoucherBatchGetPayload<{ select: typeof batchSelect }>;
 type BatchRowWithCount = BatchRow & { _count?: { credentials: number } };
@@ -224,7 +217,8 @@ function parseDateBoundary(value: string, endOfDay: boolean): Date | null {
 
 function buildListWhere(
   orgId: string | undefined,
-  query: AuthenticatedRequest['query']
+  query: AuthenticatedRequest['query'],
+  allowedStationIds: string[] | null = null
 ): Prisma.VoucherBatchWhereInput {
   const where: Prisma.VoucherBatchWhereInput = {
     deletedAt: null,
@@ -243,7 +237,14 @@ function buildListWhere(
     typeof query.hasBalance === 'string' ? query.hasBalance.trim().toLowerCase() : '';
 
   if (planId) where.planId = planId;
-  if (stationId) where.stationId = stationId;
+  if (stationId) {
+    where.stationId =
+      allowedStationIds && !allowedStationIds.includes(stationId)
+        ? { in: [] }
+        : stationId;
+  } else if (allowedStationIds) {
+    where.stationId = { in: allowedStationIds };
+  }
 
   const stationFilter: Prisma.WifiStationWhereInput = {};
   if (township) {
@@ -313,6 +314,9 @@ export class AccessVoucherRunsController {
         }
 
         const loadAllCatalog = canViewAllOrgs && !orgId;
+        const allowedStationIds = orgId
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!)
+          : null;
 
         const [memberships, plans, stations, stationSizes] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
@@ -333,6 +337,7 @@ export class AccessVoucherRunsController {
                   deletedAt: null,
                   status: 'ACTIVE',
                   ...(orgId ? { orgId } : {}),
+                  ...stationPkScope(allowedStationIds),
                 },
                 select: stationOptionSelect,
                 orderBy: [{ org: { code: 'asc' } }, { name: 'asc' }],
@@ -356,6 +361,115 @@ export class AccessVoucherRunsController {
             canSwitchOrg: isDeveloper || memberships.length > 1,
             requiresOrgSelection: !canViewAllOrgs && !orgId && memberships.length > 1,
             scopedOrgId: orgId ?? null,
+          },
+        });
+      }
+
+      if (req.query.siteBalance === 'true') {
+        const stationId =
+          typeof req.query.stationId === 'string' ? req.query.stationId.trim() : '';
+        if (!stationId) {
+          return responseError(res, 400, {
+            code: 'STATION_REQUIRED',
+            message: 'Select a site to view remaining balance by plan.',
+          });
+        }
+
+        const station = await this.prisma.wifiStation.findFirst({
+          where: { id: stationId, deletedAt: null },
+          select: { id: true, code: true, name: true, orgId: true },
+        });
+        if (!station) {
+          return responseError(res, 404, {
+            code: 'NOT_FOUND',
+            message: 'Site not found.',
+          });
+        }
+
+        if (!isDeveloper) {
+          let orgId: string;
+          try {
+            orgId = await resolveOrgFromRequest(this.prisma, req);
+          } catch (err: unknown) {
+            const message =
+              err instanceof Error ? err.message : 'Organization context is required.';
+            return responseError(res, 400, { code: 'ORG_REQUIRED', message });
+          }
+          if (station.orgId !== orgId) {
+            return responseError(res, 403, {
+              code: 'FORBIDDEN_ORG',
+              message: 'You do not have access to this site.',
+            });
+          }
+        }
+
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          station.orgId,
+          req.user!
+        );
+        if (allowedStationIds && !allowedStationIds.includes(station.id)) {
+          return responseError(res, 403, {
+            code: 'SITE_NOT_ALLOWED',
+            message: 'This site is not on your allow-list.',
+          });
+        }
+
+        const [plans, batches] = await Promise.all([
+          this.prisma.plan.findMany({
+            where: { orgId: station.orgId, deletedAt: null, isActive: true },
+            select: { id: true, code: true, name: true },
+            orderBy: [{ name: 'asc' }, { code: 'asc' }],
+          }),
+          this.prisma.voucherBatch.findMany({
+            where: {
+              orgId: station.orgId,
+              deletedAt: null,
+              resellerId: null,
+              remainingQuantity: { gt: 0 },
+              OR: [{ stationId: null }, { stationId: station.id }],
+            },
+            select: { planId: true, stationId: true, remainingQuantity: true },
+          }),
+        ]);
+
+        const byPlan = new Map<
+          string,
+          { siteRemaining: number; sharedRemaining: number; runCount: number }
+        >();
+        for (const batch of batches) {
+          const bucket = byPlan.get(batch.planId) ?? {
+            siteRemaining: 0,
+            sharedRemaining: 0,
+            runCount: 0,
+          };
+          if (batch.stationId === station.id) bucket.siteRemaining += batch.remainingQuantity;
+          else bucket.sharedRemaining += batch.remainingQuantity;
+          bucket.runCount += 1;
+          byPlan.set(batch.planId, bucket);
+        }
+
+        return responseSuccess(res, {
+          message: 'Success',
+          data: {
+            station: { id: station.id, code: station.code, name: station.name },
+            plans: plans.map((plan) => {
+              const bucket = byPlan.get(plan.id) ?? {
+                siteRemaining: 0,
+                sharedRemaining: 0,
+                runCount: 0,
+              };
+              return {
+                planId: plan.id,
+                code: plan.code,
+                name: plan.name,
+                remaining: bucket.siteRemaining + bucket.sharedRemaining,
+                siteRemaining: bucket.siteRemaining,
+                sharedRemaining: bucket.sharedRemaining,
+                runCount: bucket.runCount,
+              };
+            }),
           },
         });
       }
@@ -403,20 +517,11 @@ export class AccessVoucherRunsController {
 
         const credWhere = credentialWhereForBatch(batch.id);
 
-        const [statusGroups, credentials, totalCredentials] = await Promise.all([
-          this.prisma.credential.groupBy({
-            by: ['status'],
-            where: credWhere,
-            _count: { _all: true },
-          }),
-          this.prisma.credential.findMany({
-            where: credWhere,
-            select: credentialBriefSelect,
-            orderBy: [{ soldAt: 'desc' }, { createdAt: 'desc' }],
-            take: CREDENTIAL_PREVIEW_LIMIT,
-          }),
-          this.prisma.credential.count({ where: credWhere }),
-        ]);
+        const statusGroups = await this.prisma.credential.groupBy({
+          by: ['status'],
+          where: credWhere,
+          _count: { _all: true },
+        });
 
         const credentialStats = Object.fromEntries(
           statusGroups.map((g) => [g.status, g._count._all])
@@ -427,15 +532,6 @@ export class AccessVoucherRunsController {
           data: {
             ...serializeBatch(batch),
             credentialStats,
-            credentials: credentials.map((c) => ({
-              ...c,
-              createdAt: c.createdAt.toISOString(),
-              soldAt: c.soldAt?.toISOString() ?? null,
-              activatedAt: c.activatedAt?.toISOString() ?? null,
-              revokedAt: c.revokedAt?.toISOString() ?? null,
-            })),
-            credentialsTotal: totalCredentials,
-            credentialsTruncated: totalCredentials > CREDENTIAL_PREVIEW_LIMIT,
           },
           meta: {
             canViewAllOrgs,
@@ -446,7 +542,10 @@ export class AccessVoucherRunsController {
         });
       }
 
-      const where = buildListWhere(orgId, req.query);
+      const allowedStationIds = orgId
+        ? await resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!)
+        : null;
+      const where = buildListWhere(orgId, req.query, allowedStationIds);
       const { page, limit, skip, take } = parsePagination(req.query);
 
       const [rows, total, totals] = await Promise.all([
@@ -576,17 +675,28 @@ export class AccessVoucherRunsController {
         });
       }
 
-      if (value.stationId) {
-        const station = await this.prisma.wifiStation.findFirst({
-          where: { id: value.stationId, orgId, deletedAt: null },
-          select: { id: true },
+      const station = await this.prisma.wifiStation.findFirst({
+        where: { id: value.stationId, orgId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!station) {
+        return responseError(res, 400, {
+          code: 'VALIDATION_ERROR',
+          message: 'Selected site is invalid for this organization.',
         });
-        if (!station) {
-          return responseError(res, 400, {
-            code: 'VALIDATION_ERROR',
-            message: 'Selected site is invalid for this organization.',
-          });
-        }
+      }
+
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
+      if (allowedStationIds && !allowedStationIds.includes(station.id)) {
+        return responseError(res, 403, {
+          code: 'SITE_NOT_ALLOWED',
+          message: 'This site is not on your allow-list.',
+        });
       }
 
       const batchNo = value.batchNo?.trim().toUpperCase() || generateBatchNo();
@@ -614,7 +724,7 @@ export class AccessVoucherRunsController {
           remainingQuantity: quantity,
           prefix,
           note: value.note || null,
-          stationId: value.stationId ?? null,
+          stationId: value.stationId,
           resellerId: null,
           createdByAdminId: adminId,
         },

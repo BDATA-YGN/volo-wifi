@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { Tags } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -16,7 +16,7 @@ import PriceBooksTable from "./components/PriceBooksTable";
 import PriceBookFormDrawer from "./components/PriceBookFormDrawer";
 import PricesDrawer from "./components/PricesDrawer";
 
-const { Paragraph } = Typography;
+
 
 const CatalogRetailPricingPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -175,14 +175,6 @@ const CatalogRetailPricingPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Retail price books for service plans — set organization defaults or override prices per
-            reseller or site. Plans are defined on{" "}
-            <Link href="/wifi/catalog/service-plans">Service Plans</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

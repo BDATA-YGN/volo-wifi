@@ -12,6 +12,11 @@ import {
   scopedNetworkFormOrgs,
   toNetworkOrgMeta,
 } from '@/features/wifi/network/shared/resolve-network-org';
+import {
+  resolveAllowedStationIds,
+  stationFkScope,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 
 const orgSelect = {
   id: true,
@@ -85,20 +90,29 @@ function parseDate(value: unknown): Date | undefined {
 
 function baseScopeWhere(
   query: AuthenticatedRequest['query'],
-  orgId: string
+  orgId: string,
+  allowedStationIds: string[] | null = null
 ): Prisma.RadiusSessionWhereInput {
   const stationId = typeof query.stationId === 'string' ? query.stationId.trim() : '';
 
   const where: Prisma.RadiusSessionWhereInput = { orgId };
-  if (stationId) where.stationId = stationId;
+  if (stationId) {
+    where.stationId =
+      allowedStationIds && !allowedStationIds.includes(stationId)
+        ? { in: [] }
+        : stationId;
+  } else {
+    Object.assign(where, stationFkScope(allowedStationIds));
+  }
   return where;
 }
 
 function buildListWhere(
   query: AuthenticatedRequest['query'],
-  orgId: string
+  orgId: string,
+  allowedStationIds: string[] | null = null
 ): Prisma.RadiusSessionWhereInput {
-  const where = baseScopeWhere(query, orgId);
+  const where = baseScopeWhere(query, orgId, allowedStationIds);
   const status = typeof query.status === 'string' ? query.status.trim().toUpperCase() : '';
   const view = typeof query.view === 'string' ? query.view.trim().toLowerCase() : 'active';
   const search = typeof query.search === 'string' ? query.search.trim() : '';
@@ -196,10 +210,16 @@ export class NetworkRadiusLiveSessionsController {
       }
 
       const { orgId } = scope;
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
 
       if (req.query.formOptions === 'true') {
         const stations = await this.prisma.wifiStation.findMany({
-          where: { orgId, deletedAt: null },
+          where: { orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
           select: stationSelect,
           orderBy: { name: 'asc' },
         });
@@ -215,7 +235,7 @@ export class NetworkRadiusLiveSessionsController {
         const idParam = req.params.id as string | string[];
         const id = Array.isArray(idParam) ? idParam[0] : idParam;
         const row = await this.prisma.radiusSession.findFirst({
-          where: { id, orgId },
+          where: { id, orgId, ...stationFkScope(allowedStationIds) },
           select: sessionSelect,
         });
 
@@ -234,8 +254,8 @@ export class NetworkRadiusLiveSessionsController {
       }
 
       const view = typeof req.query.view === 'string' ? req.query.view.trim().toLowerCase() : 'active';
-      const where = buildListWhere(req.query, orgId);
-      const scopeWhere = baseScopeWhere(req.query, orgId);
+      const where = buildListWhere(req.query, orgId, allowedStationIds);
+      const scopeWhere = baseScopeWhere(req.query, orgId, allowedStationIds);
       const { page, limit, skip, take } = parsePagination(req.query);
       const todayStart = startOfToday();
       const recentSince = new Date(Date.now() - 24 * 60 * 60 * 1000);

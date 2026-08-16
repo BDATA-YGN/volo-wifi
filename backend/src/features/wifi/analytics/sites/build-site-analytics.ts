@@ -2,7 +2,10 @@ import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { commissionForLine } from '@/jobs/reporting/lib/commission';
 import {
   appDayKey as utcDayKey,
+  appHourKey,
   eachAppDay,
+  eachAppHour,
+  isSameAppDay,
   previousAppPeriod,
   resolvePeriodFromPresetDays,
 } from '@/utils/app-time';
@@ -33,6 +36,8 @@ export type SiteDailyPoint = {
 };
 
 export type SiteAnalyticsView = 'stats' | 'sites' | 'tiers';
+
+export type SiteTrendGrain = 'day' | 'hour';
 
 export type SiteAnalyticsSource = 'aggregated' | 'live';
 
@@ -102,6 +107,7 @@ export type SiteAnalyticsPayload = {
   /** Grand totals per plan (for paginated sites table footer). */
   planTotals: SitePlanBreakdown[];
   dataSource: SiteAnalyticsSource;
+  trendGrain: SiteTrendGrain;
   statsCoverage: SiteStatsCoverage | null;
   pagination: {
     page: number;
@@ -212,6 +218,200 @@ function mergeDailyTrend(
   return points;
 }
 
+function mergeHourlyTrend(
+  salesByHour: Map<
+    string,
+    { ordersCount: number; itemsCount: number; revenue: number; commission: number; siteIds: Set<string> }
+  >,
+  usageByHour: Map<string, { sessionsCount: number; totalBytes: number; siteIds: Set<string> }>,
+  periodFrom: Date,
+  periodTo: Date
+): SiteDailyPoint[] {
+  const points: SiteDailyPoint[] = [];
+  for (const cursor of eachAppHour(periodFrom, periodTo)) {
+    const key = appHourKey(cursor);
+    const sales = salesByHour.get(key) ?? {
+      ordersCount: 0,
+      itemsCount: 0,
+      revenue: 0,
+      commission: 0,
+      siteIds: new Set<string>(),
+    };
+    const usage = usageByHour.get(key) ?? {
+      sessionsCount: 0,
+      totalBytes: 0,
+      siteIds: new Set<string>(),
+    };
+    const activeSites = new Set([...sales.siteIds, ...usage.siteIds]);
+    points.push({
+      date: key,
+      ordersCount: sales.ordersCount,
+      itemsCount: sales.itemsCount,
+      revenue: Math.round(sales.revenue * 100) / 100,
+      commission: Math.round(sales.commission * 100) / 100,
+      sessionsCount: usage.sessionsCount,
+      totalBytes: usage.totalBytes,
+      activeSites: activeSites.size,
+    });
+  }
+
+  return points;
+}
+
+function hourBucketKey(dayKey: string, hour: number): string {
+  return `${dayKey}T${String(hour).padStart(2, '0')}:00:00`;
+}
+
+async function buildHourlyTrendFromLive(
+  prisma: PrismaClient,
+  orgId: string,
+  stationIds: string[],
+  periodFrom: Date,
+  periodTo: Date
+): Promise<SiteDailyPoint[]> {
+  if (stationIds.length === 0) {
+    return mergeHourlyTrend(new Map(), new Map(), periodFrom, periodTo);
+  }
+
+  type HourlyItemRow = {
+    orderId: string;
+    stationId: string;
+    resellerId: string | null;
+    planId: string;
+    qty: number;
+    lineTotal: Prisma.Decimal | number;
+    hour: number | string;
+  };
+  type HourlyRadiusRow = {
+    hour: number | string;
+    stationId: string;
+    sessionsCount: number;
+    totalBytes: bigint | number;
+  };
+
+  const parseHour = (value: number | string): number | null => {
+    const hour = typeof value === 'number' ? value : Number(value);
+    if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+    return hour;
+  };
+
+  const [itemRows, radiusRows, rules] = await Promise.all([
+    prisma.$queryRaw<HourlyItemRow[]>`
+      SELECT
+        so.id AS "orderId",
+        so.station_id AS "stationId",
+        so.reseller_id AS "resellerId",
+        si.plan_id AS "planId",
+        si.qty::int AS qty,
+        si.line_total AS "lineTotal",
+        EXTRACT(HOUR FROM timezone('Asia/Yangon', so.sold_at))::int AS hour
+      FROM wf_sale_order so
+      INNER JOIN wf_sale_item si ON si.order_id = so.id
+      WHERE so.org_id = ${orgId}
+        AND so.status = 'PAID'
+        AND so.sold_at >= ${periodFrom}
+        AND so.sold_at <= ${periodTo}
+        AND so.station_id IN (${Prisma.join(stationIds)})
+    `,
+    prisma.$queryRaw<HourlyRadiusRow[]>`
+      SELECT
+        EXTRACT(HOUR FROM timezone('Asia/Yangon', rs.started_at))::int AS hour,
+        COALESCE(rs.station_id, c.station_id) AS "stationId",
+        COUNT(*)::int AS "sessionsCount",
+        COALESCE(SUM(COALESCE(rs."totalBytes", 0)), 0) AS "totalBytes"
+      FROM wf_radius_session rs
+      LEFT JOIN wf_credential c ON c.id = rs.credential_id
+      WHERE (rs.org_id = ${orgId} OR c.org_id = ${orgId})
+        AND rs.started_at >= ${periodFrom}
+        AND rs.started_at <= ${periodTo}
+        AND COALESCE(rs.station_id, c.station_id) IN (${Prisma.join(stationIds)})
+      GROUP BY 1, 2
+    `,
+    prisma.commissionRule.findMany({
+      where: { orgId, deletedAt: null, isActive: true },
+      select: {
+        resellerId: true,
+        planId: true,
+        type: true,
+        value: true,
+        isActive: true,
+      },
+    }),
+  ]);
+
+  const dayKey = utcDayKey(periodFrom);
+  const salesByHour = new Map<
+    string,
+    { ordersCount: number; itemsCount: number; revenue: number; commission: number; siteIds: Set<string> }
+  >();
+  const orderIdsByHour = new Map<string, Set<string>>();
+
+  for (const row of itemRows) {
+    const hour = parseHour(row.hour);
+    if (!row.stationId || hour == null) continue;
+    const key = hourBucketKey(dayKey, hour);
+    const lineTotal = row.lineTotal as Prisma.Decimal;
+    const revenue = decimalToNumber(lineTotal);
+    const commission = commissionForLine(
+      rules,
+      row.resellerId,
+      row.planId,
+      lineTotal,
+      row.qty
+    );
+    const bucket = salesByHour.get(key) ?? {
+      ordersCount: 0,
+      itemsCount: 0,
+      revenue: 0,
+      commission: 0,
+      siteIds: new Set<string>(),
+    };
+    const seen = orderIdsByHour.get(key) ?? new Set<string>();
+    if (!seen.has(row.orderId)) {
+      seen.add(row.orderId);
+      orderIdsByHour.set(key, seen);
+      bucket.ordersCount += 1;
+    }
+    bucket.itemsCount += row.qty;
+    bucket.revenue += revenue;
+    bucket.commission += commission;
+    bucket.siteIds.add(row.stationId);
+    salesByHour.set(key, bucket);
+  }
+
+  const usageByHour = new Map<
+    string,
+    { sessionsCount: number; totalBytes: number; siteIds: Set<string> }
+  >();
+  for (const row of radiusRows) {
+    const hour = parseHour(row.hour);
+    if (!row.stationId || hour == null) continue;
+    const key = hourBucketKey(dayKey, hour);
+    const bucket = usageByHour.get(key) ?? {
+      sessionsCount: 0,
+      totalBytes: 0,
+      siteIds: new Set<string>(),
+    };
+    bucket.sessionsCount += row.sessionsCount;
+    bucket.totalBytes += bigintToNumber(
+      typeof row.totalBytes === 'bigint' ? row.totalBytes : BigInt(row.totalBytes)
+    );
+    if (row.sessionsCount > 0) bucket.siteIds.add(row.stationId);
+    usageByHour.set(key, bucket);
+  }
+
+  return mergeHourlyTrend(salesByHour, usageByHour, periodFrom, periodTo);
+}
+
+function resolveTrend(
+  periodFrom: Date,
+  periodTo: Date,
+  view: SiteAnalyticsView
+): { grain: SiteTrendGrain; useHourly: boolean } {
+  const grain: SiteTrendGrain = isSameAppDay(periodFrom, periodTo) ? 'hour' : 'day';
+  return { grain, useHourly: view === 'stats' && grain === 'hour' };
+}
+
 export function resolvePeriodFromPreset(
   preset: string,
   periodTo: Date = new Date()
@@ -235,14 +435,22 @@ async function loadStationMeta(
   prisma: PrismaClient,
   orgId: string,
   stationSizeId?: string,
-  stationId?: string
+  stationId?: string,
+  allowedStationIds?: string[] | null
 ): Promise<StationMeta[]> {
+  const idFilter = stationId
+    ? allowedStationIds && !allowedStationIds.includes(stationId)
+      ? { in: [] as string[] }
+      : stationId
+    : allowedStationIds
+      ? { in: allowedStationIds }
+      : undefined;
   const stations = await prisma.wifiStation.findMany({
     where: {
       orgId,
       deletedAt: null,
       ...(stationSizeId ? { stationSizeId } : {}),
-      ...(stationId ? { id: stationId } : {}),
+      ...(idFilter ? { id: idFilter } : {}),
     },
     select: {
       id: true,
@@ -292,11 +500,15 @@ function emptyPayload(
     view === 'tiers'
       ? buildByTier(mergeSiteRows(stations, new Map(), new Map(), new Map(), plans), plans)
       : [];
+  const { grain, useHourly } = resolveTrend(periodFrom, periodTo, view);
   return {
     summary: emptySummary(siteCount),
     previousSummary: emptySummary(siteCount),
-    dailyTrend:
-      view === 'stats' ? mergeDailyTrend(new Map(), new Map(), periodFrom, periodTo) : [],
+    dailyTrend: useHourly
+      ? mergeHourlyTrend(new Map(), new Map(), periodFrom, periodTo)
+      : view === 'stats'
+        ? mergeDailyTrend(new Map(), new Map(), periodFrom, periodTo)
+        : [],
     bySite,
     byTier,
     plans: view === 'sites' || view === 'tiers' ? plans : [],
@@ -311,6 +523,7 @@ function emptyPayload(
           }))
         : [],
     dataSource,
+    trendGrain: grain,
     statsCoverage:
       dataSource === 'aggregated'
         ? coverageForPeriod(periodFrom, periodTo, 0, 0, null)
@@ -362,6 +575,7 @@ function shapeForView(
     bySiteFull: SiteRow[];
     plans: PlanMeta[];
     dataSource: SiteAnalyticsSource;
+    trendGrain: SiteTrendGrain;
     statsCoverage: SiteStatsCoverage | null;
   },
   opts: AggregateViewOptions
@@ -376,6 +590,7 @@ function shapeForView(
       plans: [],
       planTotals: [],
       dataSource: input.dataSource,
+      trendGrain: input.trendGrain,
       statsCoverage: input.statsCoverage,
       pagination: null,
     };
@@ -391,6 +606,7 @@ function shapeForView(
       plans: input.plans,
       planTotals: buildPlanTotals(input.bySiteFull, input.plans),
       dataSource: input.dataSource,
+      trendGrain: input.trendGrain,
       statsCoverage: input.statsCoverage,
       pagination: null,
     };
@@ -402,6 +618,7 @@ function shapeForView(
     dailyTrend: [],
     byTier: [],
     dataSource: input.dataSource,
+    trendGrain: input.trendGrain,
     statsCoverage: input.statsCoverage,
     ...sitesListPayload(input.bySiteFull, input.plans),
   };
@@ -734,6 +951,7 @@ async function aggregateFromDailyStats(
     plans: resolvedPlans,
     planTotals: buildPlanTotals(bySite, resolvedPlans),
     dataSource: 'aggregated',
+    trendGrain: 'day',
     statsCoverage: coverageForPeriod(
       periodFrom,
       periodTo,
@@ -1066,6 +1284,7 @@ async function aggregateFromLiveOrders(
     plans: resolvedPlans,
     planTotals: buildPlanTotals(bySite, resolvedPlans),
     dataSource: 'live',
+    trendGrain: 'day',
     statsCoverage: null,
     pagination: { page: 1, limit: bySite.length || 10, total: bySite.length },
   };
@@ -1076,7 +1295,7 @@ export async function buildSiteAnalytics(
   orgId: string,
   periodFrom: Date,
   periodTo: Date,
-  filters?: { stationId?: string; stationSizeId?: string },
+  filters?: { stationId?: string; stationSizeId?: string; allowedStationIds?: string[] | null },
   options?: {
     view?: SiteAnalyticsView;
     page?: number;
@@ -1091,7 +1310,13 @@ export async function buildSiteAnalytics(
   const opts: AggregateViewOptions = { view, page, limit };
 
   const [stations, plans] = await Promise.all([
-    loadStationMeta(prisma, orgId, filters?.stationSizeId, filters?.stationId),
+    loadStationMeta(
+      prisma,
+      orgId,
+      filters?.stationSizeId,
+      filters?.stationId,
+      filters?.allowedStationIds
+    ),
     view === 'sites' || view === 'tiers' ? loadPlanMeta(prisma, orgId) : Promise.resolve([] as PlanMeta[]),
   ]);
   const stationIds = stations.map((s) => s.id);
@@ -1147,14 +1372,20 @@ export async function buildSiteAnalytics(
           )
       : emptySummary(stations.length);
 
+  const { grain, useHourly } = resolveTrend(periodFrom, periodTo, view);
+  const dailyTrend = useHourly
+    ? await buildHourlyTrendFromLive(prisma, orgId, stationIds, periodFrom, periodTo)
+    : current.dailyTrend;
+
   return shapeForView(
     {
       summary: current.summary,
       previousSummary,
-      dailyTrend: current.dailyTrend,
+      dailyTrend,
       bySiteFull: current.bySite,
       plans: current.plans.length > 0 ? current.plans : plans,
       dataSource: current.dataSource,
+      trendGrain: grain,
       statsCoverage: current.statsCoverage,
     },
     opts

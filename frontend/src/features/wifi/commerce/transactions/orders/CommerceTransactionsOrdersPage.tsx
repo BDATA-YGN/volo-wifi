@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { Alert, Card, Typography, theme } from "antd";
 import { Receipt } from "lucide-react";
 
@@ -15,7 +14,7 @@ import OrdersTable from "./components/OrdersTable";
 import OrderDetailDrawer from "./components/OrderDetailDrawer";
 import { formatMoney } from "./utils";
 
-const { Paragraph, Text } = Typography;
+const { Text } = Typography;
 
 const CommerceTransactionsOrdersPage: React.FC = () => {
   const { token } = theme.useToken();
@@ -82,14 +81,6 @@ const CommerceTransactionsOrdersPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Sales order ledger — every token sale from{" "}
-            <Link href="/wifi/commerce/access-tokens">Access Tokens</Link> creates a paid order
-            with line items and payment records.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

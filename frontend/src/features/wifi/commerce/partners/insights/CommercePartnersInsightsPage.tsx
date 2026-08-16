@@ -114,15 +114,6 @@ const CommercePartnersInsightsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Reseller-scoped sales and WiFi usage analytics — revenue, commission, sessions, and
-            data transfer from{" "}
-            <Link href="/wifi/commerce/transactions/orders">Orders</Link> and daily stats. Configure
-            partners in <Link href="/wifi/commerce/partners">Partner Directory</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
@@ -194,16 +185,6 @@ const CommercePartnersInsightsPage: React.FC = () => {
 
           {insights ? (
             <>
-              {isPartner ? null : (
-                <Alert
-                  type="info"
-                  showIcon
-                  className="mb-0"
-                  title="Admin view"
-                  description="You are viewing analytics for a selected partner account."
-                />
-              )}
-
               <Card
                 styles={{ body: { padding: 20 } }}
                 style={{ borderRadius: token.borderRadiusLG }}

@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
 import type { CommonListResponse } from "@/common/interface/interface";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PartnerDetail,
@@ -50,17 +51,24 @@ export function useCommercePartners() {
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as PartnersFormOptions;
-    setFormOptions(opts);
+    const applyScope = (data: PartnersFormOptions, scopedOrgId?: string) => ({
+      ...data,
+      stations: filterBySiteAllowList(
+        data.stations ?? [],
+        sessionStationAllowList(scopedOrgId ?? data.memberships[0]?.id)
+      ),
+    });
+    setFormOptions(applyScope(opts, targetOrgId));
     // Without orgId the API returns empty stations/plans — hydrate when there is a single membership.
     if (!targetOrgId && opts.memberships.length === 1) {
       const onlyOrgId = opts.memberships[0].id;
       setOrgId(onlyOrgId);
       const withOrg = await Query.loadFormOptions(onlyOrgId);
-      const hydrated = withOrg.data as PartnersFormOptions;
+      const hydrated = applyScope(withOrg.data as PartnersFormOptions, onlyOrgId);
       setFormOptions(hydrated);
       return hydrated;
     }
-    return opts;
+    return applyScope(opts, targetOrgId);
   }, []);
 
   const selectOrg = useCallback(

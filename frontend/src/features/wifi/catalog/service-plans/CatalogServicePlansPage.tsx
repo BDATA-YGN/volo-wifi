@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { Package } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -16,7 +16,7 @@ import ServicePlansTable from "./components/ServicePlansTable";
 import PlanFormDrawer from "./components/PlanFormDrawer";
 import PlanDetailDrawer from "./components/PlanDetailDrawer";
 
-const { Paragraph } = Typography;
+
 
 const CatalogServicePlansPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -158,14 +158,6 @@ const CatalogServicePlansPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Internet plan catalog for your tenant — define quota, validity, and device limits for
-            tokens and vouchers. Set retail prices separately on{" "}
-            <Link href="/wifi/catalog/retail-pricing">Retail Pricing</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

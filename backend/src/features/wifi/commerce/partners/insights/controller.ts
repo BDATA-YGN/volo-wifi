@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '@/interfaces/express.interface';
 import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import { isDeveloperAdmin, loadOrgMembershipOptions } from '@/features/wifi/shared/resolve-org';
+import { resolveAllowedStationIds } from '@/features/wifi/shared/resolve-station-scope';
 import {
   loadResellerPicker,
   resolveCommerceScope,
@@ -71,9 +72,14 @@ export class CommercePartnersInsightsController {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
         if (orgIdParam) orgId = orgIdParam;
 
+        const allowedStationIds = orgId
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!)
+          : null;
         const [memberships, resellers] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
-          orgId ? loadResellerPicker(this.prisma, orgId) : Promise.resolve([]),
+          orgId
+            ? loadResellerPicker(this.prisma, orgId, allowedStationIds)
+            : Promise.resolve([]),
         ]);
 
         const org = orgId
@@ -145,7 +151,17 @@ export class CommercePartnersInsightsController {
 
       const resellerId = scope.resellerId;
       if (!resellerId) {
-        const resellers = await loadResellerPicker(this.prisma, scope.orgId);
+        const scopedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          scope.orgId,
+          req.user!
+        );
+        const resellers = await loadResellerPicker(
+          this.prisma,
+          scope.orgId,
+          scopedStationIds
+        );
         return responseSuccess(res, {
           message: 'Select a partner',
           data: null,
@@ -159,9 +175,22 @@ export class CommercePartnersInsightsController {
       }
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        scope.orgId,
+        req.user!
+      );
 
       const [insights, reseller, org] = await Promise.all([
-        buildPartnerInsights(this.prisma, scope.orgId, resellerId, periodFrom, periodTo),
+        buildPartnerInsights(
+          this.prisma,
+          scope.orgId,
+          resellerId,
+          periodFrom,
+          periodTo,
+          allowedStationIds ?? undefined
+        ),
         this.prisma.reseller.findFirst({
           where: { id: resellerId, orgId: scope.orgId, deletedAt: null },
           select: { id: true, code: true, name: true, status: true },
@@ -214,7 +243,7 @@ export class CommercePartnersInsightsController {
               : undefined,
           resellers:
             scope.mode === 'org'
-              ? await loadResellerPicker(this.prisma, scope.orgId)
+              ? await loadResellerPicker(this.prisma, scope.orgId, allowedStationIds)
               : undefined,
         },
       });

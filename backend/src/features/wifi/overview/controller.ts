@@ -11,6 +11,7 @@ import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
+import { resolveAllowedStationIds } from '@/features/wifi/shared/resolve-station-scope';
 import { WifiOverviewQuerySchema } from './schema';
 import {
   buildOverviewDashboard,
@@ -74,12 +75,19 @@ export class WifiOverviewController {
         }
 
         const onlyOrgId = memberships[0].id;
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          onlyOrgId,
+          req.user!
+        );
         const dashboard = await buildOverviewDashboard(
           this.prisma,
           onlyOrgId,
           adminId,
           isDeveloper,
-          consoleRole
+          consoleRole,
+          allowedStationIds
         );
         const org = await this.prisma.org.findUnique({
           where: { id: onlyOrgId },
@@ -106,12 +114,19 @@ export class WifiOverviewController {
         });
       }
 
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgIdParam,
+        req.user!
+      );
       const dashboard = await buildOverviewDashboard(
         this.prisma,
         orgIdParam,
         adminId,
         isDeveloper,
-        consoleRole
+        consoleRole,
+        allowedStationIds
       );
 
       const org = await this.prisma.org.findUnique({

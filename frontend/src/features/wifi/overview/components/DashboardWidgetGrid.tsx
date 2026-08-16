@@ -57,7 +57,7 @@ function widgetMetrics(
     case "analytics":
       return {
         primary: formatMoney(summary.weekRevenue, currency),
-        secondary: `${summary.weekSessions} sessions · ${summary.weekOrders} orders (7d)`,
+        secondary: `${summary.weekSessions.toLocaleString()} sessions · ${summary.weekOrders.toLocaleString()} orders · 7 days`,
       };
     default:
       return { primary: "—", secondary: "" };

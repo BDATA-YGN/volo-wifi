@@ -38,24 +38,21 @@ export type OverviewSitePulse = {
   todayBytes: number;
 };
 
-export type OverviewRecentOrder = {
-  orderId: string;
-  orderNo: string;
-  stationCode: string | null;
-  resellerCode: string | null;
-  total: number;
-  currency: string;
-  soldAt: string | null;
+export type OverviewSessionHealth = {
+  stationId: string;
+  code: string;
+  name: string;
+  liveSessions: number;
+  stalledSessions: number;
+  todaySessions: number;
 };
 
-export type OverviewRecentSession = {
-  sessionId: string;
-  userName: string | null;
-  stationCode: string | null;
-  status: string;
-  startedAt: string;
-  totalBytes: number;
-  isStalled: boolean;
+export type OverviewPartnerSales = {
+  resellerId: string;
+  code: string;
+  name: string;
+  orders: number;
+  revenue: number;
 };
 
 export type OverviewContext = {
@@ -68,8 +65,8 @@ export type OverviewDashboardData = {
   summary: OverviewSummary;
   trend7d: OverviewTrendPoint[];
   topSites: OverviewSitePulse[];
-  recentOrders: OverviewRecentOrder[];
-  recentSessions: OverviewRecentSession[];
+  sessionHealth: OverviewSessionHealth[];
+  partnerSales: OverviewPartnerSales[];
   context: OverviewContext;
   generatedAt: string;
   org: { id: string; name: string; code: string; currency: string };

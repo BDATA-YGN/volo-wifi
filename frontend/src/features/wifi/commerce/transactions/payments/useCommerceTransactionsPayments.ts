@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRequest } from "ahooks";
 import type { CommonListResponse } from "@/common/interface/interface";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PaymentDetail,
@@ -60,7 +61,13 @@ export function useCommerceTransactionsPayments() {
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as PaymentsFormOptions;
-    setFormOptions(opts);
+    setFormOptions({
+      ...opts,
+      stations: filterBySiteAllowList(
+        opts.stations ?? [],
+        sessionStationAllowList(targetOrgId ?? opts.memberships[0]?.id)
+      ),
+    });
     if (!targetOrgId && opts.memberships.length === 1) {
       setOrgId(opts.memberships[0].id);
     }

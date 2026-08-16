@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { Alert, Card, Col, Row, Typography, theme } from "antd";
 import { Banknote } from "lucide-react";
 
@@ -16,7 +15,7 @@ import PaymentDetailDrawer from "./components/PaymentDetailDrawer";
 import MethodBreakdownCard from "./components/MethodBreakdownCard";
 import { formatMoney } from "./utils";
 
-const { Paragraph, Text } = Typography;
+const { Text } = Typography;
 
 const CommerceTransactionsPaymentsPage: React.FC = () => {
   const { token } = theme.useToken();
@@ -83,15 +82,6 @@ const CommerceTransactionsPaymentsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Payment tender ledger — cash and electronic payments recorded when partners complete
-            sales via{" "}
-            <Link href="/wifi/commerce/access-tokens">Access Tokens</Link>. View linked orders in{" "}
-            <Link href="/wifi/commerce/transactions/orders">Orders</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

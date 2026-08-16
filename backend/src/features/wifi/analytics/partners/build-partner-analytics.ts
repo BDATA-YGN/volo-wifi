@@ -184,13 +184,17 @@ export function previousPeriod(periodFrom: Date, periodTo: Date): { from: Date; 
 async function loadResellerMeta(
   prisma: PrismaClient,
   orgId: string,
-  resellerId?: string
+  resellerId?: string,
+  stationIds?: string[]
 ): Promise<ResellerMeta[]> {
   const resellers = await prisma.reseller.findMany({
     where: {
       orgId,
       deletedAt: null,
       ...(resellerId ? { id: resellerId } : {}),
+      ...(stationIds
+        ? { resellerStations: { some: { stationId: { in: stationIds }, deletedAt: null } } }
+        : {}),
     },
     select: {
       id: true,
@@ -198,7 +202,10 @@ async function loadResellerMeta(
       name: true,
       status: true,
       resellerStations: {
-        where: { deletedAt: null },
+        where: {
+          deletedAt: null,
+          ...(stationIds ? { stationId: { in: stationIds } } : {}),
+        },
         select: {
           stationId: true,
           station: { select: { name: true, stationSizeId: true } },
@@ -347,7 +354,8 @@ async function aggregateFromDailyStats(
   resellers: ResellerMeta[],
   plans: PlanMeta[],
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationIds?: string[]
 ): Promise<PartnerAnalyticsPayload> {
   if (resellerIds.length === 0) {
     return emptyPayload(0, resellers, plans, periodFrom, periodTo, 'aggregated');
@@ -359,6 +367,7 @@ async function aggregateFromDailyStats(
     deletedAt: null,
     date: { gte: periodFrom, lte: periodTo },
     resellerId: { in: resellerIds },
+    ...(stationIds ? { stationId: { in: stationIds } } : {}),
   };
 
   const [salesRows, usageRows] = await Promise.all([
@@ -525,7 +534,8 @@ async function aggregateFromLiveOrders(
   resellers: ResellerMeta[],
   plans: PlanMeta[],
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationIds?: string[]
 ): Promise<PartnerAnalyticsPayload> {
   if (resellerIds.length === 0) {
     return emptyPayload(0, resellers, plans, periodFrom, periodTo, 'live');
@@ -555,6 +565,7 @@ async function aggregateFromLiveOrders(
       AND so.sold_at >= ${periodFrom}
       AND so.sold_at <= ${periodTo}
       AND so.reseller_id IN (${Prisma.join(resellerIds)})
+      ${stationIds?.length ? Prisma.sql`AND so.station_id IN (${Prisma.join(stationIds)})` : Prisma.empty}
   `;
 
   const resellerIdSet = new Set(resellerIds);
@@ -659,12 +670,12 @@ export async function buildPartnerAnalytics(
   orgId: string,
   periodFrom: Date,
   periodTo: Date,
-  filters?: { resellerId?: string },
+  filters?: { resellerId?: string; stationIds?: string[] },
   options?: { source?: PartnerAnalyticsSource }
 ): Promise<PartnerAnalyticsPayload> {
   const source: PartnerAnalyticsSource = options?.source ?? 'aggregated';
   const [resellers, plans] = await Promise.all([
-    loadResellerMeta(prisma, orgId, filters?.resellerId),
+    loadResellerMeta(prisma, orgId, filters?.resellerId, filters?.stationIds),
     loadPlanMeta(prisma, orgId),
   ]);
   const resellerIds = resellers.map((r) => r.id);
@@ -682,7 +693,8 @@ export async function buildPartnerAnalytics(
           resellers,
           plans,
           periodFrom,
-          periodTo
+          periodTo,
+          filters?.stationIds
         )
       : await aggregateFromDailyStats(
           prisma,
@@ -691,7 +703,8 @@ export async function buildPartnerAnalytics(
           resellers,
           plans,
           periodFrom,
-          periodTo
+          periodTo,
+          filters?.stationIds
         );
 
   const prev = previousPeriod(periodFrom, periodTo);
@@ -704,7 +717,8 @@ export async function buildPartnerAnalytics(
           resellers,
           plans,
           prev.from,
-          prev.to
+          prev.to,
+          filters?.stationIds
         )
       : await aggregateFromDailyStats(
           prisma,
@@ -713,7 +727,8 @@ export async function buildPartnerAnalytics(
           resellers,
           plans,
           prev.from,
-          prev.to
+          prev.to,
+          filters?.stationIds
         );
 
   return {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   Alert,
   Button,
@@ -135,7 +135,11 @@ const PartnerFormDrawer: React.FC<Props> = ({
         email: editing.email ?? undefined,
         address: editing.address ?? undefined,
         status: editing.status,
-        stationIds: editing.stationIds,
+        stationIds: editing.stationIds.filter((id) =>
+          formOptions.stations.length === 0
+            ? true
+            : formOptions.stations.some((s) => s.id === id)
+        ),
         enabledPlanIds: initialEnabledPlanIds,
       }
     : {
@@ -150,21 +154,6 @@ const PartnerFormDrawer: React.FC<Props> = ({
       };
   useDrawerFormSync(form, open, formValues, editing?.id ?? "create");
 
-  const applyGeneratedCode = () => {
-    const code = generateUniquePartnerCode(formOptions.existingCodes ?? []);
-    form.setFieldsValue({
-      code,
-      loginUsername: code.toLowerCase(),
-    });
-    return code;
-  };
-
-  useEffect(() => {
-    if (!open || editing) return;
-    applyGeneratedCode();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- generate after sync on create open
-  }, [open, editing, formOptions.existingCodes, form]);
-
   const handleFinish = async (values: PartnerFormFields) => {
     // Include values from inactive tabs (Ant Form omits unmounted fields from `values`
     // when preserve is false — that wiped sites when saving from Plans, and vice versa).
@@ -173,7 +162,9 @@ const PartnerFormDrawer: React.FC<Props> = ({
     const enabledPlanIds = allValues.enabledPlanIds ?? values.enabledPlanIds ?? [];
 
     const payload: PartnerFormValues = {
-      code: values.code,
+      code:
+        values.code?.trim() ||
+        (isCreate ? generateUniquePartnerCode(formOptions.existingCodes ?? []) : values.code),
       name: values.name,
       phone: values.phone,
       email: values.email,
@@ -248,32 +239,20 @@ const PartnerFormDrawer: React.FC<Props> = ({
 
       <Form.Item
         label="Partner code"
-        required
+        required={!isCreate}
         extra={
           isCreate
-            ? "Auto-generated 8-character code — unique per tenant"
+            ? "Assigned automatically when you save"
             : "Partner code cannot be changed after creation"
         }
       >
-        {isCreate ? (
-          <Space.Compact style={{ width: "100%" }}>
-            <Form.Item
-              name="code"
-              noStyle
-              rules={[{ required: true, message: "Code is required" }]}
-            >
-              <Input
-                readOnly
-                style={{ fontFamily: "monospace", letterSpacing: "0.06em" }}
-              />
-            </Form.Item>
-            <Button onClick={applyGeneratedCode}>Regenerate</Button>
-          </Space.Compact>
-        ) : (
-          <Form.Item name="code" noStyle rules={[{ required: true, message: "Code is required" }]}>
-            <Input disabled style={{ fontFamily: "monospace" }} />
-          </Form.Item>
-        )}
+        <Form.Item name="code" noStyle rules={isCreate ? [] : [{ required: true, message: "Code is required" }]}>
+          <Input
+            disabled
+            placeholder={isCreate ? "Assigned on save" : undefined}
+            style={{ fontFamily: "monospace", letterSpacing: isCreate ? "0.06em" : undefined }}
+          />
+        </Form.Item>
       </Form.Item>
 
       <Form.Item
@@ -298,9 +277,9 @@ const PartnerFormDrawer: React.FC<Props> = ({
               { required: true, message: "Username is required" },
               { min: 3, message: "At least 3 characters" },
             ]}
-            extra="Suggested from partner code — editable before create"
+            extra="Choose a login username — it is not tied to the partner code"
           >
-            <Input placeholder="a3k9m2x7" autoComplete="off" />
+            <Input placeholder="partner.login" autoComplete="off" />
           </Form.Item>
 
           <Form.Item
@@ -411,7 +390,10 @@ const PartnerFormDrawer: React.FC<Props> = ({
 
   const siteTransferData: SiteTransferItem[] = useMemo(() => {
     const byId = new Map(formOptions.stations.map((s) => [s.id, s]));
-    for (const s of editing?.stations ?? []) byId.set(s.id, s);
+    const allowedIds = new Set(formOptions.stations.map((s) => s.id));
+    for (const s of editing?.stations ?? []) {
+      if (allowedIds.size === 0 || allowedIds.has(s.id)) byId.set(s.id, s);
+    }
     return [...byId.values()].map((s) => ({
       key: s.id,
       title: `${s.code} — ${s.name}`,
@@ -432,10 +414,7 @@ const PartnerFormDrawer: React.FC<Props> = ({
           showIcon
           message="No sites available"
           description={
-            <span>
-              Add sites in <Text strong>Site Directory</Text> before mapping partners. Site-scoped
-              retail prices are configured under Retail Pricing.
-            </span>
+            <span>No sites are available to map for this partner.</span>
           }
         />
       ) : (
@@ -453,9 +432,7 @@ const PartnerFormDrawer: React.FC<Props> = ({
   const plansTab = (
     <>
       <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        Plans this partner is allowed to sell. Retail prices resolve as{" "}
-        <Text strong>Reseller → Site → Organization default</Text> under{" "}
-        <Text strong>Retail Pricing</Text>.
+        Plans this partner is allowed to sell.
       </Paragraph>
       <Form.Item name="enabledPlanIds" hidden>
         <Input />
@@ -466,10 +443,7 @@ const PartnerFormDrawer: React.FC<Props> = ({
           showIcon
           message="No service plans"
           description={
-            <span>
-              Create plans in <Text strong>Service Plans</Text>, then set organization / reseller /
-              site prices under <Text strong>Retail Pricing</Text>.
-            </span>
+            <span>No service plans are available to enable for this partner.</span>
           }
         />
       ) : (

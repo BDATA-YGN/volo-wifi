@@ -14,6 +14,10 @@ import {
   resolveOrgIdForAdmin,
 } from '@/features/wifi/shared/resolve-org';
 import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
+import {
   loadResellerPicker,
   resolveDirectReseller,
   resolveRoleScopedReseller,
@@ -219,7 +223,8 @@ function serializeOrderDetail(row: OrderDetailRow) {
 
 function buildListWhere(
   scope: OrdersScope,
-  query: AuthenticatedRequest['query']
+  query: AuthenticatedRequest['query'],
+  allowedStationIds: string[] | null = null
 ): Prisma.SaleOrderWhereInput {
   const where: Prisma.SaleOrderWhereInput = { orgId: scope.orgId };
 
@@ -236,7 +241,14 @@ function buildListWhere(
   if (status && (SALE_STATUSES as readonly string[]).includes(status)) {
     where.status = status as SaleStatus;
   }
-  if (stationId) where.stationId = stationId;
+  if (stationId) {
+    where.stationId =
+      allowedStationIds && !allowedStationIds.includes(stationId)
+        ? { in: [] }
+        : stationId;
+  } else if (allowedStationIds) {
+    where.stationId = { in: allowedStationIds };
+  }
 
   if (search) {
     where.OR = [
@@ -281,12 +293,17 @@ export class CommerceTransactionsOrdersController {
           }
         }
 
+        const allowedStationIds = orgId
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!)
+          : null;
         const [memberships, resellers, stations] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
-          orgId ? loadResellerPicker(this.prisma, orgId) : Promise.resolve([]),
+          orgId
+            ? loadResellerPicker(this.prisma, orgId, allowedStationIds)
+            : Promise.resolve([]),
           orgId
             ? this.prisma.wifiStation.findMany({
-                where: { orgId, deletedAt: null },
+                where: { orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
                 select: { id: true, code: true, name: true, status: true },
                 orderBy: { name: 'asc' },
               })
@@ -313,6 +330,13 @@ export class CommerceTransactionsOrdersController {
           });
         }
 
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          scope.orgId,
+          req.user!
+        );
+
         if (!isUndefinedOrUndefinedString(req.params?.id)) {
           const idParam = req.params.id as string | string[];
           const id = Array.isArray(idParam) ? idParam[0] : idParam;
@@ -321,6 +345,7 @@ export class CommerceTransactionsOrdersController {
             id,
             orgId: scope.orgId,
             ...(scope.mode === 'partner' ? { resellerId: scope.resellerId } : {}),
+            ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
           };
 
           const row = await this.prisma.saleOrder.findFirst({
@@ -341,7 +366,7 @@ export class CommerceTransactionsOrdersController {
           });
         }
 
-        const where = buildListWhere(scope, req.query);
+        const where = buildListWhere(scope, req.query, allowedStationIds);
         const { page, limit, skip, take } = parsePagination(req.query);
         const todayStart = startOfUtcDay();
         const monthStart = startOfUtcMonth();
@@ -349,10 +374,15 @@ export class CommerceTransactionsOrdersController {
 
         const baseWhere: Prisma.SaleOrderWhereInput =
           scope.mode === 'partner'
-            ? { orgId: scope.orgId, resellerId: scope.resellerId }
+            ? {
+                orgId: scope.orgId,
+                resellerId: scope.resellerId,
+                ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
+              }
             : {
                 orgId: scope.orgId,
                 ...(scope.resellerId ? { resellerId: scope.resellerId } : {}),
+                ...(allowedStationIds ? { stationId: { in: allowedStationIds } } : {}),
               };
 
         const [
@@ -395,7 +425,7 @@ export class CommerceTransactionsOrdersController {
             ? loadOrgMembershipOptions(this.prisma, adminId, isDeveloper)
             : Promise.resolve(undefined),
           scope.mode === 'org'
-            ? loadResellerPicker(this.prisma, scope.orgId)
+            ? loadResellerPicker(this.prisma, scope.orgId, allowedStationIds)
             : Promise.resolve(undefined),
           aggregatePlanSales(this.prisma, {
             orgId: scope.orgId,

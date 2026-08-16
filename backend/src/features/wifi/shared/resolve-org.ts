@@ -8,7 +8,7 @@ export type OrgMembershipOption = {
   isPrimary: boolean;
 };
 
-type AdminLike = {
+export type AdminLike = {
   isSuper?: boolean;
   role?: { roleName?: string | null } | null;
 };

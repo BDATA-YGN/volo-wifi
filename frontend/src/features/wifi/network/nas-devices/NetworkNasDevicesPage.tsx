@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { CloudServerOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -14,7 +14,7 @@ import NasDevicesToolbar from "./components/NasDevicesToolbar";
 import NasDevicesTable from "./components/NasDevicesTable";
 import NasDeviceFormDrawer from "./components/NasDeviceFormDrawer";
 
-const { Paragraph } = Typography;
+
 
 const NetworkNasDevicesPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -134,13 +134,6 @@ const NetworkNasDevicesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Central inventory for routers, access points, and RADIUS NAS clients across tenant WiFi
-            sites. Link each site device to a FreeRADIUS server.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

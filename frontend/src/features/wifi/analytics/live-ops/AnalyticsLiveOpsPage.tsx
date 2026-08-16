@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Gauge, X } from "lucide-react";
 import dayjs from "dayjs";
@@ -90,15 +89,6 @@ const AnalyticsLiveOpsPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Near-real-time operations — active RADIUS sessions, sales velocity, and hourly activity
-            across your fleet. Deeper traffic analysis in{" "}
-            <Link href="/wifi/analytics/session-traffic">Session Traffic</Link> or revenue in{" "}
-            <Link href="/wifi/analytics/revenue">Revenue Analytics</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

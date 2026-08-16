@@ -66,21 +66,23 @@ export type VoucherBatchRecord = {
   createdByAdmin: AdminBrief | null;
 };
 
-export type VoucherCredentialPreview = {
-  id: string;
-  token: string;
-  status: string;
-  createdAt: string;
-  soldAt: string | null;
-  activatedAt: string | null;
-  revokedAt: string | null;
-};
-
 export type VoucherBatchDetail = VoucherBatchRecord & {
   credentialStats: Record<string, number>;
-  credentials: VoucherCredentialPreview[];
-  credentialsTotal: number;
-  credentialsTruncated: boolean;
+};
+
+export type SitePlanBalanceRow = {
+  planId: string;
+  code: string;
+  name: string;
+  remaining: number;
+  siteRemaining: number;
+  sharedRemaining: number;
+  runCount: number;
+};
+
+export type SitePlanBalance = {
+  station: { id: string; code: string; name: string };
+  plans: SitePlanBalanceRow[];
 };
 
 export type VoucherRunFormValues = {
@@ -88,7 +90,7 @@ export type VoucherRunFormValues = {
   quantity: number;
   batchNo?: string;
   note?: string;
-  stationId?: string | null;
+  stationId: string;
 };
 
 export type VoucherRunsFormOptions = {

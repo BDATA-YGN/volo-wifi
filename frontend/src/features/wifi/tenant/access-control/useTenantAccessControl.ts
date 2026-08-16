@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
 import type { CommonListResponse } from "@/common/interface/interface";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
@@ -24,6 +24,7 @@ const emptyFormOptions: AccessControlFormOptions = {
 export function useTenantAccessControl() {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [formOptions, setFormOptions] = useState<AccessControlFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const { params, setParams, setPagination, setSearch } = useWifiListState({ limit: 20 });
   const patchParams = useCallback((patch: Partial<AccessControlListParams>) => {
@@ -48,8 +49,10 @@ export function useTenantAccessControl() {
   const meta = (data as CommonListResponse | undefined)?.meta as AccessControlMeta | undefined;
 
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as AccessControlFormOptions;
+    if (seq !== formOptionsSeq.current) return opts;
     setFormOptions(opts);
     return opts;
   }, []);

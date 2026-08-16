@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { BookOutlined } from "@ant-design/icons";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -14,7 +14,7 @@ import AttributeCatalogToolbar from "./components/AttributeCatalogToolbar";
 import AttributeCatalogTable from "./components/AttributeCatalogTable";
 import AttributeFormDrawer from "./components/AttributeFormDrawer";
 
-const { Paragraph } = Typography;
+
 
 const NetworkRadiusAttributeCatalogPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -115,13 +115,6 @@ const NetworkRadiusAttributeCatalogPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Platform FreeRADIUS attribute dictionary — define reply attributes, operators, value
-            types, and defaults used by vendor profiles and plan policies.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

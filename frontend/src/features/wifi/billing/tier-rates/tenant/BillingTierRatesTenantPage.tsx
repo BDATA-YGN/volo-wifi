@@ -15,7 +15,7 @@ import TenantRatesMatrixTable from "./components/TenantRatesMatrixTable";
 import TenantOverrideHistoryTable from "./components/TenantOverrideHistoryTable";
 import SetTenantOverrideDrawer from "./components/SetTenantOverrideDrawer";
 
-const { Paragraph, Text } = Typography;
+const { Text } = Typography;
 
 const BillingTierRatesTenantPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -120,16 +120,6 @@ const BillingTierRatesTenantPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Optional per-tenant monthly license rates by capacity tier. Resolution order:{" "}
-            <Text strong>tenant override</Text> first, then{" "}
-            <Link href="/wifi/billing/tier-rates/platform">platform tier rates</Link> when no
-            active override exists. Overrides can also be set during{" "}
-            <Link href="/wifi/billing/tenant-registration">tenant registration</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"

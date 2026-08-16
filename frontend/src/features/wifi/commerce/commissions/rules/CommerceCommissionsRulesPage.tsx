@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import Link from "next/link";
-import { Alert, App, Card, Typography, theme } from "antd";
+import { Alert, App, Card, theme } from "antd";
 import { Percent } from "lucide-react";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
@@ -17,7 +17,7 @@ import RuleFormDrawer from "./components/RuleFormDrawer";
 import RuleDetailDrawer from "./components/RuleDetailDrawer";
 import { formValuesFromRecord } from "./utils";
 
-const { Paragraph } = Typography;
+
 
 const CommerceCommissionsRulesPage: React.FC = () => {
   const { message, modal } = App.useApp();
@@ -161,14 +161,6 @@ const CommerceCommissionsRulesPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="mb-5 max-w-3xl">
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Configure how partners earn commission on WiFi token sales — set tenant defaults or
-            partner- and plan-specific rates. Payout workflow lives under{" "}
-            <Link href="/wifi/commerce/commissions/payouts">Commission Payouts</Link>.
-          </Paragraph>
-        </div>
-
         {error ? (
           <Alert
             type="error"
