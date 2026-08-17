@@ -8,6 +8,7 @@ import {
 } from '@/generated/prisma/client';
 import {
   aggregateRadiusUsedSeconds,
+  billedSessionSeconds,
   isPlanActivationWindowExceeded,
   planHasTimeQuota,
   planTimeQuotaSec,
@@ -153,11 +154,13 @@ async function endOpenRadiusSessionsForSameDevice(params: {
   if (matched.length === 0) return 0;
 
   const now = new Date();
-  const nowMs = now.getTime();
   await Promise.all(
     matched.map((row) => {
-      const wall = Math.max(0, Math.floor((nowMs - row.startedAt.getTime()) / 1000));
-      const sessionTimeSec = Math.max(row.sessionTimeSec ?? 0, wall);
+      const sessionTimeSec = billedSessionSeconds(
+        row.sessionTimeSec,
+        row.startedAt,
+        now,
+      );
       return prisma.radiusSession.update({
         where: { id: row.id },
         data: {

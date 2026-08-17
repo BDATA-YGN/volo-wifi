@@ -125,17 +125,22 @@ async function syncRemainingAndConsume(): Promise<number> {
         AND p.deleted_at IS NULL
       LEFT JOIN LATERAL (
         SELECT COALESCE(SUM(
-          GREATEST(
-            COALESCE(rs."sessionTimeSec", 0),
-            GREATEST(
-              0,
-              FLOOR(EXTRACT(EPOCH FROM (
-                COALESCE(rs.stopped_at, CURRENT_TIMESTAMP) - rs.started_at
-              )))::integer
-            )
-          )
+          CASE
+            WHEN COALESCE(rs."sessionTimeSec", 0) > w.wall + 120
+              AND COALESCE(rs."sessionTimeSec", 0) > w.wall * 2
+            THEN w.wall
+            ELSE GREATEST(COALESCE(rs."sessionTimeSec", 0), w.wall)
+          END
         ), 0)::integer AS used_sec
         FROM wf_radius_session rs
+        CROSS JOIN LATERAL (
+          SELECT GREATEST(
+            0,
+            FLOOR(EXTRACT(EPOCH FROM (
+              COALESCE(rs.stopped_at, CURRENT_TIMESTAMP) - rs.started_at
+            )))::integer
+          ) AS wall
+        ) w
         WHERE (
           rs.credential_id = c.id
           OR (

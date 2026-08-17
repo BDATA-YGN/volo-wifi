@@ -36,23 +36,33 @@ export function formatBytes(value: string | number | null | undefined): string {
   return `${size < 10 && i > 0 ? size.toFixed(1) : Math.round(size)} ${units[i]}`;
 }
 
+export function billedDurationSeconds(
+  sessionTimeSec: number | null | undefined,
+  startedAt: string,
+  stoppedAt: string | null,
+  status: string
+): number {
+  const start = new Date(startedAt).getTime();
+  const end =
+    stoppedAt != null
+      ? new Date(stoppedAt).getTime()
+      : status === "STOP"
+        ? start
+        : Date.now();
+  const wall = Math.max(0, Math.floor((end - start) / 1000));
+  const nas = sessionTimeSec ?? 0;
+  if (sessionTimeSec == null) return wall;
+  if (nas > wall + 120 && nas > wall * 2) return wall;
+  return Math.max(nas, wall);
+}
+
 export function formatSessionDuration(
   sessionTimeSec: number | null | undefined,
   startedAt: string,
   stoppedAt: string | null,
   status: string
 ): string {
-  let sec = sessionTimeSec ?? undefined;
-  if (sec == null) {
-    const start = new Date(startedAt).getTime();
-    const end =
-      stoppedAt != null
-        ? new Date(stoppedAt).getTime()
-        : status === "STOP"
-          ? start
-          : Date.now();
-    sec = Math.max(0, Math.floor((end - start) / 1000));
-  }
+  let sec = billedDurationSeconds(sessionTimeSec, startedAt, stoppedAt, status);
 
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);

@@ -45,6 +45,26 @@ export function planTimeQuotaSec(
   return plan.timeAmount * (multipliers[plan.timeUnit] ?? 0);
 }
 
+/**
+ * NAS Acct-Session-Time can be leftover hotspot host uptime or a copy of
+ * Session-Timeout (e.g. 10800s on a 1-minute session). Trust wall clock when
+ * NAS time is both >2 minutes beyond wall and more than 2× wall.
+ */
+export const ACCT_SESSION_TIME_SLACK_SEC = 120;
+
+export function billedSessionSeconds(
+  sessionTimeSec: number | null | undefined,
+  startedAt: Date,
+  endedAt: Date
+): number {
+  const wall = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+  const nas = sessionTimeSec ?? 0;
+  if (nas > wall + ACCT_SESSION_TIME_SLACK_SEC && nas > wall * 2) {
+    return wall;
+  }
+  return Math.max(nas, wall);
+}
+
 /** True when wall-clock time since activation meets or exceeds the plan time allowance. */
 export function isPlanActivationWindowExceeded(
   credential: { activatedAt: Date | null },
@@ -145,11 +165,8 @@ export async function aggregateRadiusUsedSeconds(
   let total = 0;
   for (const s of sessions) {
     if (!s.stoppedAt && !includeActive) continue;
-    const endMs = s.stoppedAt ? s.stoppedAt.getTime() : now;
-    const wall = Math.max(0, Math.floor((endMs - s.startedAt.getTime()) / 1000));
-    // Prefer the larger of NAS Acct-Session-Time and wall clock so under-reported
-    // interim/stop values cannot shrink billed usage (reconnect overshoot hole).
-    total += Math.max(s.sessionTimeSec ?? 0, wall);
+    const end = s.stoppedAt ?? new Date(now);
+    total += billedSessionSeconds(s.sessionTimeSec, s.startedAt, end);
   }
   return total;
 }
