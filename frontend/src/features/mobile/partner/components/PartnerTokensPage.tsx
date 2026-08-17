@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { App, Drawer, Form, InputNumber, Select, Spin } from "antd";
 import { useRequest } from "ahooks";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
@@ -11,6 +11,7 @@ import type {
   IssueTokenResult,
   PaymentMethod,
 } from "@/features/wifi/commerce/access-tokens/types";
+import { MAX_ISSUE_QUANTITY } from "@/features/wifi/commerce/access-tokens/constant";
 import { calcLineTotal, formatMoney, formatStatusLabel } from "@/features/wifi/commerce/access-tokens/utils";
 import { formatWifiDateTime } from "@/features/wifi/shared/format";
 import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
@@ -50,6 +51,7 @@ export default function PartnerTokensPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailFallback, setDetailFallback] = useState<AccessTokenRecord | null>(null);
   const [form] = Form.useForm<IssueTokenFormValues>();
+  const saleDefaultsApplied = useRef(false);
 
   const {
     list,
@@ -102,7 +104,12 @@ export default function PartnerTokensPage() {
   const lineTotal = calcLineTotal(selectedPlan?.unitPrice ?? null, quantity, discount);
 
   useEffect(() => {
-    if (!drawerOpen || !activeCatalog) return;
+    if (!drawerOpen) {
+      saleDefaultsApplied.current = false;
+      return;
+    }
+    if (!activeCatalog || saleDefaultsApplied.current) return;
+    saleDefaultsApplied.current = true;
     const priced = (activeCatalog.plans ?? []).filter((p) => p.hasPricing);
     const defaults: Partial<IssueTokenFormValues> = {
       quantity: 1,
@@ -282,8 +289,20 @@ export default function PartnerTokensPage() {
               }))}
             />
           </Form.Item>
-          <Form.Item name="quantity" label="Quantity" rules={[{ required: true }]}>
-            <InputNumber min={1} max={50} style={{ width: "100%" }} />
+          <Form.Item
+            name="quantity"
+            label="Quantity"
+            rules={[
+              { required: true, message: "Quantity is required" },
+              {
+                type: "number",
+                min: 1,
+                max: MAX_ISSUE_QUANTITY,
+                message: `Quantity must be between 1 and ${MAX_ISSUE_QUANTITY}`,
+              },
+            ]}
+          >
+            <InputNumber min={1} max={MAX_ISSUE_QUANTITY} style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item name="paymentMethod" label="Payment" rules={[{ required: true }]}>
             <Select options={PAYMENT_METHODS} />

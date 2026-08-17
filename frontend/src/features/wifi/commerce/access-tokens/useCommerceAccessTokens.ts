@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRequest } from "ahooks";
 import type { CommonListResponse } from "@/common/interface/interface";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
@@ -51,15 +51,16 @@ export function useCommerceAccessTokens() {
   const list = ((data as CommonListResponse | undefined)?.data ?? []) as AccessTokenRecord[];
   const meta = (data as CommonListResponse | undefined)?.meta as AccessTokensMeta | undefined;
   const rawCatalog = meta?.catalog ?? formOptions.catalog;
-  const catalog = rawCatalog
-    ? {
-        ...rawCatalog,
-        stations: filterBySiteAllowList(
-          rawCatalog.stations ?? [],
-          sessionStationAllowList(orgId)
-        ),
-      }
-    : rawCatalog;
+  const catalog = useMemo(() => {
+    if (!rawCatalog) return rawCatalog;
+    return {
+      ...rawCatalog,
+      stations: filterBySiteAllowList(
+        rawCatalog.stations ?? [],
+        sessionStationAllowList(orgId)
+      ),
+    };
+  }, [rawCatalog, orgId]);
 
   const loadFormOptions = useCallback(async (targetOrgId?: string, targetResellerId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId, targetResellerId);
