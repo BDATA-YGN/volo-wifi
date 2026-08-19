@@ -102,7 +102,7 @@ docker compose logs -f freeradius
 docker exec freeradius sh -c 'tail -f /var/log/freeradius/linelog-auth-$(date +%Y%m%d)'
 ```
 
-Log retention: old files are purged daily inside the `freeradius` container (`KEEP_DAYS=3`). Docker/Dokploy json logs are capped (`max-size` / `max-file` in compose).
+Log retention: `freeradius-log-cleanup` purges files older than 3 days in the `freeradius-logs` volume. Docker json logs are capped (`max-size` / `max-file` in compose). Production must **not** run `-X` (use `docker-compose.debug.yml` only when debugging).
 
 **Dokploy:** Logs tab → select container **`freeradius`** only. Look for `Login OK`, `Login incorrect`, `ACCEPT`, or `REJECT`.
 

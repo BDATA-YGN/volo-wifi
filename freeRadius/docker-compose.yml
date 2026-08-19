@@ -5,8 +5,8 @@
 #
 # Dokploy → Logs → select container "freeradius"
 #
-# TEMP: full debug (-X) so Dokploy shows every packet/SQL line.
-# Revert to `freeradius -f -d /etc/raddb` when done debugging (see docker-compose.debug.yml).
+# Debug (full packet/SQL dump) — do not leave this on in production:
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up
 #
 # Requires:
 #   - ./raddb mounted at /etc/raddb (includes certs/do-ca-certificate.crt)
@@ -30,18 +30,44 @@ services:
       - ./raddb:/etc/raddb
       - freeradius-logs:/var/log/freeradius
 
-    # Full debug to stdout → visible in Dokploy Logs / docker compose logs -f
+    # Foreground, not -X. Auth accept/reject still go to Dokploy via log_auth_console.
     entrypoint: ["freeradius"]
     command:
-      - -X
+      - -f
       - -d
       - /etc/raddb
 
     logging:
       driver: json-file
       options:
-        max-size: "50m"
-        max-file: "5"
+        max-size: "20m"
+        max-file: "3"
+
+  # Purge linelog / leftover detail files so the log volume cannot fill the disk.
+  freeradius-log-cleanup:
+    image: busybox:1.36
+    container_name: freeradius-log-cleanup
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Yangon
+      LOGDIR: /var/log/freeradius
+      KEEP_DAYS: "3"   # linelog-auth-* only; radacct/ is always purged
+      MAX_MB: "50"
+    volumes:
+      - ./raddb/scripts/cleanup-logs.sh:/cleanup-logs.sh:ro
+      - freeradius-logs:/var/log/freeradius
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          sh /cleanup-logs.sh
+          sleep 43200
+        done
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
   freeradius-logs:

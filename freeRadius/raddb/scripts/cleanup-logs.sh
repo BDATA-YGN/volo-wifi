@@ -60,13 +60,12 @@ for f in radius.log linelog-auth linelog-accounting linelog sqllog.sql; do
 	fi
 done
 
-# Old radacct detail trees (daily files under per-client dirs)
+# radacct/ is leftover from the accounting `detail` module (now disabled).
+# Sessions are already in PostgreSQL — purge the whole tree, not just old files.
 radacct_deleted=0
 if [ -d "$LOGDIR/radacct" ]; then
-	radacct_deleted=$(find "$LOGDIR/radacct" -type f -name 'detail-*' -mtime +"$KEEP_DAYS" -print 2>/dev/null | wc -l | tr -d ' ')
-	find "$LOGDIR/radacct" -type f -name 'detail-*' -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
-	# Remove empty client directories left behind
-	find "$LOGDIR/radacct" -type d -empty -delete 2>/dev/null || true
+	radacct_deleted=$(find "$LOGDIR/radacct" -type f -print 2>/dev/null | wc -l | tr -d ' ')
+	rm -rf "$LOGDIR/radacct"
 fi
 
 echo "cleanup-logs: done (removed ${deleted:-0} log files, ${radacct_deleted:-0} radacct detail files)"

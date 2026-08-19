@@ -701,10 +701,10 @@ accounting {
 #	cui
 
 	#
-	#  Create a 'detail'ed log of the packets.
-	#  Note that accounting requests which are proxied
-	#  are also logged in the detail file.
-	detail
+	#  File-based accounting dumps under ${radacctdir}/<nas-ip>/detail-YYYYMMDD
+	#  grow without bound. SQL already stores sessions in wf_radius_session.
+	#  Re-enable only for short-term packet capture, then run cleanup-logs.sh.
+	# detail
 #	daily
 
 	#  Update the wtmp file
