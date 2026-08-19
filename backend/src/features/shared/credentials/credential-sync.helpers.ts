@@ -52,12 +52,26 @@ export function planTimeQuotaSec(
  */
 export const ACCT_SESSION_TIME_SLACK_SEC = 120;
 
+/**
+ * Delayed Accounting-Start can arrive hours later with a backdated `startedAt`
+ * while the row is still open. Bill open sessions from insert time, not NAS start.
+ */
+export function effectiveAccountingStart(
+  startedAt: Date,
+  options?: { createdAt?: Date | null; stoppedAt?: Date | null },
+): Date {
+  if (options?.stoppedAt != null || !options?.createdAt) return startedAt;
+  return options.createdAt.getTime() > startedAt.getTime() ? options.createdAt : startedAt;
+}
+
 export function billedSessionSeconds(
   sessionTimeSec: number | null | undefined,
   startedAt: Date,
-  endedAt: Date
+  endedAt: Date,
+  options?: { createdAt?: Date | null; stoppedAt?: Date | null },
 ): number {
-  const wall = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+  const wallStart = effectiveAccountingStart(startedAt, options);
+  const wall = Math.max(0, Math.floor((endedAt.getTime() - wallStart.getTime()) / 1000));
   const nas = sessionTimeSec ?? 0;
   if (nas > wall + ACCT_SESSION_TIME_SLACK_SEC && nas > wall * 2) {
     return wall;
@@ -158,6 +172,7 @@ export async function aggregateRadiusUsedSeconds(
       sessionTimeSec: true,
       startedAt: true,
       stoppedAt: true,
+      createdAt: true,
     },
   });
 
@@ -166,7 +181,10 @@ export async function aggregateRadiusUsedSeconds(
   for (const s of sessions) {
     if (!s.stoppedAt && !includeActive) continue;
     const end = s.stoppedAt ?? new Date(now);
-    total += billedSessionSeconds(s.sessionTimeSec, s.startedAt, end);
+    total += billedSessionSeconds(s.sessionTimeSec, s.startedAt, end, {
+      createdAt: s.createdAt,
+      stoppedAt: s.stoppedAt,
+    });
   }
   return total;
 }

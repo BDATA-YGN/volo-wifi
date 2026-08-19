@@ -60,6 +60,7 @@ type SessionLike = {
   nasIpAddress: string | null;
   nasIdentifier: string | null;
   startedAt: Date;
+  createdAt?: Date;
   lastInterimAt: Date | null;
   stoppedAt: Date | null;
   sessionTimeSec: number | null;
@@ -106,7 +107,8 @@ function serializeSession(session: SessionLike, now: Date) {
   const billed = billedSessionSeconds(
     session.sessionTimeSec,
     session.startedAt,
-    session.stoppedAt ?? now
+    session.stoppedAt ?? now,
+    { createdAt: session.createdAt ?? null, stoppedAt: session.stoppedAt },
   );
   return {
     id: session.id,

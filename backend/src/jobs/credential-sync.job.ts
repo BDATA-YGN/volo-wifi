@@ -64,6 +64,9 @@ const loadConfig = async (): Promise<CredentialSyncConfig> => {
 /**
  * Close orphan START/INTERIM RADIUS sessions so remaining-time math stays accurate
  * and Simultaneous-Use slots free up after NAS power loss.
+ *
+ * Age is measured from GREATEST(started_at, created_at) so a delayed Accounting-Start
+ * with a backdated started_at is not treated as already hours old.
  */
 async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<number> {
   const result = await prisma.$executeRaw`
@@ -74,14 +77,16 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
       terminate_cause = COALESCE(NULLIF(terminate_cause, ''), 'Cleanup-Timeout'),
       "sessionTimeSec" = GREATEST(
         COALESCE("sessionTimeSec", 0),
-        GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)))::integer)
+        GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (
+          CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
+        )))::integer)
       ),
       updated_at = CURRENT_TIMESTAMP
     WHERE stopped_at IS NULL
       AND status IN ('START', 'INTERIM')
       AND (
-        started_at < CURRENT_TIMESTAMP - (${cfg.maxOpenHours} * INTERVAL '1 hour')
-        OR COALESCE(last_interim_at, started_at) <
+        GREATEST(started_at, created_at) < CURRENT_TIMESTAMP - (${cfg.maxOpenHours} * INTERVAL '1 hour')
+        OR COALESCE(last_interim_at, created_at) <
           CURRENT_TIMESTAMP - (${cfg.staleInterimMinutes} * INTERVAL '1 minute')
       )
   `;
@@ -111,6 +116,9 @@ async function markExpiredCredentials(): Promise<number> {
 /**
  * Recompute remaining seconds from RADIUS usage and mark CONSUMED when
  * remaining ≤ 0 (or SINGLE_SESSION activation window exceeded).
+ *
+ * Open sessions bill from created_at when NAS started_at is backdated (delayed
+ * accounting). CONSUMED tokens with leftover quota are restored after a real STOP.
  */
 async function syncRemainingAndConsume(): Promise<number> {
   const result = await prisma.$executeRaw`
@@ -137,7 +145,11 @@ async function syncRemainingAndConsume(): Promise<number> {
           SELECT GREATEST(
             0,
             FLOOR(EXTRACT(EPOCH FROM (
-              COALESCE(rs.stopped_at, CURRENT_TIMESTAMP) - rs.started_at
+              COALESCE(rs.stopped_at, CURRENT_TIMESTAMP)
+              - CASE
+                  WHEN rs.stopped_at IS NULL THEN GREATEST(rs.started_at, rs.created_at)
+                  ELSE rs.started_at
+                END
             )))::integer
           ) AS wall
         ) w
@@ -197,12 +209,18 @@ async function syncRemainingAndConsume(): Promise<number> {
         AND c.status IN (
           'SOLD'::"CredentialStatus",
           'ACTIVATED'::"CredentialStatus",
-          'PAUSED'::"CredentialStatus"
+          'PAUSED'::"CredentialStatus",
+          'CONSUMED'::"CredentialStatus"
         )
         AND q.quota_sec IS NOT NULL
         AND (
-          rem.should_consume
-          OR c."timeRemainingSec" IS DISTINCT FROM rem.remaining_sec
+          c."timeRemainingSec" IS DISTINCT FROM rem.remaining_sec
+          OR (rem.should_consume AND c.status IS DISTINCT FROM 'CONSUMED'::"CredentialStatus")
+          OR (
+            NOT rem.should_consume
+            AND c.status = 'CONSUMED'::"CredentialStatus"
+            AND rem.remaining_sec > 0
+          )
         )
     )
     UPDATE wf_credential c
@@ -210,6 +228,14 @@ async function syncRemainingAndConsume(): Promise<number> {
       "timeRemainingSec" = computed.remaining_sec,
       status = CASE
         WHEN computed.should_consume THEN 'CONSUMED'::"CredentialStatus"
+        WHEN c.status = 'CONSUMED'::"CredentialStatus"
+          AND computed.remaining_sec > 0
+          AND c.expires_at IS NOT NULL
+          AND c.expires_at < CURRENT_TIMESTAMP
+          THEN 'EXPIRED'::"CredentialStatus"
+        WHEN c.status = 'CONSUMED'::"CredentialStatus"
+          AND computed.remaining_sec > 0
+          THEN 'ACTIVATED'::"CredentialStatus"
         ELSE c.status
       END,
       updated_at = CURRENT_TIMESTAMP

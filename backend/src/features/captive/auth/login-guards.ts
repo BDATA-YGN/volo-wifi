@@ -144,6 +144,7 @@ async function endOpenRadiusSessionsForSameDevice(params: {
       id: true,
       callingStationId: true,
       startedAt: true,
+      createdAt: true,
       sessionTimeSec: true,
     },
   });
@@ -160,6 +161,7 @@ async function endOpenRadiusSessionsForSameDevice(params: {
         row.sessionTimeSec,
         row.startedAt,
         now,
+        { createdAt: row.createdAt, stoppedAt: null },
       );
       return prisma.radiusSession.update({
         where: { id: row.id },
