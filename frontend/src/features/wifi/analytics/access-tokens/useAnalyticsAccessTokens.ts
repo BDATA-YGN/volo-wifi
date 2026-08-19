@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
+import dayjs from "dayjs";
 import type { CredentialType } from "./types";
 import * as Query from "./query";
 import type {
@@ -26,7 +27,10 @@ export function useAnalyticsAccessTokens() {
   const [customPeriod, setCustomPeriod] = useState<{
     periodFrom?: string;
     periodTo?: string;
-  }>({});
+  }>(() => ({
+    periodFrom: dayjs().startOf("day").toISOString(),
+    periodTo: dayjs().endOf("day").toISOString(),
+  }));
   const [formOptions, setFormOptions] = useState<AccessTokensFormOptions>(emptyFormOptions);
 
   const params: CredentialAnalyticsParams = {
@@ -58,7 +62,6 @@ export function useAnalyticsAccessTokens() {
       setOrgId(id);
       setPlanId(undefined);
       setCredentialType(undefined);
-      setCustomPeriod({});
       void loadFormOptions(id);
     },
     [loadFormOptions]
@@ -79,7 +82,11 @@ export function useAnalyticsAccessTokens() {
   }, []);
 
   const selectCustomPeriod = useCallback((periodFrom: string, periodTo: string) => {
-    setCustomPeriod({ periodFrom, periodTo });
+    setCustomPeriod((prev) =>
+      prev.periodFrom === periodFrom && prev.periodTo === periodTo
+        ? prev
+        : { periodFrom, periodTo },
+    );
   }, []);
 
   const clearCustomPeriod = useCallback(() => {

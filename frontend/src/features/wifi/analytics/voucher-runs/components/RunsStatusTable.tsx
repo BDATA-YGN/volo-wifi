@@ -22,6 +22,7 @@ const RunsStatusTable: React.FC<Props> = ({ rows, total, loading }) => {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      sorter: (a, b) => a.status.localeCompare(b.status),
       render: (status: string) => (
         <Tag color={STATUS_COLOR[status as CredentialStatus] ?? "default"}>
           {formatStatusLabel(status as CredentialStatus)}
@@ -42,6 +43,7 @@ const RunsStatusTable: React.FC<Props> = ({ rows, total, loading }) => {
       key: "share",
       width: 80,
       align: "right",
+      sorter: (a, b) => a.count - b.count,
       render: (_, row) => (
         <Text type="secondary" style={{ fontSize: 12 }}>
           {total > 0 ? `${Math.round((row.count / total) * 100)}%` : "—"}

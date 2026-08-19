@@ -1,7 +1,9 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import {
   appDayKey as utcDayKey,
+  appHourKey,
   eachAppDay,
+  eachAppHour,
   previousAppPeriod,
   resolvePeriodFromPresetDays,
 } from '@/utils/app-time';
@@ -59,10 +61,13 @@ export type SessionTrafficTerminateRow = {
   count: number;
 };
 
+export type TrendGranularity = 'daily' | 'hourly';
+
 export type SessionTrafficPayload = {
   summary: SessionTrafficSummary;
   previousSummary: SessionTrafficSummary;
   dailyTrend: SessionTrafficDailyPoint[];
+  trendGranularity: TrendGranularity;
   bySite: SessionTrafficSiteRow[];
   byPlan: SessionTrafficPlanRow[];
   byTerminateCause: SessionTrafficTerminateRow[];
@@ -88,10 +93,19 @@ type TrafficFilters = {
   planId?: string;
 };
 
-function bigintToNumber(value: bigint | null | undefined): number {
-  if (value == null) return 0;
-  const n = Number(value);
-  return Number.isSafeInteger(n) ? n : 0;
+function bigintToNumber(value: bigint | number | string | null | undefined): number {
+  if (value == null || value === '') return 0;
+  const n = typeof value === 'bigint' ? Number(value) : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function sessionUserKey(session: {
+  credentialId: string | null;
+  userName?: string | null;
+}): string | null {
+  if (session.credentialId) return `c:${session.credentialId}`;
+  const name = session.userName?.trim();
+  return name ? `u:${name.toLowerCase()}` : null;
 }
 
 function emptySummary(): SessionTrafficSummary {
@@ -120,8 +134,8 @@ function finalizeSummary(
   return {
     ...partial,
     avgSessionTimeSec:
-      partial.sessionsCount > 0
-        ? Math.round(partial.totalSessionTimeSec / partial.sessionsCount)
+      partial.uniqueCredentials > 0
+        ? Math.round(partial.totalSessionTimeSec / partial.uniqueCredentials)
         : 0,
     avgBytesPerSession:
       partial.sessionsCount > 0
@@ -132,8 +146,16 @@ function finalizeSummary(
   };
 }
 
-function mergeDailyTrend(
-  usageByDay: Map<
+function isSingleAppDay(periodFrom: Date, periodTo: Date): boolean {
+  return utcDayKey(periodFrom) === utcDayKey(periodTo);
+}
+
+function bucketKey(date: Date, grain: TrendGranularity): string {
+  return grain === 'hourly' ? appHourKey(date) : utcDayKey(date);
+}
+
+function mergeTrend(
+  usageByBucket: Map<
     string,
     {
       sessionsCount: number;
@@ -144,29 +166,29 @@ function mergeDailyTrend(
     }
   >,
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  grain: TrendGranularity
 ): SessionTrafficDailyPoint[] {
-  const points: SessionTrafficDailyPoint[] = [];
-  for (const cursor of eachAppDay(periodFrom, periodTo)) {
-    const key = utcDayKey(cursor);
-    const day = usageByDay.get(key) ?? {
+  const buckets =
+    grain === 'hourly' ? eachAppHour(periodFrom, periodTo) : eachAppDay(periodFrom, periodTo);
+  return buckets.map((cursor) => {
+    const key = bucketKey(cursor, grain);
+    const point = usageByBucket.get(key) ?? {
       sessionsCount: 0,
       totalInputBytes: 0,
       totalOutputBytes: 0,
       totalBytes: 0,
       uniqueCredentials: 0,
     };
-    points.push({ date: key, ...day });
-  }
-
-  return points;
+    return { date: key, ...point };
+  });
 }
 
 export function resolvePeriodFromPreset(
   preset: string,
   periodTo: Date = new Date()
 ): { periodFrom: Date; periodTo: Date } {
-  const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
+  const days = preset === 'today' ? 1 : preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
   return resolvePeriodFromPresetDays(days, periodTo);
 }
 
@@ -399,7 +421,8 @@ async function aggregateFromDailyStats(
   return {
     summary: finalizeSummary(summary, active.count, active.totalBytes),
     previousSummary: emptySummary(),
-    dailyTrend: mergeDailyTrend(usageByDay, periodFrom, periodTo),
+    dailyTrend: mergeTrend(usageByDay, periodFrom, periodTo, 'daily'),
+    trendGranularity: 'daily',
     bySite,
     byPlan,
     byTerminateCause: [],
@@ -414,7 +437,8 @@ async function aggregateFromLiveSessions(
   plans: PlanMeta[],
   periodFrom: Date,
   periodTo: Date,
-  filters?: TrafficFilters
+  filters?: TrafficFilters,
+  grain: TrendGranularity = 'daily'
 ): Promise<SessionTrafficPayload> {
   const sessions = await prisma.radiusSession.findMany({
     where: {
@@ -426,18 +450,21 @@ async function aggregateFromLiveSessions(
     select: {
       stationId: true,
       credentialId: true,
+      userName: true,
       startedAt: true,
       inputBytes: true,
       outputBytes: true,
       totalBytes: true,
       sessionTimeSec: true,
       terminateCause: true,
-      credential: { select: { planId: true } },
+      credential: { select: { planId: true, stationId: true } },
     },
   });
 
   const siteMap = new Map<string, SessionTrafficSiteRow>();
   const planMap = new Map<string, SessionTrafficPlanRow>();
+  const siteUserKeys = new Map<string, Set<string>>();
+  const planUserKeys = new Map<string, Set<string>>();
   const usageByDay = new Map<
     string,
     {
@@ -470,15 +497,16 @@ async function aggregateFromLiveSessions(
     totalBytes += bytes;
     totalSessionTimeSec += sessionTime;
 
-    if (session.credentialId) uniqueCredentialIds.add(session.credentialId);
+    const userKey = sessionUserKey(session);
+    if (userKey) uniqueCredentialIds.add(userKey);
 
     if (session.terminateCause) {
       const cause = session.terminateCause.trim() || 'Unknown';
       terminateMap.set(cause, (terminateMap.get(cause) ?? 0) + 1);
     }
 
-    const dayKey = utcDayKey(session.startedAt);
-    const day = usageByDay.get(dayKey) ?? {
+    const bucket = bucketKey(session.startedAt, grain);
+    const day = usageByDay.get(bucket) ?? {
       sessionsCount: 0,
       totalInputBytes: 0,
       totalOutputBytes: 0,
@@ -489,15 +517,16 @@ async function aggregateFromLiveSessions(
     day.totalInputBytes += inputBytes;
     day.totalOutputBytes += outputBytes;
     day.totalBytes += bytes;
-    if (session.credentialId) day.credentialIds.add(session.credentialId);
-    usageByDay.set(dayKey, day);
+    if (userKey) day.credentialIds.add(userKey);
+    usageByDay.set(bucket, day);
 
-    if (session.stationId) {
-      const station = stationById.get(session.stationId);
+    const stationId = session.stationId ?? session.credential?.stationId ?? null;
+    if (stationId) {
+      const station = stationById.get(stationId);
       const site =
-        siteMap.get(session.stationId) ??
+        siteMap.get(stationId) ??
         ({
-          stationId: session.stationId,
+          stationId,
           code: station?.code ?? '—',
           name: station?.name ?? 'Unknown site',
           status: station?.status ?? 'UNKNOWN',
@@ -514,7 +543,12 @@ async function aggregateFromLiveSessions(
       site.totalOutputBytes += outputBytes;
       site.totalBytes += bytes;
       site.totalSessionTimeSec += sessionTime;
-      siteMap.set(session.stationId, site);
+      siteMap.set(stationId, site);
+      if (userKey) {
+        const keys = siteUserKeys.get(stationId) ?? new Set<string>();
+        keys.add(userKey);
+        siteUserKeys.set(stationId, keys);
+      }
     }
 
     const planId = session.credential?.planId;
@@ -539,14 +573,24 @@ async function aggregateFromLiveSessions(
       plan.totalBytes += bytes;
       plan.totalSessionTimeSec += sessionTime;
       planMap.set(planId, plan);
+      if (userKey) {
+        const keys = planUserKeys.get(planId) ?? new Set<string>();
+        keys.add(userKey);
+        planUserKeys.set(planId, keys);
+      }
     }
   }
 
-  // Recompute unique credentials per site/plan from credential sets would need another pass;
-  // approximate with session counts for live rows without credentialId
+  for (const site of siteMap.values()) {
+    site.uniqueCredentials = siteUserKeys.get(site.stationId)?.size ?? 0;
+  }
+  for (const plan of planMap.values()) {
+    plan.uniqueCredentials = planUserKeys.get(plan.planId)?.size ?? 0;
+  }
+
   const active = await loadActiveSessions(prisma, orgId, filters);
 
-  const dailyTrend = mergeDailyTrend(
+  const dailyTrend = mergeTrend(
     new Map(
       [...usageByDay.entries()].map(([date, day]) => [
         date,
@@ -560,13 +604,13 @@ async function aggregateFromLiveSessions(
       ])
     ),
     periodFrom,
-    periodTo
+    periodTo,
+    grain
   );
 
   const byTerminateCause = [...terminateMap.entries()]
     .map(([cause, count]) => ({ cause, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+    .sort((a, b) => b.count - a.count);
 
   return {
     summary: finalizeSummary(
@@ -583,6 +627,7 @@ async function aggregateFromLiveSessions(
     ),
     previousSummary: emptySummary(),
     dailyTrend,
+    trendGranularity: grain,
     bySite: [...siteMap.values()].sort(
       (a, b) => b.totalBytes - a.totalBytes || b.sessionsCount - a.sessionsCount
     ),
@@ -606,13 +651,15 @@ export async function buildSessionTrafficAnalytics(
     loadPlanMeta(prisma, orgId, filters?.planId),
   ]);
   const stationIds = stations.map((s) => s.id);
+  const grain: TrendGranularity = isSingleAppDay(periodFrom, periodTo) ? 'hourly' : 'daily';
 
   if (stations.length === 0 && filters?.stationId) {
     const active = await loadActiveSessions(prisma, orgId, filters);
     return {
       summary: finalizeSummary(emptySummary(), active.count, active.totalBytes),
       previousSummary: emptySummary(),
-      dailyTrend: mergeDailyTrend(new Map(), periodFrom, periodTo),
+      dailyTrend: mergeTrend(new Map(), periodFrom, periodTo, grain),
+      trendGranularity: grain,
       bySite: [],
       byPlan: [],
       byTerminateCause: [],
@@ -620,20 +667,32 @@ export async function buildSessionTrafficAnalytics(
     };
   }
 
-  const aggregated = await aggregateFromDailyStats(
-    prisma,
-    orgId,
-    stationIds,
-    stations,
-    plans,
-    periodFrom,
-    periodTo,
-    filters
-  );
+  const aggregated =
+    grain === 'hourly'
+      ? null
+      : await aggregateFromDailyStats(
+          prisma,
+          orgId,
+          stationIds,
+          stations,
+          plans,
+          periodFrom,
+          periodTo,
+          filters
+        );
 
   const current =
     aggregated ??
-    (await aggregateFromLiveSessions(prisma, orgId, stations, plans, periodFrom, periodTo, filters));
+    (await aggregateFromLiveSessions(
+      prisma,
+      orgId,
+      stations,
+      plans,
+      periodFrom,
+      periodTo,
+      filters,
+      grain
+    ));
 
   const prev = previousPeriod(periodFrom, periodTo);
   const prevAggregated = await aggregateFromDailyStats(

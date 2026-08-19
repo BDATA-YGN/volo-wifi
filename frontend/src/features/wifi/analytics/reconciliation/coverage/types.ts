@@ -2,6 +2,8 @@ import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/
 
 export type EligibilityStatus = "SEALED" | "GAP" | "UNSEALED" | "NO_COVERAGE";
 
+export type CoverageTab = "stats" | "sites" | "partners" | "ledger";
+
 export type SiteOption = {
   id: string;
   code: string;
@@ -24,6 +26,8 @@ export type CoverageSummary = {
   unsealedCount: number;
   noCoverageCount: number;
   purgeEligibleCount: number;
+  atRiskCount: number;
+  sealedPct: number;
   avgGapDays: number;
   totalUncoveredPayments: number;
   earliestCoveredAt: string | null;
@@ -47,6 +51,10 @@ export type CoveragePartnerRow = {
   scopeCount: number;
   sealedCount: number;
   gapCount: number;
+  unsealedCount: number;
+  noCoverageCount: number;
+  uncoveredPaymentCount: number;
+  sealedPct: number;
   avgGapDays: number;
 };
 
@@ -57,6 +65,10 @@ export type CoverageSiteRow = {
   scopeCount: number;
   sealedCount: number;
   gapCount: number;
+  unsealedCount: number;
+  noCoverageCount: number;
+  uncoveredPaymentCount: number;
+  sealedPct: number;
   avgGapDays: number;
 };
 
@@ -130,12 +142,15 @@ export type CoverageFormOptions = {
   memberships: OrgMembershipOption[];
   stations: SiteOption[];
   resellers: PartnerOption[];
+  canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
 };
 
 export type CoverageAnalyticsMeta = {
   memberships?: OrgMembershipOption[];
   orgId?: string;
   requiresOrgSelection?: boolean;
+  canSwitchOrg?: boolean;
 };
 
 export type CoverageAnalyticsParams = {

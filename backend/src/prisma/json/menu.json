@@ -363,12 +363,23 @@
       "groupKey": "commerce"
     },
     {
+      "id": 246,
+      "key": "/wifi/commerce/token-diagnose",
+      "title": "menus.wifi.commerce.token-diagnose",
+      "icon": "search",
+      "url": "/wifi/commerce/token-diagnose",
+      "position": 4,
+      "groupId": 5,
+      "level": "app",
+      "groupKey": "commerce"
+    },
+    {
       "id": 226,
       "key": "/wifi/commerce/transactions/orders",
       "title": "menus.wifi.commerce.transactions.orders",
       "icon": "receipt",
       "url": "/wifi/commerce/transactions/orders",
-      "position": 4,
+      "position": 5,
       "groupId": 5,
       "level": "app",
       "groupKey": "commerce"
@@ -379,7 +390,7 @@
       "title": "menus.wifi.commerce.transactions.payments",
       "icon": "payment",
       "url": "/wifi/commerce/transactions/payments",
-      "position": 5,
+      "position": 6,
       "groupId": 5,
       "level": "app",
       "groupKey": "commerce"
@@ -390,7 +401,7 @@
       "title": "menus.wifi.commerce.commissions.rules",
       "icon": "analysis",
       "url": "/wifi/commerce/commissions/rules",
-      "position": 6,
+      "position": 7,
       "groupId": 5,
       "level": "app",
       "groupKey": "commerce"
@@ -401,7 +412,7 @@
       "title": "menus.wifi.commerce.commissions.payouts",
       "icon": "wallet",
       "url": "/wifi/commerce/commissions/payouts",
-      "position": 7,
+      "position": 8,
       "groupId": 5,
       "level": "app",
       "groupKey": "commerce"
@@ -412,7 +423,7 @@
       "title": "menus.wifi.commerce.partners.insights",
       "icon": "chart",
       "url": "/wifi/commerce/partners/insights",
-      "position": 8,
+      "position": 9,
       "groupId": 5,
       "level": "app",
       "groupKey": "commerce"

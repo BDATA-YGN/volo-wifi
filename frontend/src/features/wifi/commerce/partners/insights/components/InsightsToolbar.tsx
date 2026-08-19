@@ -10,6 +10,7 @@ import { PERIOD_PRESETS } from "../constant";
 const { RangePicker } = DatePicker;
 
 type PresetOption = { value: string; label: string };
+type DatePreset = { label: string; value: [Dayjs, Dayjs] };
 
 type Props = {
   preset: string;
@@ -20,6 +21,7 @@ type Props = {
   presets?: PresetOption[];
   showPresets?: boolean;
   showCustomRange?: boolean;
+  datePresets?: DatePreset[];
   onPresetChange: (preset: string) => void;
   onCustomRangeChange: (range: [Dayjs | null, Dayjs | null] | null) => void;
   onRefresh: () => void;
@@ -33,6 +35,7 @@ const InsightsToolbar: React.FC<Props> = ({
   presets = PERIOD_PRESETS,
   showPresets = true,
   showCustomRange = true,
+  datePresets,
   onPresetChange,
   onCustomRangeChange,
   onRefresh,
@@ -53,6 +56,7 @@ const InsightsToolbar: React.FC<Props> = ({
           onChange={(dates) => onCustomRangeChange(dates)}
           format="D MMM YYYY"
           placeholder={["Custom from", "Custom to"]}
+          presets={datePresets}
         />
       ) : null}
       {dataSource ? (

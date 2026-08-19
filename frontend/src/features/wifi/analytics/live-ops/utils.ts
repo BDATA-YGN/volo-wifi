@@ -10,11 +10,20 @@ export function formatMoney(amount: number, currency: string): string {
   }
 }
 
+export function formatCount(value: number): string {
+  return value.toLocaleString();
+}
+
 export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  if (bytes <= 0) return "0 B";
+  if (bytes < 1024) return `${formatCount(bytes)} B`;
+  if (bytes < 1024 * 1024) {
+    return `${Number((bytes / 1024).toFixed(1)).toLocaleString()} KB`;
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${Number((bytes / (1024 * 1024)).toFixed(1)).toLocaleString()} MB`;
+  }
+  return `${Number((bytes / (1024 * 1024 * 1024)).toFixed(2)).toLocaleString()} GB`;
 }
 
 export function formatSessionStatus(status: string): string {

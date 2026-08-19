@@ -7,11 +7,10 @@ import {
   DollarOutlined,
   PercentageOutlined,
   ShoppingCartOutlined,
-  WifiOutlined,
 } from "@ant-design/icons";
 import { KpiDeltaText } from "@/features/wifi/shared/components/KpiDeltaText";
 import type { PlanAnalyticsSummary } from "../types";
-import { formatBytes, formatMoney, percentChange } from "../utils";
+import { formatMoney, percentChange } from "../utils";
 
 type Props = {
   summary: PlanAnalyticsSummary;
@@ -98,23 +97,6 @@ const PlansKpiCards: React.FC<Props> = ({
         value={formatMoney(summary.commission, currency)}
         delta={percentChange(summary.commission, previous.commission)}
         prefix={<PercentageOutlined style={{ color: "#722ed1" }} />}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
-        title="WiFi sessions"
-        value={summary.sessionsCount}
-        delta={percentChange(summary.sessionsCount, previous.sessionsCount)}
-        prefix={<WifiOutlined style={{ color: "#13c2c2" }} />}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
-        title="Data transferred"
-        value={formatBytes(summary.totalBytes)}
-        delta={percentChange(summary.totalBytes, previous.totalBytes)}
       />
     </Col>
   </Row>

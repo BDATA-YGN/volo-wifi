@@ -8,10 +8,8 @@ import dayjs, { type Dayjs } from "dayjs";
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
 import { useAnalyticsSessionTraffic } from "./useAnalyticsSessionTraffic";
-import type { PeriodPreset } from "./types";
 import { formatBytes } from "./utils";
 import TrafficToolbar from "./components/TrafficToolbar";
-import TrafficFilterBar from "./components/TrafficFilterBar";
 import TrafficKpiCards from "./components/TrafficKpiCards";
 import TrafficTrendChart from "./components/TrafficTrendChart";
 import TrafficSiteTable from "./components/TrafficSiteTable";
@@ -23,7 +21,10 @@ const { Title, Paragraph, Text } = Typography;
 const AnalyticsSessionTrafficPage: React.FC = () => {
   const { token } = theme.useToken();
   const [initDone, setInitDone] = useState(false);
-  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>([
+    dayjs().startOf("day"),
+    dayjs().endOf("day"),
+  ]);
 
   const {
     analytics,
@@ -33,14 +34,11 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
     orgId,
     stationId,
     planId,
-    preset,
     formOptions,
     selectOrg,
     selectStation,
     selectPlan,
-    selectPreset,
     selectCustomPeriod,
-    clearCustomPeriod,
     clearFilters,
     refresh,
     loadFormOptions,
@@ -61,6 +59,17 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
       selectOrg(meta.orgId);
     }
   }, [meta?.orgId, orgId, selectOrg]);
+
+  useEffect(() => {
+    if (customRange?.[0] && customRange?.[1]) {
+      selectCustomPeriod(
+        customRange[0].startOf("day").toISOString(),
+        customRange[1].endOf("day").toISOString(),
+      );
+    }
+    // initialize default period to today once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
   const stations = formOptions.stations;
@@ -84,14 +93,11 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
 
   const periodLabel = useMemo(() => {
     if (!analytics) return null;
-    return `${dayjs(analytics.periodFrom).format("D MMM YYYY")} – ${dayjs(analytics.periodTo).format("D MMM YYYY")}`;
+    const from = dayjs(analytics.periodFrom);
+    const to = dayjs(analytics.periodTo);
+    if (from.isSame(to, "day")) return from.format("D MMM YYYY");
+    return `${from.format("D MMM YYYY")} – ${to.format("D MMM YYYY")}`;
   }, [analytics]);
-
-  const handlePresetChange = (value: PeriodPreset) => {
-    setCustomRange(null);
-    clearCustomPeriod();
-    selectPreset(value);
-  };
 
   const handleCustomRangeChange = (range: [Dayjs | null, Dayjs | null] | null) => {
     setCustomRange(range);
@@ -101,7 +107,9 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
         range[1].endOf("day").toISOString()
       );
     } else {
-      clearCustomPeriod();
+      const today: [Dayjs, Dayjs] = [dayjs().startOf("day"), dayjs().endOf("day")];
+      setCustomRange(today);
+      selectCustomPeriod(today[0].toISOString(), today[1].toISOString());
     }
   };
 
@@ -207,25 +215,19 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
                 style={{ borderRadius: token.borderRadiusLG }}
               >
                 <TrafficToolbar
-                  preset={preset}
                   customRange={customRange}
+                  stations={stations}
+                  plans={plans}
+                  stationId={stationId}
+                  planId={planId}
                   loading={loading}
                   dataSource={analytics.dataSource}
-                  onPresetChange={handlePresetChange}
                   onCustomRangeChange={handleCustomRangeChange}
+                  onStationChange={selectStation}
+                  onPlanChange={selectPlan}
                   onRefresh={refresh}
                 />
               </Card>
-
-              <TrafficFilterBar
-                stations={stations}
-                plans={plans}
-                stationId={stationId}
-                planId={planId}
-                loading={loading}
-                onStationChange={selectStation}
-                onPlanChange={selectPlan}
-              />
 
               <TrafficKpiCards
                 summary={analytics.summary}
@@ -233,7 +235,11 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
                 loading={loading}
               />
 
-              <TrafficTrendChart points={analytics.dailyTrend} loading={loading} />
+              <TrafficTrendChart
+                points={analytics.dailyTrend}
+                granularity={analytics.trendGranularity}
+                loading={loading}
+              />
 
               <Row gutter={[16, 16]}>
                 <Col xs={24} lg={14}>
@@ -245,25 +251,22 @@ const AnalyticsSessionTrafficPage: React.FC = () => {
                   />
                 </Col>
                 <Col xs={24} lg={10}>
-                  <TrafficPlanTable
-                    rows={analytics.byPlan}
-                    loading={loading}
-                    selectedPlanId={planId}
-                    onSelectPlan={(id) => selectPlan(id)}
-                  />
+                  <div className="flex flex-col gap-4">
+                    <TrafficPlanTable
+                      rows={analytics.byPlan}
+                      loading={loading}
+                      selectedPlanId={planId}
+                      onSelectPlan={(id) => selectPlan(id)}
+                    />
+                    {analytics.byTerminateCause.length > 0 ? (
+                      <TrafficTerminateTable
+                        rows={analytics.byTerminateCause}
+                        loading={loading}
+                      />
+                    ) : null}
+                  </div>
                 </Col>
               </Row>
-
-              {analytics.byTerminateCause.length > 0 ? (
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} lg={12}>
-                    <TrafficTerminateTable
-                      rows={analytics.byTerminateCause}
-                      loading={loading}
-                    />
-                  </Col>
-                </Row>
-              ) : null}
             </>
           ) : initDone && orgId && !loading && !needsOrg && !error ? (
             <Alert

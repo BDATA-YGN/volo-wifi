@@ -1,7 +1,9 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import {
   appDayKey as utcDayKey,
+  appHourKey,
   eachAppDay,
+  eachAppHour,
   previousAppPeriod,
   resolvePeriodFromPresetDays,
 } from '@/utils/app-time';
@@ -38,7 +40,7 @@ export type VoucherRunBatchRow = {
   remaining: number;
   redeemed: number;
   utilizationPercent: number;
-  activatedInPeriod: number;
+  activatedCount: number;
   createdAt: string;
   statusBreakdown: Record<string, number>;
 };
@@ -51,6 +53,7 @@ export type VoucherRunPlanRow = {
   totalIssued: number;
   totalRemaining: number;
   totalRedeemed: number;
+  activatedCount: number;
   utilizationPercent: number;
 };
 
@@ -59,10 +62,13 @@ export type VoucherRunStatusRow = {
   count: number;
 };
 
+export type TrendGranularity = 'daily' | 'hourly';
+
 export type VoucherRunAnalyticsPayload = {
   summary: VoucherRunSummary;
   previousSummary: VoucherRunSummary;
   dailyTrend: VoucherRunDailyPoint[];
+  trendGranularity: TrendGranularity;
   byBatch: VoucherRunBatchRow[];
   byPlan: VoucherRunPlanRow[];
   byStatus: VoucherRunStatusRow[];
@@ -143,30 +149,38 @@ function finalizeSummary(
   };
 }
 
-function mergeDailyTrend(
-  batchesByDay: Map<string, { batchesCreated: number; vouchersIssued: number }>,
-  activatedByDay: Map<string, number>,
+function isSingleAppDay(periodFrom: Date, periodTo: Date): boolean {
+  return utcDayKey(periodFrom) === utcDayKey(periodTo);
+}
+
+function bucketKey(date: Date, grain: TrendGranularity): string {
+  return grain === 'hourly' ? appHourKey(date) : utcDayKey(date);
+}
+
+function mergeTrend(
+  batchesByBucket: Map<string, { batchesCreated: number; vouchersIssued: number }>,
+  activatedByBucket: Map<string, number>,
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  grain: TrendGranularity
 ): VoucherRunDailyPoint[] {
-  const points: VoucherRunDailyPoint[] = [];
-  for (const cursor of eachAppDay(periodFrom, periodTo)) {
-    const key = utcDayKey(cursor);
-    const batchDay = batchesByDay.get(key) ?? { batchesCreated: 0, vouchersIssued: 0 };
-    points.push({
+  const buckets =
+    grain === 'hourly' ? eachAppHour(periodFrom, periodTo) : eachAppDay(periodFrom, periodTo);
+  return buckets.map((cursor) => {
+    const key = bucketKey(cursor, grain);
+    const batchDay = batchesByBucket.get(key) ?? { batchesCreated: 0, vouchersIssued: 0 };
+    return {
       date: key,
       batchesCreated: batchDay.batchesCreated,
       vouchersIssued: batchDay.vouchersIssued,
-      vouchersActivated: activatedByDay.get(key) ?? 0,
-    });
-  }
-
-  return points;
+      vouchersActivated: activatedByBucket.get(key) ?? 0,
+    };
+  });
 }
 
-function incrementDay(map: Map<string, number>, date: Date | null | undefined) {
+function incrementBucket(map: Map<string, number>, date: Date | null | undefined, grain: TrendGranularity) {
   if (!date) return;
-  const key = utcDayKey(date);
+  const key = bucketKey(date, grain);
   map.set(key, (map.get(key) ?? 0) + 1);
 }
 
@@ -174,7 +188,7 @@ export function resolvePeriodFromPreset(
   preset: string,
   periodTo: Date = new Date()
 ): { periodFrom: Date; periodTo: Date } {
-  const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
+  const days = preset === 'today' ? 1 : preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
   return resolvePeriodFromPresetDays(days, periodTo);
 }
 
@@ -266,12 +280,14 @@ function buildAnalyticsFromBatches(
   batches: BatchMeta[],
   credentials: CredentialRow[],
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  grain: TrendGranularity
 ): Omit<VoucherRunAnalyticsPayload, 'previousSummary'> {
   if (batches.length === 0) {
     return {
       summary: emptySummary(),
-      dailyTrend: mergeDailyTrend(new Map(), new Map(), periodFrom, periodTo),
+      dailyTrend: mergeTrend(new Map(), new Map(), periodFrom, periodTo, grain),
+      trendGranularity: grain,
       byBatch: [],
       byPlan: [],
       byStatus: [],
@@ -293,7 +309,7 @@ function buildAnalyticsFromBatches(
 
     const saleDay = credential.soldAt ?? credential.createdAt;
     if (saleDay >= periodFrom && saleDay <= periodTo) {
-      const dayKey = utcDayKey(saleDay);
+      const dayKey = bucketKey(saleDay, grain);
       const batchDay = batchesByDay.get(dayKey) ?? { batchesCreated: 0, vouchersIssued: 0 };
       batchDay.vouchersIssued += 1;
       batchesByDay.set(dayKey, batchDay);
@@ -324,7 +340,7 @@ function buildAnalyticsFromBatches(
       if (cred.activatedAt && cred.activatedAt >= periodFrom && cred.activatedAt <= periodTo) {
         batchActivatedInPeriod += 1;
         activatedInPeriod += 1;
-        incrementDay(activatedByDay, cred.activatedAt);
+        incrementBucket(activatedByDay, cred.activatedAt, grain);
       }
 
       if (cred.expiresAt && cred.expiresAt >= periodFrom && cred.expiresAt <= periodTo) {
@@ -341,7 +357,7 @@ function buildAnalyticsFromBatches(
     totalIssued += issued;
     totalRemaining += remaining;
 
-    const dayKey = utcDayKey(batch.createdAt);
+    const dayKey = bucketKey(batch.createdAt, grain);
     const batchDay = batchesByDay.get(dayKey) ?? { batchesCreated: 0, vouchersIssued: 0 };
     batchDay.batchesCreated += 1;
     batchesByDay.set(dayKey, batchDay);
@@ -360,7 +376,7 @@ function buildAnalyticsFromBatches(
       remaining,
       redeemed,
       utilizationPercent: utilizationPercent(issued, remaining),
-      activatedInPeriod: batchActivatedInPeriod,
+      activatedCount: statusBreakdown.ACTIVATED ?? 0,
       createdAt: batch.createdAt.toISOString(),
       statusBreakdown,
     });
@@ -375,6 +391,7 @@ function buildAnalyticsFromBatches(
         totalIssued: 0,
         totalRemaining: 0,
         totalRedeemed: 0,
+        activatedCount: 0,
         utilizationPercent: 0,
       } as VoucherRunPlanRow);
 
@@ -382,6 +399,7 @@ function buildAnalyticsFromBatches(
     planRow.totalIssued += issued;
     planRow.totalRemaining += remaining;
     planRow.totalRedeemed += redeemed;
+    planRow.activatedCount += statusBreakdown.ACTIVATED ?? 0;
     planMap.set(batch.planId, planRow);
   }
 
@@ -390,7 +408,7 @@ function buildAnalyticsFromBatches(
       ...p,
       utilizationPercent: utilizationPercent(p.totalIssued, p.totalRemaining),
     }))
-    .sort((a, b) => b.utilizationPercent - a.utilizationPercent || b.totalIssued - a.totalIssued);
+    .sort((a, b) => a.utilizationPercent - b.utilizationPercent || b.totalIssued - a.totalIssued);
 
   const byStatus = [...statusMap.entries()]
     .map(([status, count]) => ({ status, count }))
@@ -405,7 +423,8 @@ function buildAnalyticsFromBatches(
       expiredInPeriod,
       revokedInPeriod
     ),
-    dailyTrend: mergeDailyTrend(batchesByDay, activatedByDay, periodFrom, periodTo),
+    dailyTrend: mergeTrend(batchesByDay, activatedByDay, periodFrom, periodTo, grain),
+    trendGranularity: grain,
     byBatch: byBatch.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     ),
@@ -421,9 +440,10 @@ export async function buildVoucherRunAnalytics(
   periodTo: Date,
   filters?: VoucherFilters
 ): Promise<VoucherRunAnalyticsPayload> {
+  const grain: TrendGranularity = isSingleAppDay(periodFrom, periodTo) ? 'hourly' : 'daily';
   const batches = await loadBatches(prisma, orgId, periodFrom, periodTo, filters);
   const credentials = await loadCredentialsForBatches(prisma, orgId, batches);
-  const current = buildAnalyticsFromBatches(batches, credentials, periodFrom, periodTo);
+  const current = buildAnalyticsFromBatches(batches, credentials, periodFrom, periodTo, grain);
 
   const prev = previousPeriod(periodFrom, periodTo);
   const prevBatches = await loadBatches(prisma, orgId, prev.from, prev.to, filters);
@@ -432,7 +452,8 @@ export async function buildVoucherRunAnalytics(
     prevBatches,
     prevCredentials,
     prev.from,
-    prev.to
+    prev.to,
+    'daily'
   );
 
   return {

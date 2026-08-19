@@ -1,47 +1,79 @@
 "use client";
 
 import React from "react";
-import { Card, Select, Space, Typography } from "antd";
-import { QUOTA_TYPE_OPTIONS } from "@/features/wifi/catalog/service-plans/constant";
-import type { PlanOption } from "../types";
-import type { PlanQuotaType } from "@/features/wifi/catalog/service-plans/types";
+import { Select, Space, Typography } from "antd";
+import type { PartnerOption, PlanOption, ProfileOption, SiteOption } from "../types";
 
 const { Text } = Typography;
 
 type Props = {
+  stations: SiteOption[];
+  resellers: PartnerOption[];
+  profiles: ProfileOption[];
   plans: PlanOption[];
+  stationId?: string;
+  resellerId?: string;
+  profile?: string;
   planId?: string;
-  quotaType?: PlanQuotaType;
   loading?: boolean;
+  onStationChange: (id: string | undefined) => void;
+  onResellerChange: (id: string | undefined) => void;
+  onProfileChange: (value: string | undefined) => void;
   onPlanChange: (id: string | undefined) => void;
-  onQuotaTypeChange: (value: PlanQuotaType | undefined) => void;
 };
 
 const PlansFilterBar: React.FC<Props> = ({
+  stations,
+  resellers,
+  profiles,
   plans,
+  stationId,
+  resellerId,
+  profile,
   planId,
-  quotaType,
   loading,
+  onStationChange,
+  onResellerChange,
+  onProfileChange,
   onPlanChange,
-  onQuotaTypeChange,
 }) => (
-  <Card size="small" styles={{ body: { padding: 16 } }} title="Filters">
-    <Text type="secondary" className="mb-3 block" style={{ fontSize: 13 }}>
-      Narrow by quota type or a specific service plan. Click a table row to drill down.
-    </Text>
-    <Space wrap size="middle">
+  <Space wrap size="middle" align="end">
       <div>
         <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
-          Quota type
+          Site
         </Text>
         <Select
           allowClear
-          placeholder="All types"
-          style={{ minWidth: 180 }}
+          showSearch
+          placeholder="All sites"
+          style={{ minWidth: 200 }}
           loading={loading}
-          value={quotaType}
-          onChange={(v) => onQuotaTypeChange(v ?? undefined)}
-          options={QUOTA_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          value={stationId}
+          optionFilterProp="label"
+          onChange={(v) => onStationChange(v ?? undefined)}
+          options={stations.map((s) => ({
+            value: s.id,
+            label: `${s.name} (${s.code})`,
+          }))}
+        />
+      </div>
+      <div>
+        <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+          Partner
+        </Text>
+        <Select
+          allowClear
+          showSearch
+          placeholder="All partners"
+          style={{ minWidth: 200 }}
+          loading={loading}
+          value={resellerId}
+          optionFilterProp="label"
+          onChange={(v) => onResellerChange(v ?? undefined)}
+          options={resellers.map((r) => ({
+            value: r.id,
+            label: `${r.name} (${r.code})`,
+          }))}
         />
       </div>
       <div>
@@ -52,21 +84,32 @@ const PlansFilterBar: React.FC<Props> = ({
           allowClear
           showSearch
           placeholder="All plans"
-          style={{ minWidth: 280 }}
+          style={{ minWidth: 240 }}
           loading={loading}
           value={planId}
           optionFilterProp="label"
           onChange={(v) => onPlanChange(v ?? undefined)}
-          options={plans
-            .filter((p) => !quotaType || p.quotaType === quotaType)
-            .map((p) => ({
-              value: p.id,
-              label: `${p.name} (${p.code})`,
-            }))}
+          options={plans.map((p) => ({
+            value: p.id,
+            label: `${p.name} (${p.code})`,
+          }))}
+        />
+      </div>
+      <div>
+        <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+          Profile
+        </Text>
+        <Select
+          allowClear
+          placeholder="All profiles"
+          style={{ minWidth: 180 }}
+          loading={loading}
+          value={profile}
+          onChange={(v) => onProfileChange(v ?? undefined)}
+          options={profiles}
         />
       </div>
     </Space>
-  </Card>
 );
 
 export default PlansFilterBar;

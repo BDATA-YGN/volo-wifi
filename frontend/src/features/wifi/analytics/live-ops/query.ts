@@ -23,8 +23,10 @@ export const loadAnalytics = async (
       params: {
         orgId: params?.orgId || undefined,
         stationId: params?.stationId || undefined,
-        resellerId: params?.resellerId || undefined,
-        windowHours: params?.windowHours || undefined,
+        stationSizeId: params?.stationSizeId || undefined,
+        planId: params?.planId || undefined,
+        profile: params?.profile || undefined,
+        date: params?.date || undefined,
       },
     });
     return res.data;

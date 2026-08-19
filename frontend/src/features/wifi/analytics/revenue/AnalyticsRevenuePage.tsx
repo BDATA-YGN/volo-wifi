@@ -1,27 +1,24 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Card, Col, Row, Tag, Typography, theme } from "antd";
+import React, { useEffect, useState } from "react";
+import { Alert, Card, Tag, Typography, theme } from "antd";
 import { TrendingUp } from "lucide-react";
-import dayjs, { type Dayjs } from "dayjs";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
 import { useAnalyticsRevenue } from "./useAnalyticsRevenue";
-import type { PeriodPreset } from "./types";
+import { formatCount, formatMoney, formatMonthLabel } from "./utils";
 import RevenueToolbar from "./components/RevenueToolbar";
 import RevenueKpiCards from "./components/RevenueKpiCards";
 import RevenueTrendChart from "./components/RevenueTrendChart";
-import RevenuePaymentTable from "./components/RevenuePaymentTable";
-import RevenueOrderStatusTable from "./components/RevenueOrderStatusTable";
-import { formatMoney, granularityLabel } from "./utils";
+import RevenueTierTable from "./components/RevenueTierTable";
+import RevenueTierSitesTable from "./components/RevenueTierSitesTable";
 
 const { Title, Paragraph, Text } = Typography;
 
 const AnalyticsRevenuePage: React.FC = () => {
   const { token } = theme.useToken();
   const [initDone, setInitDone] = useState(false);
-  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
 
   const {
     analytics,
@@ -29,12 +26,10 @@ const AnalyticsRevenuePage: React.FC = () => {
     loading,
     error,
     orgId,
-    preset,
+    month,
     formOptions,
     selectOrg,
-    selectPreset,
-    selectCustomPeriod,
-    clearCustomPeriod,
+    selectMonth,
     refresh,
     loadFormOptions,
   } = useAnalyticsRevenue();
@@ -44,43 +39,33 @@ const AnalyticsRevenuePage: React.FC = () => {
   }, [loadFormOptions]);
 
   useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
+    if (
+      initDone &&
+      meta?.memberships?.length === 1 &&
+      !orgId &&
+      !(meta?.canSwitchOrg ?? formOptions.canSwitchOrg)
+    ) {
       selectOrg(meta.memberships[0].id);
     }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
+  }, [initDone, meta?.memberships, meta?.canSwitchOrg, formOptions.canSwitchOrg, orgId, selectOrg]);
 
   useEffect(() => {
-    if (meta?.orgId && !orgId) {
+    if (meta?.orgId && !orgId && !(meta?.canSwitchOrg ?? formOptions.canSwitchOrg)) {
       selectOrg(meta.orgId);
     }
-  }, [meta?.orgId, orgId, selectOrg]);
+  }, [meta?.orgId, meta?.canSwitchOrg, formOptions.canSwitchOrg, orgId, selectOrg]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
-  const showOrgSwitcher = memberships.length > 1;
-  const needsOrg = Boolean(meta?.requiresOrgSelection) && !orgId;
+  const showOrgSwitcher =
+    memberships.length > 1 ||
+    Boolean(meta?.requiresOrgSelection || formOptions.requiresOrgSelection);
+  const needsOrg = Boolean(meta?.requiresOrgSelection || formOptions.requiresOrgSelection) && !orgId;
   const currency = analytics?.org.currency ?? formOptions.currency;
+  const monthLabel = analytics?.month ? formatMonthLabel(analytics.month) : formatMonthLabel(month);
 
-  const periodLabel = useMemo(() => {
-    if (!analytics) return null;
-    return `${dayjs(analytics.periodFrom).format("D MMM YYYY")} – ${dayjs(analytics.periodTo).format("D MMM YYYY")}`;
-  }, [analytics]);
-
-  const handlePresetChange = (value: PeriodPreset) => {
-    setCustomRange(null);
-    clearCustomPeriod();
-    selectPreset(value);
-  };
-
-  const handleCustomRangeChange = (range: [Dayjs | null, Dayjs | null] | null) => {
-    setCustomRange(range);
-    if (range?.[0] && range?.[1]) {
-      selectCustomPeriod(
-        range[0].startOf("day").toISOString(),
-        range[1].endOf("day").toISOString()
-      );
-    } else {
-      clearCustomPeriod();
-    }
+  const scrollToTier = (stationSizeId: string) => {
+    const el = document.getElementById(`revenue-tier-${stationSizeId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -138,14 +123,13 @@ const AnalyticsRevenuePage: React.FC = () => {
                     </Title>
                     <Paragraph type="secondary" style={{ marginBottom: 8, marginTop: 4 }}>
                       {analytics.org.name}
-                      {periodLabel ? ` · ${periodLabel}` : ""}
+                      {monthLabel ? ` · ${monthLabel}` : ""}
                     </Paragraph>
                     <div className="flex flex-wrap gap-2">
                       <Tag style={{ fontFamily: "monospace" }}>{analytics.org.code}</Tag>
                       <Tag>{currency}</Tag>
-                      <Tag color="geekblue">
-                        {granularityLabel(analytics.trendGranularity)} trend
-                      </Tag>
+                      <Tag color="geekblue">{formatCount(analytics.summary.tierCount)} tiers</Tag>
+                      <Tag>{formatCount(analytics.summary.siteCount)} sites</Tag>
                       <Tag color={analytics.dataSource === "aggregated" ? "blue" : "orange"}>
                         {analytics.dataSource === "aggregated" ? "Aggregated" : "Live"}
                       </Tag>
@@ -160,27 +144,22 @@ const AnalyticsRevenuePage: React.FC = () => {
                     </Title>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       Net {formatMoney(analytics.summary.netRevenue, currency)} ·{" "}
-                      {analytics.summary.ordersCount} paid order
+                      {formatCount(analytics.summary.ordersCount)} paid order
                       {analytics.summary.ordersCount === 1 ? "" : "s"}
                     </Text>
                   </div>
                 </div>
-              </Card>
 
-              <Card
-                styles={{ body: { padding: 16 } }}
-                style={{ borderRadius: token.borderRadiusLG }}
-              >
-                <RevenueToolbar
-                  preset={preset}
-                  customRange={customRange}
-                  trendGranularity={analytics.trendGranularity}
-                  dataSource={analytics.dataSource}
-                  loading={loading}
-                  onPresetChange={handlePresetChange}
-                  onCustomRangeChange={handleCustomRangeChange}
-                  onRefresh={refresh}
-                />
+                <div style={{ marginTop: 16, paddingTop: 14 }}>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <RevenueToolbar
+                      month={analytics.month || month}
+                      loading={loading}
+                      onMonthChange={selectMonth}
+                      onRefresh={refresh}
+                    />
+                  </div>
+                </div>
               </Card>
 
               <RevenueKpiCards
@@ -197,29 +176,28 @@ const AnalyticsRevenuePage: React.FC = () => {
                 loading={loading}
               />
 
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={12}>
-                  <RevenuePaymentTable
-                    rows={analytics.byPaymentMethod}
-                    currency={currency}
-                    loading={loading}
-                  />
-                </Col>
-                <Col xs={24} lg={12}>
-                  <RevenueOrderStatusTable
-                    rows={analytics.byOrderStatus}
-                    currency={currency}
-                    loading={loading}
-                  />
-                </Col>
-              </Row>
+              <RevenueTierTable
+                rows={analytics.byTier}
+                currency={currency}
+                loading={loading}
+                onSelectTier={scrollToTier}
+              />
+
+              {analytics.byTier.map((tier) => (
+                <RevenueTierSitesTable
+                  key={tier.stationSizeId}
+                  tier={tier}
+                  currency={currency}
+                  loading={loading}
+                />
+              ))}
             </>
           ) : initDone && orgId && !loading && !needsOrg && !error ? (
             <Alert
               type="info"
               showIcon
               title="No revenue data"
-              description="There is no sales or payment activity for the selected period."
+              description="There is no sales activity for the selected month."
             />
           ) : null}
         </div>

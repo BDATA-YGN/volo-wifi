@@ -1,14 +1,13 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { Badge, Button, Card, Table, Tag, Typography } from "antd";
+import { Badge, Card, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { QUOTA_TYPE_COLOR } from "@/features/wifi/catalog/service-plans/constant";
 import { formatQuotaTypeLabel } from "@/features/wifi/catalog/service-plans/utils";
 import type { PlanQuotaType } from "@/features/wifi/catalog/service-plans/types";
 import type { PlanRow } from "../types";
-import { formatBytes, formatMoney } from "../utils";
+import { formatMoney } from "../utils";
 
 const { Text } = Typography;
 
@@ -87,35 +86,6 @@ const PlansTable: React.FC<Props> = ({
       render: (_, row) => formatMoney(row.commission, currency),
       sorter: (a, b) => a.commission - b.commission,
     },
-    {
-      title: "Sessions",
-      dataIndex: "sessionsCount",
-      key: "sessionsCount",
-      width: 90,
-      align: "right",
-      sorter: (a, b) => a.sessionsCount - b.sessionsCount,
-    },
-    {
-      title: "Data",
-      key: "totalBytes",
-      width: 90,
-      align: "right",
-      render: (_, row) => formatBytes(row.totalBytes),
-      sorter: (a, b) => a.totalBytes - b.totalBytes,
-    },
-    {
-      title: "",
-      key: "actions",
-      width: 90,
-      fixed: "right",
-      render: (_, row) => (
-        <Link href={`/wifi/catalog/service-plans`} onClick={(e) => e.stopPropagation()}>
-          <Button type="link" size="small">
-            Catalog
-          </Button>
-        </Link>
-      ),
-    },
   ];
 
   return (
@@ -131,7 +101,7 @@ const PlansTable: React.FC<Props> = ({
           showSizeChanger: rows.length > 10,
           showTotal: (total) => `${total} plan${total === 1 ? "" : "s"}`,
         }}
-        scroll={{ x: 960 }}
+        scroll={{ x: 720 }}
         onRow={(row) => ({
           onClick: onSelectPlan ? () => onSelectPlan(row.planId) : undefined,
           style: {

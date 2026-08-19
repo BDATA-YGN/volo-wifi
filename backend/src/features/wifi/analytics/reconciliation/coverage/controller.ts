@@ -6,9 +6,11 @@ import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import {
   canAccessOrg,
+  canSwitchOrgContext,
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
+import { resolveAllowedStationIds } from '@/features/wifi/shared/resolve-station-scope';
 import type { EligibilityStatus } from './constants';
 import { AnalyticsReconciliationCoverageQuerySchema } from './schema';
 import {
@@ -16,6 +18,10 @@ import {
   loadCoverageDetail,
   type CoverageAnalyticsPayload,
 } from './build-coverage-analytics';
+
+function allowedStationScope(ids: string[] | null): string[] | null {
+  return ids && ids.length > 0 ? ids : null;
+}
 
 /** menus.wifi.analytics.reconciliation.coverage @route /wifi/analytics/reconciliation/coverage */
 export class AnalyticsReconciliationCoverageController {
@@ -27,6 +33,7 @@ export class AnalyticsReconciliationCoverageController {
     asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const adminId = req.userId!;
       const isDeveloper = isDeveloperAdmin(req.user!);
+      const canSwitchOrg = canSwitchOrgContext(req.user!);
 
       const { error } = AnalyticsReconciliationCoverageQuerySchema.validate(req.query, {
         abortEarly: false,
@@ -40,11 +47,21 @@ export class AnalyticsReconciliationCoverageController {
 
       if (req.query.formOptions === 'true') {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+        const allowedStationIds = orgIdParam
+          ? allowedStationScope(
+              await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+            )
+          : null;
+
         const [memberships, stations, resellers] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgIdParam
             ? this.prisma.wifiStation.findMany({
-                where: { orgId: orgIdParam, deletedAt: null },
+                where: {
+                  orgId: orgIdParam,
+                  deletedAt: null,
+                  ...(allowedStationIds ? { id: { in: allowedStationIds } } : {}),
+                },
                 select: { id: true, code: true, name: true, status: true },
                 orderBy: { name: 'asc' },
               })
@@ -60,7 +77,13 @@ export class AnalyticsReconciliationCoverageController {
 
         return responseSuccess(res, {
           message: 'Success',
-          data: { memberships, stations, resellers },
+          data: {
+            memberships,
+            stations,
+            resellers,
+            canSwitchOrg,
+            requiresOrgSelection: canSwitchOrg || (!orgIdParam && memberships.length !== 1),
+          },
         });
       }
 
@@ -69,7 +92,7 @@ export class AnalyticsReconciliationCoverageController {
         return responseSuccess(res, {
           message: 'No tenant access',
           data: null,
-          meta: { memberships: [], requiresOrgSelection: true },
+          meta: { memberships: [], requiresOrgSelection: true, canSwitchOrg },
         });
       }
 
@@ -80,8 +103,9 @@ export class AnalyticsReconciliationCoverageController {
           data: null,
           meta: {
             memberships,
-            requiresOrgSelection: memberships.length > 1,
-            orgId: memberships.length === 1 ? memberships[0].id : undefined,
+            requiresOrgSelection: canSwitchOrg || memberships.length > 1,
+            canSwitchOrg,
+            orgId: canSwitchOrg ? undefined : memberships.length === 1 ? memberships[0].id : undefined,
           },
         });
       }
@@ -114,7 +138,7 @@ export class AnalyticsReconciliationCoverageController {
         return responseSuccess(res, {
           message: 'Success',
           data: { detail, org: org! },
-          meta: { memberships, orgId: orgIdParam, requiresOrgSelection: false },
+          meta: { memberships, orgId: orgIdParam, requiresOrgSelection: false, canSwitchOrg },
         });
       }
 
@@ -127,7 +151,17 @@ export class AnalyticsReconciliationCoverageController {
           ? (req.query.eligibility.trim() as EligibilityStatus)
           : undefined;
 
+      const allowedStationIds = allowedStationScope(
+        await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+      );
+
       if (stationId) {
+        if (allowedStationIds && !allowedStationIds.includes(stationId)) {
+          return responseError(res, 403, {
+            code: 'FORBIDDEN_SITE',
+            message: 'You do not have access to this site.',
+          });
+        }
         const station = await this.prisma.wifiStation.findFirst({
           where: { id: stationId, orgId: orgIdParam, deletedAt: null },
           select: { id: true },
@@ -157,6 +191,7 @@ export class AnalyticsReconciliationCoverageController {
         stationId,
         resellerId,
         eligibility,
+        allowedStationIds,
       });
 
       const org = await this.prisma.org.findUnique({
@@ -184,6 +219,7 @@ export class AnalyticsReconciliationCoverageController {
           memberships,
           orgId: orgIdParam,
           requiresOrgSelection: false,
+          canSwitchOrg,
         },
       });
     }),

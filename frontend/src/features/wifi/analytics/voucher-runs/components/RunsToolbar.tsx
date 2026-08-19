@@ -1,56 +1,91 @@
 "use client";
 
 import React from "react";
-import { Button, DatePicker, Segmented, Space } from "antd";
+import { Button, DatePicker, Select, Space } from "antd";
 import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
 import { ReloadOutlined } from "@ant-design/icons";
-import type { Dayjs } from "dayjs";
-import type { PeriodPreset } from "../types";
-import { PERIOD_PRESETS } from "../constant";
-
-const { RangePicker } = DatePicker;
+import dayjs, { type Dayjs } from "dayjs";
+import type { PlanOption, SiteOption } from "../types";
 
 type Props = {
-  preset: PeriodPreset;
-  customRange: [Dayjs | null, Dayjs | null] | null;
+  month: string;
+  stations: SiteOption[];
+  plans: PlanOption[];
+  stationId?: string;
+  planId?: string;
   loading?: boolean;
-  onPresetChange: (preset: PeriodPreset) => void;
-  onCustomRangeChange: (range: [Dayjs | null, Dayjs | null] | null) => void;
+  onMonthChange: (month: string) => void;
+  onStationChange: (value: string | undefined) => void;
+  onPlanChange: (value: string | undefined) => void;
   onRefresh: () => void;
 };
 
 const RunsToolbar: React.FC<Props> = ({
-  preset,
-  customRange,
+  month,
+  stations,
+  plans,
+  stationId,
+  planId,
   loading,
-  onPresetChange,
-  onCustomRangeChange,
+  onMonthChange,
+  onStationChange,
+  onPlanChange,
   onRefresh,
-}) => (
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <Space wrap align="center">
-      <Segmented
-        value={customRange ? undefined : preset}
-        options={PERIOD_PRESETS.map((p) => ({ value: p.value, label: p.label }))}
-        onChange={(v) => onPresetChange(v as PeriodPreset)}
-      />
-      <RangePicker
-        allowClear
-        value={customRange}
-        onChange={(dates) => onCustomRangeChange(dates)}
-        format="D MMM YYYY"
-        placeholder={["Custom from", "Custom to"]}
-      />
-    </Space>
-    <Space>
-      <WifiMutedText style={{ fontSize: 12 }}>
-        Batches created in period · vs prior period
-      </WifiMutedText>
-      <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading}>
-        Refresh
-      </Button>
-    </Space>
-  </div>
-);
+}) => {
+  const thisMonth = dayjs().startOf("month");
+
+  return (
+    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <Space wrap size="middle" align="center">
+        <DatePicker
+          picker="month"
+          allowClear={false}
+          value={dayjs(`${month}-01`)}
+          format="MMM YYYY"
+          disabledDate={(current: Dayjs) => current.startOf("month").isAfter(thisMonth)}
+          onChange={(value) => {
+            if (value) onMonthChange(value.format("YYYY-MM"));
+          }}
+        />
+        <Select
+          allowClear
+          showSearch
+          placeholder="All sites"
+          style={{ minWidth: 200 }}
+          loading={loading}
+          value={stationId}
+          optionFilterProp="label"
+          onChange={(v) => onStationChange(v)}
+          options={stations.map((s) => ({
+            value: s.id,
+            label: `${s.name} (${s.code})`,
+          }))}
+        />
+        <Select
+          allowClear
+          showSearch
+          placeholder="All plans"
+          style={{ minWidth: 200 }}
+          loading={loading}
+          value={planId}
+          optionFilterProp="label"
+          onChange={(v) => onPlanChange(v)}
+          options={plans.map((p) => ({
+            value: p.id,
+            label: `${p.name} (${p.code})`,
+          }))}
+        />
+      </Space>
+      <Space>
+        <WifiMutedText style={{ fontSize: 12 }}>
+          Batches created in month · vs previous month
+        </WifiMutedText>
+        <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading}>
+          Refresh
+        </Button>
+      </Space>
+    </div>
+  );
+};
 
 export default RunsToolbar;

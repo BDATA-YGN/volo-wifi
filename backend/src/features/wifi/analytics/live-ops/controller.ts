@@ -10,19 +10,30 @@ import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
-import { DEFAULT_WINDOW_HOURS, WINDOW_HOURS_OPTIONS, type WindowHours } from './constants';
+import { resolveAllowedStationIds } from '@/features/wifi/shared/resolve-station-scope';
+import { addAppDays, startOfAppDay } from '@/utils/app-time';
+import { DATE_LOOKBACK_DAYS } from './constants';
 import { AnalyticsLiveOpsQuerySchema } from './schema';
 import {
   buildLiveOpsAnalytics,
   type LiveOpsAnalyticsPayload,
 } from './build-live-ops-analytics';
 
-function parseWindowHours(value: unknown): WindowHours {
-  const n = typeof value === 'string' ? Number.parseInt(value, 10) : Number(value);
-  if ((WINDOW_HOURS_OPTIONS as readonly number[]).includes(n)) {
-    return n as WindowHours;
+function parseDateParam(value: unknown): Date | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function resolveSelectedDay(value: unknown): Date {
+  const today = startOfAppDay(new Date());
+  const earliest = addAppDays(today, -(DATE_LOOKBACK_DAYS - 1));
+  const parsed = parseDateParam(value);
+  const day = startOfAppDay(parsed ?? today);
+  if (day.getTime() < earliest.getTime() || day.getTime() > today.getTime()) {
+    return today;
   }
-  return DEFAULT_WINDOW_HOURS;
+  return day;
 }
 
 /** menus.wifi.analytics.live-ops @route /wifi/analytics/live-ops */
@@ -46,27 +57,68 @@ export class AnalyticsLiveOpsController {
 
       if (req.query.formOptions === 'true') {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
-        const [memberships, stations, resellers] = await Promise.all([
+        const allowedStationIdsRaw = orgIdParam
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+          : null;
+        const allowedStationIds =
+          allowedStationIdsRaw && allowedStationIdsRaw.length > 0 ? allowedStationIdsRaw : null;
+
+        const [memberships, stations, stationSizes, plans, profiles] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgIdParam
             ? this.prisma.wifiStation.findMany({
+                where: {
+                  orgId: orgIdParam,
+                  deletedAt: null,
+                  ...(allowedStationIds ? { id: { in: allowedStationIds } } : {}),
+                },
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  status: true,
+                  stationSizeId: true,
+                },
+                orderBy: { name: 'asc' },
+              })
+            : Promise.resolve([]),
+          this.prisma.stationSize.findMany({
+            where: { isActive: true },
+            select: { id: true, code: true, name: true, sortOrder: true },
+            orderBy: { sortOrder: 'asc' },
+          }),
+          orgIdParam
+            ? this.prisma.plan.findMany({
                 where: { orgId: orgIdParam, deletedAt: null },
-                select: { id: true, code: true, name: true, status: true },
+                select: { id: true, code: true, name: true, isActive: true },
                 orderBy: { name: 'asc' },
               })
             : Promise.resolve([]),
           orgIdParam
-            ? this.prisma.reseller.findMany({
+            ? this.prisma.radiusVendorProfile.findMany({
                 where: { orgId: orgIdParam, deletedAt: null },
-                select: { id: true, code: true, name: true, status: true },
-                orderBy: { name: 'asc' },
+                select: { vendor: true },
+                distinct: ['vendor'],
+                orderBy: { vendor: 'asc' },
               })
             : Promise.resolve([]),
         ]);
 
         return responseSuccess(res, {
           message: 'Success',
-          data: { memberships, stations, resellers },
+          data: {
+            memberships,
+            stations,
+            stationSizes,
+            plans,
+            profiles: profiles
+              .map((row) => row.vendor?.trim())
+              .filter((v): v is string => Boolean(v))
+              .map((v) => ({ value: v, label: v })),
+            canSwitchOrg: canSwitchOrgContext(req.user!),
+            requiresOrgSelection:
+              canSwitchOrgContext(req.user!) || (!orgIdParam && memberships.length !== 1),
+          },
         });
       }
 
@@ -103,42 +155,90 @@ export class AnalyticsLiveOpsController {
 
       const stationId =
         typeof req.query.stationId === 'string' ? req.query.stationId.trim() : undefined;
-      const resellerId =
-        typeof req.query.resellerId === 'string' ? req.query.resellerId.trim() : undefined;
-      const windowHours = parseWindowHours(req.query.windowHours);
+      const stationSizeId =
+        typeof req.query.stationSizeId === 'string' ? req.query.stationSizeId.trim() : undefined;
+      const planId = typeof req.query.planId === 'string' ? req.query.planId.trim() : undefined;
+      const profile =
+        typeof req.query.profile === 'string' ? req.query.profile.trim() : undefined;
+      const dayStart = resolveSelectedDay(req.query.date);
+
+      const allowedStationIdsRaw = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgIdParam,
+        req.user!
+      );
+      const allowedStationIds =
+        allowedStationIdsRaw && allowedStationIdsRaw.length > 0 ? allowedStationIdsRaw : null;
 
       if (stationId) {
+        if (allowedStationIds && !allowedStationIds.includes(stationId)) {
+          return responseError(res, 403, {
+            code: 'FORBIDDEN_SITE',
+            message: 'You do not have access to this site.',
+          });
+        }
         const station = await this.prisma.wifiStation.findFirst({
           where: { id: stationId, orgId: orgIdParam, deletedAt: null },
           select: { id: true },
         });
         if (!station) {
           return responseError(res, 400, {
-            code: 'INVALID_STATION',
+            code: 'INVALID_SITE',
             message: 'Site not found in this organization.',
           });
         }
       }
 
-      if (resellerId) {
-        const reseller = await this.prisma.reseller.findFirst({
-          where: { id: resellerId, orgId: orgIdParam, deletedAt: null },
+      if (planId) {
+        const plan = await this.prisma.plan.findFirst({
+          where: { id: planId, orgId: orgIdParam, deletedAt: null },
           select: { id: true },
         });
-        if (!reseller) {
+        if (!plan) {
           return responseError(res, 400, {
-            code: 'INVALID_RESELLER',
-            message: 'Partner not found in this organization.',
+            code: 'INVALID_PLAN',
+            message: 'Service plan not found in this organization.',
           });
         }
       }
 
-      const analytics = await buildLiveOpsAnalytics(
-        this.prisma,
-        orgIdParam,
-        windowHours,
-        { stationId, resellerId }
-      );
+      let scopedStationIds: string[] | undefined = allowedStationIds || undefined;
+      if (profile || stationSizeId) {
+        const matched = await this.prisma.wifiStation.findMany({
+          where: {
+            orgId: orgIdParam,
+            deletedAt: null,
+            ...(allowedStationIds ? { id: { in: allowedStationIds } } : {}),
+            ...(stationSizeId ? { stationSizeId } : {}),
+            ...(profile
+              ? {
+                  radiusVendorProfile: {
+                    is: {
+                      vendor: { equals: profile, mode: 'insensitive' },
+                      deletedAt: null,
+                    },
+                  },
+                }
+              : {}),
+          },
+          select: { id: true },
+        });
+        scopedStationIds = matched.map((row) => row.id);
+      }
+
+      if (stationId && scopedStationIds && !scopedStationIds.includes(stationId)) {
+        return responseError(res, 400, {
+          code: 'SITE_FILTER_MISMATCH',
+          message: 'Selected site does not match the profile or tier filter.',
+        });
+      }
+
+      const analytics = await buildLiveOpsAnalytics(this.prisma, orgIdParam, dayStart, {
+        stationId,
+        allowedStationIds: stationId ? undefined : scopedStationIds,
+        planId,
+      });
 
       const org = await this.prisma.org.findUnique({
         where: { id: orgIdParam },
@@ -147,12 +247,16 @@ export class AnalyticsLiveOpsController {
 
       const payload: LiveOpsAnalyticsPayload & {
         scopeStationId: string | null;
-        scopeResellerId: string | null;
+        scopeStationSizeId: string | null;
+        scopePlanId: string | null;
+        scopeProfile: string | null;
         org: { id: string; name: string; code: string; currency: string };
       } = {
         ...analytics,
         scopeStationId: stationId ?? null,
-        scopeResellerId: resellerId ?? null,
+        scopeStationSizeId: stationSizeId ?? null,
+        scopePlanId: planId ?? null,
+        scopeProfile: profile ?? null,
         org: org!,
       };
 
@@ -163,6 +267,7 @@ export class AnalyticsLiveOpsController {
           memberships,
           orgId: orgIdParam,
           requiresOrgSelection: false,
+          canSwitchOrg: canSwitchOrgContext(req.user!),
         },
       });
     }),

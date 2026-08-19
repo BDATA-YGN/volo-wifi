@@ -4,4 +4,4 @@ export { ANALYTICS_REVENUE_API } from "./constant";
 export * as AnalyticsRevenueQuery from "./query";
 export { useAnalyticsRevenue } from "./useAnalyticsRevenue";
 export type { RevenueAnalyticsData } from "./interface";
-export type { PeriodPreset, TrendGranularity } from "./types";
+export type { TrendGranularity } from "./types";

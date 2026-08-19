@@ -1,11 +1,10 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Card, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { SessionTrafficSiteRow } from "../types";
-import { STATION_STATUS_COLOR, formatBytes, formatDuration } from "../utils";
+import { STATION_STATUS_COLOR, avgTimePerUserSec, formatBytes, formatDuration } from "../utils";
 
 const { Text } = Typography;
 
@@ -26,6 +25,7 @@ const TrafficSiteTable: React.FC<Props> = ({
     {
       title: "Site",
       key: "site",
+      sorter: (a, b) => a.name.localeCompare(b.name) || a.code.localeCompare(b.code),
       render: (_, row) => (
         <div>
           <div className="flex items-center gap-2">
@@ -68,16 +68,14 @@ const TrafficSiteTable: React.FC<Props> = ({
       sorter: (a, b) => a.totalBytes - b.totalBytes,
     },
     {
-      title: "Avg time",
+      title: "Avg / user",
       key: "avgTime",
-      width: 90,
+      width: 100,
       align: "right",
-      render: (_, row) =>
-        formatDuration(
-          row.sessionsCount > 0
-            ? Math.round(row.totalSessionTimeSec / row.sessionsCount)
-            : 0
-        ),
+      sorter: (a, b) =>
+        avgTimePerUserSec(a.totalSessionTimeSec, a.uniqueCredentials) -
+        avgTimePerUserSec(b.totalSessionTimeSec, b.uniqueCredentials),
+      render: (_, row) => formatDuration(avgTimePerUserSec(row.totalSessionTimeSec, row.uniqueCredentials)),
     },
   ];
 
@@ -85,13 +83,6 @@ const TrafficSiteTable: React.FC<Props> = ({
     <Card
       size="small"
       title="By site"
-      extra={
-        <Link href="/wifi/network/radius/live-sessions">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Live sessions →
-          </Text>
-        </Link>
-      }
       styles={{ body: { padding: 0 } }}
     >
       <Table<SessionTrafficSiteRow>
@@ -100,7 +91,8 @@ const TrafficSiteTable: React.FC<Props> = ({
         loading={loading}
         dataSource={rows}
         columns={columns}
-        pagination={{ pageSize: 8, hideOnSinglePage: true, size: "small" }}
+        pagination={false}
+        sticky
         rowClassName={(row) =>
           row.stationId === selectedStationId ? "ant-table-row-selected" : ""
         }

@@ -3,14 +3,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
 import { Ticket, X } from "lucide-react";
-import dayjs, { type Dayjs } from "dayjs";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
 import { useAnalyticsVoucherRuns } from "./useAnalyticsVoucherRuns";
-import type { PeriodPreset } from "./types";
+import { formatMonthLabel } from "./constant";
 import RunsToolbar from "./components/RunsToolbar";
-import RunsFilterBar from "./components/RunsFilterBar";
 import RunsKpiCards from "./components/RunsKpiCards";
 import RunsTrendChart from "./components/RunsTrendChart";
 import RunsBatchTable from "./components/RunsBatchTable";
@@ -22,7 +20,6 @@ const { Title, Paragraph, Text } = Typography;
 const AnalyticsVoucherRunsPage: React.FC = () => {
   const { token } = theme.useToken();
   const [initDone, setInitDone] = useState(false);
-  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
 
   const {
     analytics,
@@ -33,15 +30,13 @@ const AnalyticsVoucherRunsPage: React.FC = () => {
     planId,
     stationId,
     batchId,
-    preset,
+    month,
     formOptions,
     selectOrg,
     selectPlan,
     selectStation,
     selectBatch,
-    selectPreset,
-    selectCustomPeriod,
-    clearCustomPeriod,
+    selectMonth,
     clearFilters,
     refresh,
     loadFormOptions,
@@ -68,6 +63,7 @@ const AnalyticsVoucherRunsPage: React.FC = () => {
   const plans = formOptions.plans;
   const showOrgSwitcher = memberships.length > 1;
   const needsOrg = Boolean(meta?.requiresOrgSelection) && !orgId;
+  const periodLabel = formatMonthLabel(month);
 
   const scopedBatch = useMemo(() => {
     if (!batchId) return null;
@@ -84,33 +80,12 @@ const AnalyticsVoucherRunsPage: React.FC = () => {
     return stations.find((s) => s.id === stationId) ?? null;
   }, [stationId, stations]);
 
-  const periodLabel = useMemo(() => {
-    if (!analytics) return null;
-    return `${dayjs(analytics.periodFrom).format("D MMM YYYY")} – ${dayjs(analytics.periodTo).format("D MMM YYYY")}`;
-  }, [analytics]);
-
   const statusTotal = useMemo(
     () => analytics?.byStatus.reduce((sum, row) => sum + row.count, 0) ?? 0,
     [analytics?.byStatus]
   );
 
-  const handlePresetChange = (value: PeriodPreset) => {
-    setCustomRange(null);
-    clearCustomPeriod();
-    selectPreset(value);
-  };
-
-  const handleCustomRangeChange = (range: [Dayjs | null, Dayjs | null] | null) => {
-    setCustomRange(range);
-    if (range?.[0] && range?.[1]) {
-      selectCustomPeriod(
-        range[0].startOf("day").toISOString(),
-        range[1].endOf("day").toISOString()
-      );
-    } else {
-      clearCustomPeriod();
-    }
-  };
+  const showContent = Boolean(orgId) && !needsOrg;
 
   return (
     <div className="p-0">
@@ -154,126 +129,131 @@ const AnalyticsVoucherRunsPage: React.FC = () => {
             />
           ) : null}
 
-          {analytics ? (
+          {showContent ? (
             <>
-              <Card
-                styles={{ body: { padding: 20 } }}
-                style={{ borderRadius: token.borderRadiusLG }}
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <Title level={4} style={{ margin: 0 }}>
-                      Batch utilization
-                    </Title>
-                    <Paragraph type="secondary" style={{ marginBottom: 8, marginTop: 4 }}>
-                      {analytics.org.name}
-                      {periodLabel ? ` · ${periodLabel}` : ""}
-                    </Paragraph>
-                    <div className="flex flex-wrap gap-2">
-                      <Tag style={{ fontFamily: "monospace" }}>{analytics.org.code}</Tag>
-                      <Tag color="blue">{analytics.summary.batchCount} runs</Tag>
-                      <Tag color="success">{analytics.summary.utilizationPercent}% utilized</Tag>
-                      {scopedBatch ? (
-                        <Tag style={{ fontFamily: "monospace" }}>{scopedBatch.batchNo}</Tag>
-                      ) : null}
-                      {scopedSite ? (
-                        <Tag style={{ fontFamily: "monospace" }}>{scopedSite.code}</Tag>
-                      ) : null}
-                      {scopedPlan ? (
-                        <Tag style={{ fontFamily: "monospace" }}>{scopedPlan.code}</Tag>
-                      ) : null}
-                      {stationId || planId || batchId ? (
-                        <Button
-                          type="link"
-                          size="small"
-                          icon={<X size={14} />}
-                          onClick={clearFilters}
-                          style={{ padding: 0, height: "auto" }}
-                        >
-                          Clear filters
-                        </Button>
-                      ) : null}
+              {analytics ? (
+                <Card
+                  styles={{ body: { padding: 20 } }}
+                  style={{ borderRadius: token.borderRadiusLG }}
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <Title level={4} style={{ margin: 0 }}>
+                        Voucher run analytics
+                      </Title>
+                      <Paragraph type="secondary" style={{ marginBottom: 8, marginTop: 4 }}>
+                        {analytics.org.name}
+                        {periodLabel ? ` · ${periodLabel}` : ""}
+                      </Paragraph>
+                      <div className="flex flex-wrap gap-2">
+                        <Tag style={{ fontFamily: "monospace" }}>{analytics.org.code}</Tag>
+                        <Tag color="blue">{analytics.summary.batchCount} runs</Tag>
+                        <Tag color="success">{analytics.summary.utilizationPercent}% utilized</Tag>
+                        {scopedBatch ? (
+                          <Tag style={{ fontFamily: "monospace" }}>{scopedBatch.batchNo}</Tag>
+                        ) : null}
+                        {scopedSite ? (
+                          <Tag style={{ fontFamily: "monospace" }}>{scopedSite.code}</Tag>
+                        ) : null}
+                        {scopedPlan ? (
+                          <Tag style={{ fontFamily: "monospace" }}>{scopedPlan.code}</Tag>
+                        ) : null}
+                        {stationId || planId || batchId ? (
+                          <Button
+                            type="link"
+                            size="small"
+                            icon={<X size={14} />}
+                            onClick={clearFilters}
+                            style={{ padding: 0, height: "auto" }}
+                          >
+                            Clear filters
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Text type="secondary" style={{ fontSize: 12, display: "block" }}>
+                        Vouchers issued
+                      </Text>
+                      <Title level={3} style={{ margin: 0 }}>
+                        {analytics.summary.totalIssued.toLocaleString()}
+                      </Title>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {analytics.summary.totalRedeemed} redeemed ·{" "}
+                        {analytics.summary.totalRemaining} remaining
+                      </Text>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Text type="secondary" style={{ fontSize: 12, display: "block" }}>
-                      Vouchers issued
-                    </Text>
-                    <Title level={3} style={{ margin: 0 }}>
-                      {analytics.summary.totalIssued.toLocaleString()}
-                    </Title>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {analytics.summary.totalRedeemed} redeemed ·{" "}
-                      {analytics.summary.totalRemaining} remaining
-                    </Text>
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              ) : null}
 
               <Card
                 styles={{ body: { padding: 16 } }}
                 style={{ borderRadius: token.borderRadiusLG }}
               >
                 <RunsToolbar
-                  preset={preset}
-                  customRange={customRange}
+                  month={month}
+                  stations={stations}
+                  plans={plans}
+                  stationId={stationId}
+                  planId={planId}
                   loading={loading}
-                  onPresetChange={handlePresetChange}
-                  onCustomRangeChange={handleCustomRangeChange}
+                  onMonthChange={selectMonth}
+                  onStationChange={selectStation}
+                  onPlanChange={selectPlan}
                   onRefresh={refresh}
                 />
               </Card>
 
-              <RunsFilterBar
-                stations={stations}
-                plans={plans}
-                stationId={stationId}
-                planId={planId}
-                loading={loading}
-                onStationChange={selectStation}
-                onPlanChange={selectPlan}
-              />
-
-              <RunsKpiCards
-                summary={analytics.summary}
-                previous={analytics.previousSummary}
-                loading={loading}
-              />
-
-              <RunsTrendChart points={analytics.dailyTrend} loading={loading} />
-
-              <RunsBatchTable
-                rows={analytics.byBatch}
-                loading={loading}
-                selectedBatchId={batchId}
-                onSelectBatch={(id) => selectBatch(id)}
-              />
-
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={14}>
-                  <RunsPlanTable
-                    rows={analytics.byPlan}
-                    loading={loading}
-                    selectedPlanId={planId}
-                    onSelectPlan={(id) => selectPlan(id)}
-                  />
-                </Col>
-                <Col xs={24} lg={10}>
-                  <RunsStatusTable
-                    rows={analytics.byStatus}
-                    total={statusTotal}
+              {analytics ? (
+                <>
+                  <RunsKpiCards
+                    summary={analytics.summary}
+                    previous={analytics.previousSummary}
                     loading={loading}
                   />
-                </Col>
-              </Row>
+
+                  <RunsTrendChart
+                    points={analytics.dailyTrend}
+                    granularity={analytics.trendGranularity}
+                    loading={loading}
+                  />
+
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={14}>
+                      <RunsBatchTable
+                        rows={analytics.byBatch}
+                        loading={loading}
+                        selectedBatchId={batchId}
+                        onSelectBatch={(id) => selectBatch(id)}
+                      />
+                    </Col>
+                    <Col xs={24} lg={10}>
+                      <div className="flex flex-col gap-4">
+                        <RunsPlanTable
+                          rows={analytics.byPlan}
+                          loading={loading}
+                          selectedPlanId={planId}
+                          onSelectPlan={(id) => selectPlan(id)}
+                        />
+                        <RunsStatusTable
+                          rows={analytics.byStatus}
+                          total={statusTotal}
+                          loading={loading}
+                        />
+                      </div>
+                    </Col>
+                  </Row>
+                </>
+              ) : initDone && !loading && !error ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  title="No voucher runs"
+                  description="There are no voucher batches created in the selected month and filters."
+                />
+              ) : null}
             </>
-          ) : initDone && orgId && !loading && !needsOrg && !error ? (
-            <Alert
-              type="info"
-              showIcon
-              title="No voucher runs"
-              description="There are no voucher batches created in the selected period and filters."
-            />
           ) : null}
         </div>
       </div>

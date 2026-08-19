@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { CoverageDetail, UncoveredPaymentRow } from "../types";
 import { ELIGIBILITY_COLOR } from "../constant";
 import {
+  formatCount,
   formatEligibility,
   formatGapDays,
   formatMoney,
@@ -117,7 +118,8 @@ const CoverageDetailDrawer: React.FC<Props> = ({
                 : "—"}
             </Descriptions.Item>
             <Descriptions.Item label="Payments in scope">
-              {detail.paymentCount} total · {detail.uncoveredPaymentCount} uncovered
+              {formatCount(detail.paymentCount)} total · {formatCount(detail.uncoveredPaymentCount)}{" "}
+              uncovered
             </Descriptions.Item>
             <Descriptions.Item label="Last posting">
               {detail.lastPostedAt

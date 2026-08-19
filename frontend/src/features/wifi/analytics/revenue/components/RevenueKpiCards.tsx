@@ -3,14 +3,15 @@
 import React from "react";
 import { Card, Col, Row, Statistic } from "antd";
 import {
-  CreditCardOutlined,
   DollarOutlined,
   PercentageOutlined,
   ShoppingCartOutlined,
+  ShopOutlined,
 } from "@ant-design/icons";
 import { KpiDeltaText } from "@/features/wifi/shared/components/KpiDeltaText";
+import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
 import type { RevenueAnalyticsSummary } from "../types";
-import { formatMoney, percentChange } from "../utils";
+import { formatCount, formatMoney, percentChange } from "../utils";
 
 type Props = {
   summary: RevenueAnalyticsSummary;
@@ -23,20 +24,28 @@ type KpiProps = {
   title: string;
   value: number | string;
   delta: number | null;
+  hint?: string;
   prefix?: React.ReactNode;
   loading?: boolean;
 };
 
-const KpiCard: React.FC<KpiProps> = ({ title, value, delta, prefix, loading }) => (
+const KpiCard: React.FC<KpiProps> = ({ title, value, delta, hint, prefix, loading }) => (
   <Card size="small" styles={{ body: { padding: 16 } }}>
-    <Statistic loading={loading} title={title} value={value} prefix={prefix} />
+    <Statistic
+      loading={loading}
+      title={title}
+      value={value}
+      prefix={prefix}
+      formatter={typeof value === "number" ? (v) => formatCount(Number(v)) : undefined}
+    />
+    {hint ? <WifiMutedText style={{ fontSize: 12 }}>{hint}</WifiMutedText> : null}
     <KpiDeltaText delta={delta} />
   </Card>
 );
 
 const RevenueKpiCards: React.FC<Props> = ({ summary, previous, currency, loading }) => (
   <Row gutter={[16, 16]}>
-    <Col xs={24} sm={12} lg={6}>
+    <Col xs={24} sm={12} lg={8}>
       <KpiCard
         loading={loading}
         title="Gross revenue"
@@ -45,7 +54,7 @@ const RevenueKpiCards: React.FC<Props> = ({ summary, previous, currency, loading
         prefix={<DollarOutlined style={{ color: "#52c41a" }} />}
       />
     </Col>
-    <Col xs={24} sm={12} lg={6}>
+    <Col xs={24} sm={12} lg={8}>
       <KpiCard
         loading={loading}
         title="Net revenue"
@@ -53,7 +62,7 @@ const RevenueKpiCards: React.FC<Props> = ({ summary, previous, currency, loading
         delta={percentChange(summary.netRevenue, previous.netRevenue)}
       />
     </Col>
-    <Col xs={24} sm={12} lg={6}>
+    <Col xs={24} sm={12} lg={8}>
       <KpiCard
         loading={loading}
         title="Commission"
@@ -62,16 +71,7 @@ const RevenueKpiCards: React.FC<Props> = ({ summary, previous, currency, loading
         prefix={<PercentageOutlined style={{ color: "#722ed1" }} />}
       />
     </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
-        title="Payments collected"
-        value={formatMoney(summary.paymentsCollected, currency)}
-        delta={percentChange(summary.paymentsCollected, previous.paymentsCollected)}
-        prefix={<CreditCardOutlined style={{ color: "#1677ff" }} />}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
+    <Col xs={24} sm={12} lg={8}>
       <KpiCard
         loading={loading}
         title="Paid orders"
@@ -80,7 +80,7 @@ const RevenueKpiCards: React.FC<Props> = ({ summary, previous, currency, loading
         prefix={<ShoppingCartOutlined style={{ color: "#1677ff" }} />}
       />
     </Col>
-    <Col xs={24} sm={12} lg={6}>
+    <Col xs={24} sm={12} lg={8}>
       <KpiCard
         loading={loading}
         title="Tokens sold"
@@ -88,20 +88,14 @@ const RevenueKpiCards: React.FC<Props> = ({ summary, previous, currency, loading
         delta={percentChange(summary.itemsCount, previous.itemsCount)}
       />
     </Col>
-    <Col xs={24} sm={12} lg={6}>
+    <Col xs={24} sm={12} lg={8}>
       <KpiCard
         loading={loading}
         title="Avg order value"
         value={formatMoney(summary.avgOrderValue, currency)}
         delta={percentChange(summary.avgOrderValue, previous.avgOrderValue)}
-      />
-    </Col>
-    <Col xs={24} sm={12} lg={6}>
-      <KpiCard
-        loading={loading}
-        title="Payment records"
-        value={summary.paymentCount}
-        delta={percentChange(summary.paymentCount, previous.paymentCount)}
+        hint={`${formatCount(summary.siteCount)} sites · ${formatCount(summary.tierCount)} tiers`}
+        prefix={<ShopOutlined style={{ color: "#13c2c2" }} />}
       />
     </Col>
   </Row>

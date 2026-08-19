@@ -2,23 +2,30 @@
 
 import React from "react";
 import { Card, Table, Tag, Typography } from "antd";
+import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
 import type { ColumnsType } from "antd/es/table";
 import type { LiveOpsSiteRow } from "../types";
-import { formatBytes, formatMoney } from "../utils";
+import { formatBytes, formatCount, formatSessionStatus } from "../utils";
+import { SESSION_STATUS_COLOR, TOKEN_STATUS_COLOR, TOKEN_STATUS_LABEL } from "../constant";
 
 const { Text } = Typography;
 
 type Props = {
   rows: LiveOpsSiteRow[];
-  currency: string;
   loading?: boolean;
   selectedStationId?: string;
   onSelectSite: (stationId: string) => void;
 };
 
+function countCell(value: number, status?: string) {
+  const label = formatCount(value);
+  if (value <= 0) return <Text type="secondary">{label}</Text>;
+  if (!status) return label;
+  return <Tag color={SESSION_STATUS_COLOR[status] ?? "default"}>{label}</Tag>;
+}
+
 const LiveOpsSiteTable: React.FC<Props> = ({
   rows,
-  currency,
   loading,
   selectedStationId,
   onSelectSite,
@@ -27,6 +34,9 @@ const LiveOpsSiteTable: React.FC<Props> = ({
     {
       title: "Site",
       key: "name",
+      fixed: "left",
+      width: 220,
+      sorter: (a, b) => a.name.localeCompare(b.name),
       render: (_, row) => (
         <div>
           <Text strong={row.stationId === selectedStationId} style={{ fontSize: 13 }}>
@@ -41,45 +51,73 @@ const LiveOpsSiteTable: React.FC<Props> = ({
       ),
     },
     {
-      title: "Active",
-      dataIndex: "activeSessions",
-      key: "activeSessions",
-      width: 70,
-      align: "right",
-      render: (n: number) => (n > 0 ? <Tag color="processing">{n}</Tag> : n),
-    },
-    {
-      title: "Started",
-      dataIndex: "sessionsStarted",
-      key: "sessionsStarted",
-      width: 70,
-      align: "right",
-    },
-    {
-      title: "Orders",
-      dataIndex: "ordersCount",
-      key: "ordersCount",
-      width: 70,
-      align: "right",
-    },
-    {
-      title: "Revenue",
-      key: "revenue",
+      title: formatSessionStatus("START"),
+      dataIndex: "radiusStart",
+      key: "radiusStart",
       width: 100,
       align: "right",
-      render: (_, row) => formatMoney(row.revenue, currency),
+      sorter: (a, b) => a.radiusStart - b.radiusStart,
+      render: (n: number) => countCell(n, "START"),
+    },
+    {
+      title: formatSessionStatus("INTERIM"),
+      dataIndex: "radiusInterim",
+      key: "radiusInterim",
+      width: 100,
+      align: "right",
+      sorter: (a, b) => a.radiusInterim - b.radiusInterim,
+      render: (n: number) => countCell(n, "INTERIM"),
+    },
+    {
+      title: formatSessionStatus("STOP"),
+      dataIndex: "radiusStop",
+      key: "radiusStop",
+      width: 110,
+      align: "right",
+      sorter: (a, b) => a.radiusStop - b.radiusStop,
+      render: (n: number) => countCell(n, "STOP"),
+    },
+    {
+      title: "Token status",
+      key: "tokenStatus",
+      sorter: (a, b) =>
+        a.tokenStatus.reduce((sum, item) => sum + item.count, 0) -
+        b.tokenStatus.reduce((sum, item) => sum + item.count, 0),
+      render: (_, row) =>
+        row.tokenStatus.length === 0 ? (
+          <Text type="secondary">—</Text>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {row.tokenStatus.map((item) => (
+              <Tag key={item.status} color={TOKEN_STATUS_COLOR[item.status] ?? "default"}>
+                {TOKEN_STATUS_LABEL[item.status] ?? item.status} {formatCount(item.count)}
+              </Tag>
+            ))}
+          </div>
+        ),
     },
     {
       title: "Traffic",
       key: "totalBytes",
-      width: 90,
+      width: 120,
       align: "right",
+      sorter: (a, b) => a.totalBytes - b.totalBytes,
+      defaultSortOrder: "descend",
       render: (_, row) => formatBytes(row.totalBytes),
     },
   ];
 
   return (
-    <Card size="small" title="By site" styles={{ body: { padding: 0 } }}>
+    <Card
+      size="small"
+      title="By site"
+      extra={
+        <WifiMutedText style={{ fontSize: 12 }}>
+          Token status is for the selected day only
+        </WifiMutedText>
+      }
+      styles={{ body: { padding: 0 } }}
+    >
       <Table<LiveOpsSiteRow>
         size="small"
         rowKey="stationId"
@@ -87,6 +125,8 @@ const LiveOpsSiteTable: React.FC<Props> = ({
         dataSource={rows}
         columns={columns}
         pagination={false}
+        sticky
+        scroll={{ x: 900, y: "calc(var(--content-body-height) - 280px)" }}
         onRow={(row) => ({
           onClick: () => onSelectSite(row.stationId),
           style: { cursor: "pointer" },

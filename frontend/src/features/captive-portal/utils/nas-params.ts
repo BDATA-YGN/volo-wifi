@@ -18,6 +18,30 @@ export type NasLocationDebug = {
   nasId?: string;
 };
 
+/**
+ * Friendly branch label from NAS-Identifier / system identity.
+ * OfficeTest → Office Test; MRUPAC0013 stays as a site code.
+ */
+export function formatNasBranchName(nasId?: string): string | undefined {
+  const raw = nasId?.trim();
+  if (!raw) return undefined;
+
+  const spaced = raw
+    .replace(/[-_]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return spaced
+    .split(" ")
+    .map((word) => {
+      if (/[0-9]/.test(word) && word === word.toUpperCase()) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 export function extractNasLocationDebug(params?: NasParams): NasLocationDebug | null {
   if (!params) return null;
   const nasIp = firstNasValue(params, [

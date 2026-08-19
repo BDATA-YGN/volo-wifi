@@ -1,3 +1,7 @@
+export function formatCount(value: number): string {
+  return value.toLocaleString();
+}
+
 export function percentChange(current: number, previous: number): number | null {
   if (previous === 0) {
     return current === 0 ? 0 : null;

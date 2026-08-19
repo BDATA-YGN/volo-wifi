@@ -1,5 +1,5 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
-import type { EligibilityStatus } from './constants';
+import { ELIGIBILITY_STATUSES, LAG_BUCKETS, type EligibilityStatus, type LagBucket } from './constants';
 
 export type CoverageSummary = {
   scopeCount: number;
@@ -9,6 +9,8 @@ export type CoverageSummary = {
   unsealedCount: number;
   noCoverageCount: number;
   purgeEligibleCount: number;
+  atRiskCount: number;
+  sealedPct: number;
   avgGapDays: number;
   totalUncoveredPayments: number;
   earliestCoveredAt: string | null;
@@ -32,6 +34,10 @@ export type CoveragePartnerRow = {
   scopeCount: number;
   sealedCount: number;
   gapCount: number;
+  unsealedCount: number;
+  noCoverageCount: number;
+  uncoveredPaymentCount: number;
+  sealedPct: number;
   avgGapDays: number;
 };
 
@@ -42,6 +48,10 @@ export type CoverageSiteRow = {
   scopeCount: number;
   sealedCount: number;
   gapCount: number;
+  unsealedCount: number;
+  noCoverageCount: number;
+  uncoveredPaymentCount: number;
+  sealedPct: number;
   avgGapDays: number;
 };
 
@@ -111,6 +121,7 @@ type CoverageFilters = {
   stationId?: string;
   resellerId?: string;
   eligibility?: EligibilityStatus;
+  allowedStationIds?: string[] | null;
 };
 
 type PaymentScopeAgg = {
@@ -150,14 +161,63 @@ function resolveEligibility(input: {
   return 'SEALED';
 }
 
-function lagBucketForDays(gapDays: number, eligibility: EligibilityStatus): string {
+function lagBucketForDays(gapDays: number, eligibility: EligibilityStatus): LagBucket {
   if (eligibility === 'NO_COVERAGE') return 'No coverage record';
   if (eligibility === 'UNSEALED') return 'Unsealed posting';
-  if (gapDays === 0) return 'Fully sealed';
+  if (eligibility === 'SEALED') return 'Fully sealed';
   if (gapDays <= 7) return '1–7 day gap';
   if (gapDays <= 30) return '8–30 day gap';
   if (gapDays <= 90) return '31–90 day gap';
   return '90+ day gap';
+}
+
+function roundPct(part: number, whole: number): number {
+  if (whole <= 0) return 0;
+  return Math.round((part / whole) * 1000) / 10;
+}
+
+function emptyPartnerRow(
+  resellerId: string,
+  code: string,
+  name: string
+): CoveragePartnerRow {
+  return {
+    resellerId,
+    code,
+    name,
+    scopeCount: 0,
+    sealedCount: 0,
+    gapCount: 0,
+    unsealedCount: 0,
+    noCoverageCount: 0,
+    uncoveredPaymentCount: 0,
+    sealedPct: 0,
+    avgGapDays: 0,
+  };
+}
+
+function emptySiteRow(stationId: string, code: string, name: string): CoverageSiteRow {
+  return {
+    stationId,
+    code,
+    name,
+    scopeCount: 0,
+    sealedCount: 0,
+    gapCount: 0,
+    unsealedCount: 0,
+    noCoverageCount: 0,
+    uncoveredPaymentCount: 0,
+    sealedPct: 0,
+    avgGapDays: 0,
+  };
+}
+
+function resolveStationScope(filters?: CoverageFilters): string[] | undefined {
+  if (filters?.stationId) return [filters.stationId];
+  if (filters?.allowedStationIds && filters.allowedStationIds.length > 0) {
+    return filters.allowedStationIds;
+  }
+  return undefined;
 }
 
 function emptySummary(): CoverageSummary {
@@ -169,6 +229,8 @@ function emptySummary(): CoverageSummary {
     unsealedCount: 0,
     noCoverageCount: 0,
     purgeEligibleCount: 0,
+    atRiskCount: 0,
+    sealedPct: 0,
     avgGapDays: 0,
     totalUncoveredPayments: 0,
     earliestCoveredAt: null,
@@ -176,9 +238,21 @@ function emptySummary(): CoverageSummary {
   };
 }
 
+function stationSql(stationIds?: string[]) {
+  return stationIds?.length
+    ? Prisma.sql`AND o.station_id IN (${Prisma.join(stationIds)})`
+    : Prisma.empty;
+}
+
+function resellerSql(resellerId?: string) {
+  return resellerId ? Prisma.sql`AND o.reseller_id = ${resellerId}` : Prisma.empty;
+}
+
 async function loadPaymentScopeAggregates(
   prisma: PrismaClient,
-  orgId: string
+  orgId: string,
+  stationIds?: string[],
+  resellerId?: string
 ): Promise<Map<ScopeKey, { latestPaidAt: Date; paymentCount: number }>> {
   const rows = await prisma.$queryRaw<PaymentScopeAgg[]>`
     SELECT
@@ -191,6 +265,8 @@ async function loadPaymentScopeAggregates(
     WHERE p.org_id = ${orgId}
       AND o.reseller_id IS NOT NULL
       AND o.station_id IS NOT NULL
+      ${stationSql(stationIds)}
+      ${resellerSql(resellerId)}
     GROUP BY o.reseller_id, o.station_id
   `;
 
@@ -221,6 +297,37 @@ async function countUncoveredPayments(
       AND p.paid_at > ${maxCoveredPaidAt}
   `;
   return result[0]?.count ?? 0;
+}
+
+async function loadUncoveredPaymentCounts(
+  prisma: PrismaClient,
+  orgId: string,
+  stationIds?: string[],
+  resellerId?: string
+): Promise<Map<ScopeKey, number>> {
+  const rows = await prisma.$queryRaw<{ reseller_id: string; station_id: string; count: number }[]>`
+    SELECT
+      o.reseller_id,
+      o.station_id,
+      COUNT(p.id)::int AS count
+    FROM wf_payment p
+    INNER JOIN wf_sale_order o ON o.id = p.order_id
+    INNER JOIN rpt_fin_source_coverage c
+      ON c.org_id = p.org_id
+      AND c.reseller_id = o.reseller_id
+      AND c.station_id = o.station_id
+    WHERE p.org_id = ${orgId}
+      AND p.paid_at > c.max_covered_paid_at
+      ${stationSql(stationIds)}
+      ${resellerSql(resellerId)}
+    GROUP BY o.reseller_id, o.station_id
+  `;
+
+  const map = new Map<ScopeKey, number>();
+  for (const row of rows) {
+    map.set(scopeKey(row.reseller_id, row.station_id), row.count);
+  }
+  return map;
 }
 
 const coverageSelect = {
@@ -323,19 +430,23 @@ export async function buildCoverageAnalytics(
   orgId: string,
   filters?: CoverageFilters
 ): Promise<CoverageAnalyticsPayload> {
+  const stationScope = resolveStationScope(filters);
+  const resellerId = filters?.resellerId;
+
   const where: Prisma.RptFinSourceCoverageWhereInput = {
     orgId,
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
-    ...(filters?.resellerId ? { resellerId: filters.resellerId } : {}),
+    ...(stationScope ? { stationId: { in: stationScope } } : {}),
+    ...(resellerId ? { resellerId } : {}),
   };
 
-  const [coverageRows, paymentScopes] = await Promise.all([
+  const [coverageRows, paymentScopes, uncoveredCounts] = await Promise.all([
     prisma.rptFinSourceCoverage.findMany({
       where,
       select: coverageSelect,
       orderBy: { maxCoveredPaidAt: 'desc' },
     }),
-    loadPaymentScopeAggregates(prisma, orgId),
+    loadPaymentScopeAggregates(prisma, orgId, stationScope, resellerId),
+    loadUncoveredPaymentCounts(prisma, orgId, stationScope, resellerId),
   ]);
 
   const postingIds = [
@@ -351,16 +462,6 @@ export async function buildCoverageAnalytics(
     coveredKeys.add(key);
     const paymentAgg = paymentScopes.get(key);
     const posting = row.lastPostingId ? postingMap.get(row.lastPostingId) ?? null : null;
-    const uncoveredPaymentCount =
-      paymentAgg && row.maxCoveredPaidAt
-        ? await countUncoveredPayments(
-            prisma,
-            orgId,
-            row.resellerId,
-            row.stationId,
-            row.maxCoveredPaidAt
-          )
-        : 0;
 
     scopeRows.push(
       buildScopeRow({
@@ -373,7 +474,7 @@ export async function buildCoverageAnalytics(
         stationName: row.station.name,
         paymentAgg,
         posting,
-        uncoveredPaymentCount,
+        uncoveredPaymentCount: uncoveredCounts.get(key) ?? 0,
       })
     );
   }
@@ -382,8 +483,8 @@ export async function buildCoverageAnalytics(
   if (!filters?.eligibility || filters.eligibility === 'NO_COVERAGE') {
     const missingKeys = [...paymentScopes.keys()].filter((key) => !coveredKeys.has(key));
     const missingIds = missingKeys.map((key) => {
-      const [resellerId, stationId] = key.split(':');
-      return { resellerId, stationId };
+      const [missingResellerId, stationId] = key.split(':');
+      return { resellerId: missingResellerId, stationId };
     });
 
     if (missingIds.length > 0) {
@@ -401,22 +502,22 @@ export async function buildCoverageAnalytics(
       const resellerMap = new Map(resellers.map((r) => [r.id, r]));
       const stationMap = new Map(stations.map((s) => [s.id, s]));
 
-      for (const { resellerId, stationId } of missingIds) {
-        if (filters?.stationId && filters.stationId !== stationId) continue;
-        if (filters?.resellerId && filters.resellerId !== resellerId) continue;
+      for (const missing of missingIds) {
+        if (stationScope && !stationScope.includes(missing.stationId)) continue;
+        if (resellerId && resellerId !== missing.resellerId) continue;
 
-        const reseller = resellerMap.get(resellerId);
-        const station = stationMap.get(stationId);
+        const reseller = resellerMap.get(missing.resellerId);
+        const station = stationMap.get(missing.stationId);
         if (!reseller || !station) continue;
 
-        const paymentAgg = paymentScopes.get(scopeKey(resellerId, stationId));
+        const paymentAgg = paymentScopes.get(scopeKey(missing.resellerId, missing.stationId));
         scopeRows.push(
           buildScopeRow({
             coverage: null,
-            resellerId,
+            resellerId: missing.resellerId,
             resellerCode: reseller.code,
             resellerName: reseller.name,
-            stationId,
+            stationId: missing.stationId,
             stationCode: station.code,
             stationName: station.name,
             paymentAgg,
@@ -433,8 +534,10 @@ export async function buildCoverageAnalytics(
     : scopeRows;
 
   const summary = emptySummary();
-  const eligibilityMap = new Map<EligibilityStatus, number>();
-  const lagMap = new Map<string, number>();
+  const eligibilityMap = new Map<EligibilityStatus, number>(
+    ELIGIBILITY_STATUSES.map((status) => [status, 0])
+  );
+  const lagMap = new Map<LagBucket, number>(LAG_BUCKETS.map((bucket) => [bucket, 0]));
   const partnerMap = new Map<string, CoveragePartnerRow>();
   const siteMap = new Map<string, CoverageSiteRow>();
   let gapDaysTotal = 0;
@@ -447,11 +550,13 @@ export async function buildCoverageAnalytics(
     summary.scopeCount += 1;
     eligibilityMap.set(row.eligibility, (eligibilityMap.get(row.eligibility) ?? 0) + 1);
 
-    if (row.eligibility === 'SEALED') summary.sealedCount += 1;
+    if (row.eligibility === 'SEALED') {
+      summary.sealedCount += 1;
+      summary.purgeEligibleCount += 1;
+    }
     if (row.eligibility === 'GAP') summary.gapCount += 1;
     if (row.eligibility === 'UNSEALED') summary.unsealedCount += 1;
     if (row.eligibility === 'NO_COVERAGE') summary.noCoverageCount += 1;
-    if (row.eligibility === 'SEALED') summary.purgeEligibleCount += 1;
 
     summary.totalUncoveredPayments += row.uncoveredPaymentCount;
 
@@ -469,37 +574,28 @@ export async function buildCoverageAnalytics(
 
     const partner =
       partnerMap.get(row.resellerId) ??
-      ({
-        resellerId: row.resellerId,
-        code: row.resellerCode,
-        name: row.resellerName,
-        scopeCount: 0,
-        sealedCount: 0,
-        gapCount: 0,
-        avgGapDays: 0,
-      } satisfies CoveragePartnerRow);
+      emptyPartnerRow(row.resellerId, row.resellerCode, row.resellerName);
     partner.scopeCount += 1;
+    partner.uncoveredPaymentCount += row.uncoveredPaymentCount;
     if (row.eligibility === 'SEALED') partner.sealedCount += 1;
     if (row.eligibility === 'GAP') partner.gapCount += 1;
+    if (row.eligibility === 'UNSEALED') partner.unsealedCount += 1;
+    if (row.eligibility === 'NO_COVERAGE') partner.noCoverageCount += 1;
     partnerMap.set(row.resellerId, partner);
 
     const site =
-      siteMap.get(row.stationId) ??
-      ({
-        stationId: row.stationId,
-        code: row.stationCode,
-        name: row.stationName,
-        scopeCount: 0,
-        sealedCount: 0,
-        gapCount: 0,
-        avgGapDays: 0,
-      } satisfies CoverageSiteRow);
+      siteMap.get(row.stationId) ?? emptySiteRow(row.stationId, row.stationCode, row.stationName);
     site.scopeCount += 1;
+    site.uncoveredPaymentCount += row.uncoveredPaymentCount;
     if (row.eligibility === 'SEALED') site.sealedCount += 1;
     if (row.eligibility === 'GAP') site.gapCount += 1;
+    if (row.eligibility === 'UNSEALED') site.unsealedCount += 1;
+    if (row.eligibility === 'NO_COVERAGE') site.noCoverageCount += 1;
     siteMap.set(row.stationId, site);
   }
 
+  summary.atRiskCount = summary.gapCount + summary.unsealedCount + summary.noCoverageCount;
+  summary.sealedPct = roundPct(summary.sealedCount, summary.scopeCount);
   summary.avgGapDays =
     gapScopeCount > 0 ? Math.round((gapDaysTotal / gapScopeCount) * 10) / 10 : 0;
 
@@ -516,6 +612,7 @@ export async function buildCoverageAnalytics(
       gaps.length > 0
         ? Math.round((gaps.reduce((sum, s) => sum + s.gapDays, 0) / gaps.length) * 10) / 10
         : 0;
+    partner.sealedPct = roundPct(partner.sealedCount, partner.scopeCount);
   }
 
   for (const site of siteMap.values()) {
@@ -525,35 +622,35 @@ export async function buildCoverageAnalytics(
       gaps.length > 0
         ? Math.round((gaps.reduce((sum, s) => sum + s.gapDays, 0) / gaps.length) * 10) / 10
         : 0;
+    site.sealedPct = roundPct(site.sealedCount, site.scopeCount);
   }
 
-  const lagOrder = [
-    'Fully sealed',
-    '1–7 day gap',
-    '8–30 day gap',
-    '31–90 day gap',
-    '90+ day gap',
-    'Unsealed posting',
-    'No coverage record',
-  ];
+  const eligibilityPriority: Record<EligibilityStatus, number> = {
+    GAP: 0,
+    NO_COVERAGE: 1,
+    UNSEALED: 2,
+    SEALED: 3,
+  };
 
   return {
     summary,
-    byEligibility: [...eligibilityMap.entries()].map(([status, count]) => ({ status, count })),
-    lagBuckets: [...lagMap.entries()]
-      .map(([bucket, count]) => ({ bucket, count }))
-      .sort((a, b) => lagOrder.indexOf(a.bucket) - lagOrder.indexOf(b.bucket)),
-    byPartner: [...partnerMap.values()].sort((a, b) => b.gapCount - a.gapCount || b.scopeCount - a.scopeCount),
-    bySite: [...siteMap.values()].sort((a, b) => b.gapCount - a.gapCount || b.scopeCount - a.scopeCount),
+    byEligibility: ELIGIBILITY_STATUSES.map((status) => ({
+      status,
+      count: eligibilityMap.get(status) ?? 0,
+    })),
+    lagBuckets: LAG_BUCKETS.map((bucket) => ({
+      bucket,
+      count: lagMap.get(bucket) ?? 0,
+    })),
+    byPartner: [...partnerMap.values()].sort(
+      (a, b) => b.gapCount - a.gapCount || b.uncoveredPaymentCount - a.uncoveredPaymentCount || b.scopeCount - a.scopeCount
+    ),
+    bySite: [...siteMap.values()].sort(
+      (a, b) => b.gapCount - a.gapCount || b.uncoveredPaymentCount - a.uncoveredPaymentCount || b.scopeCount - a.scopeCount
+    ),
     scopes: filteredScopes.sort((a, b) => {
-      const priority: Record<EligibilityStatus, number> = {
-        GAP: 0,
-        NO_COVERAGE: 1,
-        UNSEALED: 2,
-        SEALED: 3,
-      };
-      const pa = priority[a.eligibility];
-      const pb = priority[b.eligibility];
+      const pa = eligibilityPriority[a.eligibility];
+      const pb = eligibilityPriority[b.eligibility];
       if (pa !== pb) return pa - pb;
       return b.gapDays - a.gapDays;
     }),

@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Card, Progress, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
@@ -27,6 +26,7 @@ const RunsBatchTable: React.FC<Props> = ({
     {
       title: "Batch",
       key: "batch",
+      sorter: (a, b) => a.batchNo.localeCompare(b.batchNo),
       render: (_, row) => (
         <div>
           <Text strong style={{ fontFamily: "monospace", fontSize: 13 }}>
@@ -47,6 +47,7 @@ const RunsBatchTable: React.FC<Props> = ({
       key: "plan",
       width: 140,
       ellipsis: true,
+      sorter: (a, b) => a.planName.localeCompare(b.planName) || a.planCode.localeCompare(b.planCode),
       render: (_, row) => (
         <div>
           <Text style={{ fontSize: 13 }}>{row.planName}</Text>
@@ -64,38 +65,44 @@ const RunsBatchTable: React.FC<Props> = ({
       key: "quantity",
       width: 70,
       align: "right",
+      sorter: (a, b) => a.quantity - b.quantity,
+    },
+    {
+      title: "Activated",
+      dataIndex: "activatedCount",
+      key: "activatedCount",
+      width: 90,
+      align: "right",
+      sorter: (a, b) => a.activatedCount - b.activatedCount,
+    },
+    {
+      title: "Remaining",
+      dataIndex: "remaining",
+      key: "remaining",
+      width: 90,
+      align: "right",
+      sorter: (a, b) => a.remaining - b.remaining,
     },
     {
       title: "Utilization",
       key: "utilization",
-      width: 140,
+      width: 120,
       render: (_, row) => (
-        <div style={{ minWidth: 100 }}>
-          <Progress
-            percent={row.utilizationPercent}
-            size="small"
-            strokeColor={utilizationColor(row.utilizationPercent)}
-            format={(p) => `${p}%`}
-          />
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            {row.redeemed} redeemed · {row.remaining} left
-          </Text>
-        </div>
+        <Progress
+          percent={row.utilizationPercent}
+          size="small"
+          strokeColor={utilizationColor(row.utilizationPercent)}
+          format={(p) => `${p}%`}
+        />
       ),
       sorter: (a, b) => a.utilizationPercent - b.utilizationPercent,
-      defaultSortOrder: "descend",
-    },
-    {
-      title: "Activated",
-      dataIndex: "activatedInPeriod",
-      key: "activatedInPeriod",
-      width: 90,
-      align: "right",
+      defaultSortOrder: "ascend",
     },
     {
       title: "Created",
       key: "createdAt",
       width: 100,
+      sorter: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       render: (_, row) => (
         <Text type="secondary" style={{ fontSize: 12 }}>
           {dayjs(row.createdAt).format("D MMM YY")}
@@ -108,13 +115,6 @@ const RunsBatchTable: React.FC<Props> = ({
     <Card
       size="small"
       title="Batch utilization"
-      extra={
-        <Link href="/wifi/access/voucher-runs">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Manage runs →
-          </Text>
-        </Link>
-      }
       styles={{ body: { padding: 0 } }}
     >
       <Table<VoucherRunBatchRow>
@@ -123,7 +123,8 @@ const RunsBatchTable: React.FC<Props> = ({
         loading={loading}
         dataSource={rows}
         columns={columns}
-        pagination={{ pageSize: 10, hideOnSinglePage: true, size: "small" }}
+        pagination={false}
+        sticky
         rowClassName={(row) =>
           row.batchId === selectedBatchId ? "ant-table-row-selected" : ""
         }

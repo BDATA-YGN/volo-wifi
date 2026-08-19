@@ -10,49 +10,16 @@ import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
-import { DEFAULT_PRESET, PERIOD_PRESETS, type PeriodPreset } from './constants';
+import { resolveAllowedStationIds } from '@/features/wifi/shared/resolve-station-scope';
 import { AnalyticsRevenueQuerySchema } from './schema';
-import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
 import {
   buildRevenueAnalytics,
-  resolvePeriodFromPreset,
+  resolveSelectedMonth,
   type RevenueAnalyticsPayload,
 } from './build-revenue-analytics';
 
-function parseDateParam(value: unknown): Date | null {
-  if (typeof value !== 'string' || !value.trim()) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function resolvePeriod(query: AuthenticatedRequest['query']): {
-  periodFrom: Date;
-  periodTo: Date;
-  preset: PeriodPreset | null;
-} {
-  const presetParam = typeof query.preset === 'string' ? query.preset.trim() : '';
-  const preset = (PERIOD_PRESETS as readonly string[]).includes(presetParam)
-    ? (presetParam as PeriodPreset)
-    : null;
-
-  const customFrom = parseDateParam(query.periodFrom);
-  const customTo = parseDateParam(query.periodTo);
-
-  if (customFrom && customTo) {
-    return {
-      periodFrom: startOfUtcDay(customFrom),
-      periodTo: endOfUtcDay(customTo),
-      preset: null,
-    };
-  }
-
-  if (preset) {
-    const resolved = resolvePeriodFromPreset(preset);
-    return { ...resolved, preset };
-  }
-
-  const resolved = resolvePeriodFromPreset(DEFAULT_PRESET);
-  return { ...resolved, preset: DEFAULT_PRESET };
+function allowedStationScope(ids: string[] | null): string[] | null {
+  return ids && ids.length > 0 ? ids : null;
 }
 
 /** menus.wifi.analytics.revenue @route /wifi/analytics/revenue */
@@ -65,6 +32,7 @@ export class AnalyticsRevenueController {
     asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const adminId = req.userId!;
       const isDeveloper = isDeveloperAdmin(req.user!);
+      const canSwitchOrg = canSwitchOrgContext(req.user!);
 
       const { error } = AnalyticsRevenueQuerySchema.validate(req.query, { abortEarly: false });
       if (error) {
@@ -91,6 +59,8 @@ export class AnalyticsRevenueController {
           data: {
             memberships,
             currency: org?.currency ?? 'MMK',
+            canSwitchOrg,
+            requiresOrgSelection: canSwitchOrg || (!orgIdParam && memberships.length !== 1),
           },
         });
       }
@@ -100,7 +70,7 @@ export class AnalyticsRevenueController {
         return responseSuccess(res, {
           message: 'No tenant access',
           data: null,
-          meta: { memberships: [], requiresOrgSelection: true },
+          meta: { memberships: [], requiresOrgSelection: true, canSwitchOrg },
         });
       }
 
@@ -111,9 +81,9 @@ export class AnalyticsRevenueController {
           data: null,
           meta: {
             memberships,
-            requiresOrgSelection: canSwitchOrgContext(req.user!) || memberships.length > 1,
-            canSwitchOrg: canSwitchOrgContext(req.user!),
-            orgId: memberships.length === 1 ? memberships[0].id : undefined,
+            requiresOrgSelection: canSwitchOrg || memberships.length > 1,
+            canSwitchOrg,
+            orgId: canSwitchOrg ? undefined : memberships.length === 1 ? memberships[0].id : undefined,
           },
         });
       }
@@ -126,8 +96,20 @@ export class AnalyticsRevenueController {
         });
       }
 
-      const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
-      const analytics = await buildRevenueAnalytics(this.prisma, orgIdParam, periodFrom, periodTo);
+      const selected = resolveSelectedMonth(
+        typeof req.query.month === 'string' ? req.query.month : undefined
+      );
+      const allowedStationIds = allowedStationScope(
+        await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+      );
+
+      const analytics = await buildRevenueAnalytics(
+        this.prisma,
+        orgIdParam,
+        selected.year,
+        selected.month,
+        allowedStationIds
+      );
 
       const org = await this.prisma.org.findUnique({
         where: { id: orgIdParam },
@@ -137,13 +119,11 @@ export class AnalyticsRevenueController {
       const payload: RevenueAnalyticsPayload & {
         periodFrom: string;
         periodTo: string;
-        preset: PeriodPreset | null;
         org: { id: string; name: string; code: string; currency: string };
       } = {
         ...analytics,
-        periodFrom: periodFrom.toISOString(),
-        periodTo: periodTo.toISOString(),
-        preset,
+        periodFrom: selected.periodFrom.toISOString(),
+        periodTo: selected.periodTo.toISOString(),
         org: {
           id: org!.id,
           name: org!.name,
@@ -159,6 +139,7 @@ export class AnalyticsRevenueController {
           memberships,
           orgId: orgIdParam,
           requiresOrgSelection: false,
+          canSwitchOrg,
         },
       });
     }),

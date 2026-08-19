@@ -4,13 +4,12 @@ import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
 import * as Query from "./query";
 import type {
-  PeriodPreset,
   VoucherRunAnalyticsData,
   VoucherRunAnalyticsMeta,
   VoucherRunAnalyticsParams,
   VoucherRunsFormOptions,
 } from "./types";
-import { DEFAULT_PRESET } from "./constant";
+import { currentMonthKey, monthPeriod } from "./constant";
 
 const emptyFormOptions: VoucherRunsFormOptions = {
   memberships: [],
@@ -23,11 +22,7 @@ export function useAnalyticsVoucherRuns() {
   const [planId, setPlanId] = useState<string | undefined>(undefined);
   const [stationId, setStationId] = useState<string | undefined>(undefined);
   const [batchId, setBatchId] = useState<string | undefined>(undefined);
-  const [preset, setPreset] = useState<PeriodPreset>(DEFAULT_PRESET);
-  const [customPeriod, setCustomPeriod] = useState<{
-    periodFrom?: string;
-    periodTo?: string;
-  }>({});
+  const [month, setMonth] = useState(currentMonthKey);
   const [formOptions, setFormOptions] = useState<VoucherRunsFormOptions>(emptyFormOptions);
 
   const params: VoucherRunAnalyticsParams = {
@@ -35,19 +30,11 @@ export function useAnalyticsVoucherRuns() {
     planId,
     stationId,
     batchId,
-    ...(customPeriod.periodFrom && customPeriod.periodTo ? customPeriod : { preset }),
+    ...monthPeriod(month),
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
-    refreshDeps: [
-      orgId,
-      planId,
-      stationId,
-      batchId,
-      preset,
-      customPeriod.periodFrom,
-      customPeriod.periodTo,
-    ],
+    refreshDeps: [orgId, planId, stationId, batchId, month],
   });
 
   const analytics = (data?.data ?? null) as VoucherRunAnalyticsData | null;
@@ -69,7 +56,6 @@ export function useAnalyticsVoucherRuns() {
       setPlanId(undefined);
       setStationId(undefined);
       setBatchId(undefined);
-      setCustomPeriod({});
       void loadFormOptions(id);
     },
     [loadFormOptions]
@@ -89,17 +75,8 @@ export function useAnalyticsVoucherRuns() {
     setBatchId(id);
   }, []);
 
-  const selectPreset = useCallback((value: PeriodPreset) => {
-    setPreset(value);
-    setCustomPeriod({});
-  }, []);
-
-  const selectCustomPeriod = useCallback((periodFrom: string, periodTo: string) => {
-    setCustomPeriod({ periodFrom, periodTo });
-  }, []);
-
-  const clearCustomPeriod = useCallback(() => {
-    setCustomPeriod({});
+  const selectMonth = useCallback((value: string) => {
+    setMonth(value);
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -117,16 +94,13 @@ export function useAnalyticsVoucherRuns() {
     planId,
     stationId,
     batchId,
-    preset,
-    customPeriod,
+    month,
     formOptions,
     selectOrg,
     selectPlan,
     selectStation,
     selectBatch,
-    selectPreset,
-    selectCustomPeriod,
-    clearCustomPeriod,
+    selectMonth,
     clearFilters,
     refresh,
     loadFormOptions,

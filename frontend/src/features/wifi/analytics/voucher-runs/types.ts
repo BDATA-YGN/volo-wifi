@@ -1,6 +1,8 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
 
-export type PeriodPreset = "7d" | "30d" | "90d";
+export type PeriodPreset = "today" | "7d" | "30d" | "90d";
+
+export type TrendGranularity = "daily" | "hourly";
 
 export type SiteOption = {
   id: string;
@@ -47,7 +49,7 @@ export type VoucherRunBatchRow = {
   remaining: number;
   redeemed: number;
   utilizationPercent: number;
-  activatedInPeriod: number;
+  activatedCount: number;
   createdAt: string;
   statusBreakdown: Record<string, number>;
 };
@@ -60,6 +62,7 @@ export type VoucherRunPlanRow = {
   totalIssued: number;
   totalRemaining: number;
   totalRedeemed: number;
+  activatedCount: number;
   utilizationPercent: number;
 };
 
@@ -72,6 +75,7 @@ export type VoucherRunAnalyticsData = {
   summary: VoucherRunSummary;
   previousSummary: VoucherRunSummary;
   dailyTrend: VoucherRunDailyPoint[];
+  trendGranularity?: TrendGranularity;
   byBatch: VoucherRunBatchRow[];
   byPlan: VoucherRunPlanRow[];
   byStatus: VoucherRunStatusRow[];

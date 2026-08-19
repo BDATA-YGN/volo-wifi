@@ -196,6 +196,7 @@
                   "insights": "Partner Insights"
                 },
                 "access-tokens": "Access Tokens",
+                "token-diagnose": "Token Diagnose",
                 "transactions": {
                   "orders": "Orders",
                   "payments": "Payments"
@@ -599,6 +600,7 @@
                   "insights": "Partner Insights"
                 },
                 "access-tokens": "Access Tokens",
+                "token-diagnose": "Token Diagnose",
                 "transactions": {
                   "orders": "အော်ဒါများ",
                   "payments": "ငွေပေးချေမှုများ"

@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Card, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
@@ -104,13 +103,6 @@ const SettlementsTable: React.FC<Props> = ({ rows, currency, loading, onView }) 
     <Card
       size="small"
       title="Settlement ledger"
-      extra={
-        <Link href="/wifi/analytics/reconciliation/approvals">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Approvals →
-          </Text>
-        </Link>
-      }
       styles={{ body: { padding: 0 } }}
     >
       <Table<SettlementRow>

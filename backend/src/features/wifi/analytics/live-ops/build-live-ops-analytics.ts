@@ -2,8 +2,8 @@ import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { APP_TIMEZONE, startOfAppDay } from '@/utils/app-time';
-import { STALLED_SESSION_MINUTES, type WindowHours } from './constants';
+import { APP_TIMEZONE, endOfAppDay, startOfAppDay } from '@/utils/app-time';
+import { STALLED_SESSION_MINUTES } from './constants';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -36,76 +36,32 @@ export type LiveOpsHourlyPoint = {
   totalBytes: number;
 };
 
-export type LiveOpsStatusRow = {
-  status: string;
-  count: number;
-};
-
 export type LiveOpsSiteRow = {
   stationId: string;
   code: string;
   name: string;
   status: string;
-  activeSessions: number;
-  sessionsStarted: number;
-  ordersCount: number;
-  revenue: number;
+  radiusStart: number;
+  radiusInterim: number;
+  radiusStop: number;
   totalBytes: number;
-};
-
-export type LiveOpsPartnerRow = {
-  resellerId: string;
-  code: string;
-  name: string;
-  activeSessions: number;
-  sessionsStarted: number;
-  ordersCount: number;
-  revenue: number;
-  totalBytes: number;
-};
-
-export type LiveOpsRecentSessionRow = {
-  sessionId: string;
-  status: string;
-  userName: string | null;
-  stationCode: string | null;
-  stationName: string | null;
-  startedAt: string;
-  lastInterimAt: string | null;
-  totalBytes: number;
-  sessionTimeSec: number | null;
-  isStalled: boolean;
-};
-
-export type LiveOpsRecentOrderRow = {
-  orderId: string;
-  orderNo: string;
-  status: string;
-  resellerCode: string | null;
-  stationCode: string | null;
-  total: number;
-  currency: string;
-  soldAt: string | null;
-  createdAt: string;
+  tokenStatus: Array<{ status: string; count: number }>;
 };
 
 export type LiveOpsAnalyticsPayload = {
   summary: LiveOpsSummary;
-  byStatus: LiveOpsStatusRow[];
   hourlyTrend: LiveOpsHourlyPoint[];
   bySite: LiveOpsSiteRow[];
-  byPartner: LiveOpsPartnerRow[];
-  recentSessions: LiveOpsRecentSessionRow[];
-  recentOrders: LiveOpsRecentOrderRow[];
   generatedAt: string;
   windowFrom: string;
   windowTo: string;
-  windowHours: WindowHours;
+  date: string;
 };
 
 type LiveOpsFilters = {
   stationId?: string;
-  resellerId?: string;
+  allowedStationIds?: string[];
+  planId?: string;
 };
 
 function bigintToNumber(value: bigint | null | undefined): number {
@@ -122,10 +78,22 @@ function hourKey(date: Date): string {
   return appTz(date).startOf('hour').toISOString();
 }
 
-function resolveWindow(windowHours: WindowHours): { windowFrom: Date; windowTo: Date } {
-  const windowTo = new Date();
-  const windowFrom = new Date(windowTo.getTime() - windowHours * 60 * 60 * 1000);
-  return { windowFrom, windowTo };
+function resolveWindow(dayStart: Date): { windowFrom: Date; windowTo: Date; isToday: boolean } {
+  const windowFrom = startOfAppDay(dayStart);
+  const todayStart = startOfAppDay(new Date());
+  const isToday = windowFrom.getTime() === todayStart.getTime();
+  const windowTo = isToday ? new Date() : endOfAppDay(windowFrom);
+  return { windowFrom, windowTo, isToday };
+}
+
+function stationScope(filters?: LiveOpsFilters): { stationId?: string | { in: string[] } } {
+  if (filters?.stationId) return { stationId: filters.stationId };
+  if (filters?.allowedStationIds) return { stationId: { in: filters.allowedStationIds } };
+  return {};
+}
+
+function planCredentialFilter(filters?: LiveOpsFilters): { credential?: { planId: string } } {
+  return filters?.planId ? { credential: { planId: filters.planId } } : {};
 }
 
 function isSessionStalled(
@@ -138,17 +106,14 @@ function isSessionStalled(
 }
 
 function buildHourlySeries(
-  windowFrom: Date,
-  windowTo: Date,
-  windowHours: WindowHours,
+  dayStart: Date,
   sessionBuckets: Map<string, { count: number; bytes: number }>,
   orderBuckets: Map<string, { count: number; revenue: number }>
 ): LiveOpsHourlyPoint[] {
   const points: LiveOpsHourlyPoint[] = [];
-  let cursor = appTz(windowFrom).startOf('hour');
-  const end = appTz(windowTo).startOf('hour');
+  let cursor = appTz(dayStart).startOf('day');
 
-  while (cursor.isBefore(end) || cursor.isSame(end)) {
+  for (let i = 0; i < 24; i += 1) {
     const key = cursor.toISOString();
     const sessions = sessionBuckets.get(key) ?? { count: 0, bytes: 0 };
     const orders = orderBuckets.get(key) ?? { count: 0, revenue: 0 };
@@ -162,46 +127,127 @@ function buildHourlySeries(
     cursor = cursor.add(1, 'hour');
   }
 
-  // Trim to window hours if we have extra buckets
-  if (points.length > windowHours + 1) {
-    return points.slice(-(windowHours + 1));
-  }
   return points;
 }
 
 function statScopeFilter(filters?: LiveOpsFilters): Prisma.DailySalesStatWhereInput {
   return {
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
-    ...(filters?.resellerId ? { resellerId: filters.resellerId } : {}),
+    ...stationScope(filters),
+    ...(filters?.planId ? { planId: filters.planId } : {}),
   };
+}
+
+function credentialStationWhere(
+  orgId: string,
+  filters?: LiveOpsFilters
+): Prisma.CredentialWhereInput {
+  return {
+    orgId,
+    deletedAt: null,
+    ...(filters?.planId ? { planId: filters.planId } : {}),
+    ...(filters?.stationId
+      ? { stationId: filters.stationId }
+      : filters?.allowedStationIds
+        ? { stationId: { in: filters.allowedStationIds } }
+        : { stationId: { not: null } }),
+  };
+}
+
+async function loadTokenEventsByStation(
+  prisma: PrismaClient,
+  orgId: string,
+  windowFrom: Date,
+  windowTo: Date,
+  filters?: LiveOpsFilters
+): Promise<Map<string, Array<{ status: string; count: number }>>> {
+  const base = credentialStationWhere(orgId, filters);
+  const inDay = { gte: windowFrom, lte: windowTo };
+  const TOKEN_STATUS_ORDER = ['SOLD', 'ACTIVATED', 'PAUSED', 'CONSUMED', 'EXPIRED', 'REVOKED'];
+
+  const [sold, activated, paused, consumed, expired, revoked] = await Promise.all([
+    prisma.credential.groupBy({
+      by: ['stationId'],
+      where: { ...base, soldAt: inDay },
+      _count: { _all: true },
+    }),
+    prisma.credential.groupBy({
+      by: ['stationId'],
+      where: { ...base, activatedAt: inDay },
+      _count: { _all: true },
+    }),
+    prisma.credential.groupBy({
+      by: ['stationId'],
+      where: { ...base, status: 'PAUSED', updatedAt: inDay },
+      _count: { _all: true },
+    }),
+    prisma.credential.groupBy({
+      by: ['stationId'],
+      where: { ...base, status: 'CONSUMED', updatedAt: inDay },
+      _count: { _all: true },
+    }),
+    prisma.credential.groupBy({
+      by: ['stationId'],
+      where: { ...base, expiresAt: inDay },
+      _count: { _all: true },
+    }),
+    prisma.credential.groupBy({
+      by: ['stationId'],
+      where: { ...base, revokedAt: inDay },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const map = new Map<string, Array<{ status: string; count: number }>>();
+  const add = (
+    rows: Array<{ stationId: string | null; _count: { _all: number } }>,
+    status: string
+  ) => {
+    for (const row of rows) {
+      if (!row.stationId || row._count._all <= 0) continue;
+      const list = map.get(row.stationId) ?? [];
+      list.push({ status, count: row._count._all });
+      map.set(row.stationId, list);
+    }
+  };
+
+  add(sold, 'SOLD');
+  add(activated, 'ACTIVATED');
+  add(paused, 'PAUSED');
+  add(consumed, 'CONSUMED');
+  add(expired, 'EXPIRED');
+  add(revoked, 'REVOKED');
+
+  for (const list of map.values()) {
+    list.sort(
+      (a, b) => TOKEN_STATUS_ORDER.indexOf(a.status) - TOKEN_STATUS_ORDER.indexOf(b.status)
+    );
+  }
+  return map;
 }
 
 export async function buildLiveOpsAnalytics(
   prisma: PrismaClient,
   orgId: string,
-  windowHours: WindowHours,
+  dayStart: Date,
   filters?: LiveOpsFilters
 ): Promise<LiveOpsAnalyticsPayload> {
-  const { windowFrom, windowTo } = resolveWindow(windowHours);
-  const today = startOfAppDay(new Date());
+  const { windowFrom, windowTo, isToday } = resolveWindow(dayStart);
   const now = new Date();
+  const scope = stationScope(filters);
+  const planCred = planCredentialFilter(filters);
 
   const sessionWhere: Prisma.RadiusSessionWhereInput = {
     orgId,
     startedAt: { gte: windowFrom, lte: windowTo },
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
-    ...(filters?.resellerId
-      ? { credential: { resellerId: filters.resellerId } }
-      : {}),
+    ...scope,
+    ...planCred,
   };
 
   const activeWhere: Prisma.RadiusSessionWhereInput = {
     orgId,
     status: { in: ['START', 'INTERIM'] },
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
-    ...(filters?.resellerId
-      ? { credential: { resellerId: filters.resellerId } }
-      : {}),
+    ...scope,
+    ...planCred,
   };
 
   const orderWhere: Prisma.SaleOrderWhereInput = {
@@ -211,33 +257,32 @@ export async function buildLiveOpsAnalytics(
       { soldAt: { gte: windowFrom, lte: windowTo } },
       { soldAt: null, createdAt: { gte: windowFrom, lte: windowTo } },
     ],
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
-    ...(filters?.resellerId ? { resellerId: filters.resellerId } : {}),
+    ...scope,
+    ...(filters?.planId ? { items: { some: { planId: filters.planId } } } : {}),
   };
 
   const [
     activeSessions,
     windowSessions,
-    recentSessions,
     windowOrders,
-    recentOrders,
     paymentsCount,
     salesTodayAgg,
     usageTodayAgg,
     stations,
-    resellers,
+    tokenStatusMap,
   ] = await Promise.all([
-    prisma.radiusSession.findMany({
-      where: activeWhere,
-      select: {
-        id: true,
-        totalBytes: true,
-        startedAt: true,
-        lastInterimAt: true,
-        stationId: true,
-        credential: { select: { resellerId: true } },
-      },
-    }),
+    isToday
+      ? prisma.radiusSession.findMany({
+          where: activeWhere,
+          select: {
+            id: true,
+            totalBytes: true,
+            startedAt: true,
+            lastInterimAt: true,
+            stationId: true,
+          },
+        })
+      : Promise.resolve([]),
     prisma.radiusSession.findMany({
       where: sessionWhere,
       select: {
@@ -247,65 +292,26 @@ export async function buildLiveOpsAnalytics(
         totalBytes: true,
         stationId: true,
         credentialId: true,
-        credential: { select: { resellerId: true } },
-      },
-    }),
-    prisma.radiusSession.findMany({
-      where: sessionWhere,
-      select: {
-        id: true,
-        status: true,
-        userName: true,
-        startedAt: true,
-        lastInterimAt: true,
-        totalBytes: true,
-        sessionTimeSec: true,
-        station: { select: { code: true, name: true } },
-      },
-      orderBy: { startedAt: 'desc' },
-      take: 20,
-    }),
-    prisma.saleOrder.findMany({
-      where: orderWhere,
-      select: {
-        id: true,
-        orderNo: true,
-        status: true,
-        total: true,
-        currency: true,
-        soldAt: true,
-        createdAt: true,
-        stationId: true,
-        resellerId: true,
-        station: { select: { code: true } },
-        reseller: { select: { code: true } },
       },
     }),
     prisma.saleOrder.findMany({
       where: orderWhere,
       select: {
         id: true,
-        orderNo: true,
-        status: true,
         total: true,
-        currency: true,
         soldAt: true,
         createdAt: true,
-        reseller: { select: { code: true } },
-        station: { select: { code: true } },
       },
-      orderBy: [{ soldAt: 'desc' }, { createdAt: 'desc' }],
-      take: 20,
     }),
     prisma.payment.count({
       where: {
         orgId,
         paidAt: { gte: windowFrom, lte: windowTo },
-        ...(filters?.stationId || filters?.resellerId
+        ...(filters?.stationId || filters?.allowedStationIds || filters?.planId
           ? {
               order: {
-                ...(filters.stationId ? { stationId: filters.stationId } : {}),
-                ...(filters.resellerId ? { resellerId: filters.resellerId } : {}),
+                ...scope,
+                ...(filters.planId ? { items: { some: { planId: filters.planId } } } : {}),
               },
             }
           : {}),
@@ -315,7 +321,7 @@ export async function buildLiveOpsAnalytics(
       where: {
         orgId,
         deletedAt: null,
-        date: today,
+        date: windowFrom,
         ...statScopeFilter(filters),
       },
       _sum: { ordersCount: true, revenue: true },
@@ -324,21 +330,25 @@ export async function buildLiveOpsAnalytics(
       where: {
         orgId,
         deletedAt: null,
-        date: today,
+        date: windowFrom,
         ...statScopeFilter(filters),
       },
       _sum: { sessionsCount: true, totalBytes: true },
     }),
     prisma.wifiStation.findMany({
-      where: { orgId, deletedAt: null, ...(filters?.stationId ? { id: filters.stationId } : {}) },
+      where: {
+        orgId,
+        deletedAt: null,
+        ...(filters?.stationId
+          ? { id: filters.stationId }
+          : filters?.allowedStationIds
+            ? { id: { in: filters.allowedStationIds } }
+            : {}),
+      },
       select: { id: true, code: true, name: true, status: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.reseller.findMany({
-      where: { orgId, deletedAt: null, ...(filters?.resellerId ? { id: filters.resellerId } : {}) },
-      select: { id: true, code: true, name: true },
-      orderBy: { name: 'asc' },
-    }),
+    loadTokenEventsByStation(prisma, orgId, windowFrom, windowTo, filters),
   ]);
 
   const stalledSessions = activeSessions.filter((s) =>
@@ -351,22 +361,16 @@ export async function buildLiveOpsAnalytics(
   );
 
   const credentialIds = new Set<string>();
-  const statusMap = new Map<string, number>();
   const sessionHourMap = new Map<string, { count: number; bytes: number }>();
   const siteSessionMap = new Map<
     string,
-    { sessionsStarted: number; totalBytes: number; activeSessions: number }
-  >();
-  const partnerSessionMap = new Map<
-    string,
-    { sessionsStarted: number; totalBytes: number; activeSessions: number }
+    { radiusStart: number; radiusInterim: number; radiusStop: number; totalBytes: number }
   >();
 
   let sessionsStopped = 0;
 
   for (const session of windowSessions) {
     if (session.credentialId) credentialIds.add(session.credentialId);
-    statusMap.set(session.status, (statusMap.get(session.status) ?? 0) + 1);
     if (session.status === 'STOP') sessionsStopped += 1;
 
     const key = hourKey(session.startedAt);
@@ -375,55 +379,21 @@ export async function buildLiveOpsAnalytics(
     hour.bytes += bigintToNumber(session.totalBytes);
     sessionHourMap.set(key, hour);
 
-    if (session.stationId) {
-      const site = siteSessionMap.get(session.stationId) ?? {
-        sessionsStarted: 0,
-        totalBytes: 0,
-        activeSessions: 0,
-      };
-      site.sessionsStarted += 1;
-      site.totalBytes += bigintToNumber(session.totalBytes);
-      siteSessionMap.set(session.stationId, site);
-    }
-
-    const resellerId = session.credential?.resellerId;
-    if (resellerId) {
-      const partner = partnerSessionMap.get(resellerId) ?? {
-        sessionsStarted: 0,
-        totalBytes: 0,
-        activeSessions: 0,
-      };
-      partner.sessionsStarted += 1;
-      partner.totalBytes += bigintToNumber(session.totalBytes);
-      partnerSessionMap.set(resellerId, partner);
-    }
-  }
-
-  for (const session of activeSessions) {
-    if (session.stationId) {
-      const site = siteSessionMap.get(session.stationId) ?? {
-        sessionsStarted: 0,
-        totalBytes: 0,
-        activeSessions: 0,
-      };
-      site.activeSessions += 1;
-      siteSessionMap.set(session.stationId, site);
-    }
-    const resellerId = session.credential?.resellerId;
-    if (resellerId) {
-      const partner = partnerSessionMap.get(resellerId) ?? {
-        sessionsStarted: 0,
-        totalBytes: 0,
-        activeSessions: 0,
-      };
-      partner.activeSessions += 1;
-      partnerSessionMap.set(resellerId, partner);
-    }
+    if (!session.stationId) continue;
+    const site = siteSessionMap.get(session.stationId) ?? {
+      radiusStart: 0,
+      radiusInterim: 0,
+      radiusStop: 0,
+      totalBytes: 0,
+    };
+    if (session.status === 'START') site.radiusStart += 1;
+    else if (session.status === 'INTERIM') site.radiusInterim += 1;
+    else if (session.status === 'STOP') site.radiusStop += 1;
+    site.totalBytes += bigintToNumber(session.totalBytes);
+    siteSessionMap.set(session.stationId, site);
   }
 
   const orderHourMap = new Map<string, { count: number; revenue: number }>();
-  const siteOrderMap = new Map<string, { ordersCount: number; revenue: number }>();
-  const partnerOrderMap = new Map<string, { ordersCount: number; revenue: number }>();
   let revenue = 0;
 
   for (const order of windowOrders) {
@@ -435,57 +405,25 @@ export async function buildLiveOpsAnalytics(
     hour.count += 1;
     hour.revenue += amount;
     orderHourMap.set(key, hour);
-
-    if (order.stationId) {
-      const site = siteOrderMap.get(order.stationId) ?? { ordersCount: 0, revenue: 0 };
-      site.ordersCount += 1;
-      site.revenue += amount;
-      siteOrderMap.set(order.stationId, site);
-    }
-    if (order.resellerId) {
-      const partner = partnerOrderMap.get(order.resellerId) ?? { ordersCount: 0, revenue: 0 };
-      partner.ordersCount += 1;
-      partner.revenue += amount;
-      partnerOrderMap.set(order.resellerId, partner);
-    }
   }
 
   const bySite: LiveOpsSiteRow[] = stations.map((station) => {
     const sessions = siteSessionMap.get(station.id) ?? {
-      sessionsStarted: 0,
+      radiusStart: 0,
+      radiusInterim: 0,
+      radiusStop: 0,
       totalBytes: 0,
-      activeSessions: 0,
     };
-    const orders = siteOrderMap.get(station.id) ?? { ordersCount: 0, revenue: 0 };
     return {
       stationId: station.id,
       code: station.code,
       name: station.name,
       status: station.status,
-      activeSessions: sessions.activeSessions,
-      sessionsStarted: sessions.sessionsStarted,
-      ordersCount: orders.ordersCount,
-      revenue: Math.round(orders.revenue * 100) / 100,
+      radiusStart: sessions.radiusStart,
+      radiusInterim: sessions.radiusInterim,
+      radiusStop: sessions.radiusStop,
       totalBytes: sessions.totalBytes,
-    };
-  });
-
-  const byPartner: LiveOpsPartnerRow[] = resellers.map((reseller) => {
-    const sessions = partnerSessionMap.get(reseller.id) ?? {
-      sessionsStarted: 0,
-      totalBytes: 0,
-      activeSessions: 0,
-    };
-    const orders = partnerOrderMap.get(reseller.id) ?? { ordersCount: 0, revenue: 0 };
-    return {
-      resellerId: reseller.id,
-      code: reseller.code,
-      name: reseller.name,
-      activeSessions: sessions.activeSessions,
-      sessionsStarted: sessions.sessionsStarted,
-      ordersCount: orders.ordersCount,
-      revenue: Math.round(orders.revenue * 100) / 100,
-      totalBytes: sessions.totalBytes,
+      tokenStatus: tokenStatusMap.get(station.id) ?? [],
     };
   });
 
@@ -505,48 +443,15 @@ export async function buildLiveOpsAnalytics(
       todaySessions: usageTodayAgg._sum.sessionsCount ?? 0,
       todayBytes: bigintToNumber(usageTodayAgg._sum.totalBytes),
     },
-    byStatus: [...statusMap.entries()]
-      .map(([status, count]) => ({ status, count }))
-      .sort((a, b) => b.count - a.count),
-    hourlyTrend: buildHourlySeries(
-      windowFrom,
-      windowTo,
-      windowHours,
-      sessionHourMap,
-      orderHourMap
-    ),
+    hourlyTrend: buildHourlySeries(windowFrom, sessionHourMap, orderHourMap),
     bySite: bySite.sort(
-      (a, b) => b.activeSessions - a.activeSessions || b.sessionsStarted - a.sessionsStarted
+      (a, b) =>
+        b.radiusStart + b.radiusInterim - (a.radiusStart + a.radiusInterim) ||
+        b.totalBytes - a.totalBytes
     ),
-    byPartner: byPartner.sort(
-      (a, b) => b.activeSessions - a.activeSessions || b.revenue - a.revenue
-    ),
-    recentSessions: recentSessions.map((s) => ({
-      sessionId: s.id,
-      status: s.status,
-      userName: s.userName,
-      stationCode: s.station?.code ?? null,
-      stationName: s.station?.name ?? null,
-      startedAt: s.startedAt.toISOString(),
-      lastInterimAt: s.lastInterimAt?.toISOString() ?? null,
-      totalBytes: bigintToNumber(s.totalBytes),
-      sessionTimeSec: s.sessionTimeSec,
-      isStalled: isSessionStalled(s.startedAt, s.lastInterimAt, now),
-    })),
-    recentOrders: recentOrders.map((o) => ({
-      orderId: o.id,
-      orderNo: o.orderNo,
-      status: o.status,
-      resellerCode: o.reseller?.code ?? null,
-      stationCode: o.station?.code ?? null,
-      total: decimalToNumber(o.total),
-      currency: o.currency,
-      soldAt: o.soldAt?.toISOString() ?? null,
-      createdAt: o.createdAt.toISOString(),
-    })),
     generatedAt: now.toISOString(),
     windowFrom: windowFrom.toISOString(),
     windowTo: windowTo.toISOString(),
-    windowHours,
+    date: appTz(windowFrom).format('YYYY-MM-DD'),
   };
 }

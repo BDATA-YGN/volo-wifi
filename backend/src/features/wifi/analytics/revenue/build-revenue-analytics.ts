@@ -1,23 +1,13 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
 import {
-  APP_TIMEZONE,
-  appDayKey as utcDayKey,
+  appCalendarMonthRange,
+  appDayKey,
+  appNow,
   eachAppDay,
-  endOfAppDay,
-  previousAppPeriod,
-  resolvePeriodFromPresetDays,
 } from '@/utils/app-time';
 import type { TrendGranularity } from './constants';
 
-dayjs.extend(utc);
-dayjs.extend(timezone);
-
-function appTz(date: Date = new Date()) {
-  return dayjs(date).tz(process.env.TZ || APP_TIMEZONE);
-}
+const UNASSIGNED_TIER_ID = '__unassigned__';
 
 export type RevenueAnalyticsSummary = {
   revenue: number;
@@ -25,9 +15,9 @@ export type RevenueAnalyticsSummary = {
   commission: number;
   ordersCount: number;
   itemsCount: number;
-  paymentsCollected: number;
-  paymentCount: number;
   avgOrderValue: number;
+  siteCount: number;
+  tierCount: number;
 };
 
 export type RevenueTrendPoint = {
@@ -40,16 +30,29 @@ export type RevenueTrendPoint = {
   netRevenue: number;
 };
 
-export type PaymentMethodRow = {
-  method: string;
-  paymentsCount: number;
-  amount: number;
+export type RevenueSiteRow = {
+  stationId: string;
+  code: string;
+  name: string;
+  ordersCount: number;
+  itemsCount: number;
+  revenue: number;
+  commission: number;
+  netRevenue: number;
 };
 
-export type OrderStatusRow = {
-  status: string;
+export type RevenueTierRow = {
+  stationSizeId: string;
+  code: string;
+  name: string;
+  sortOrder: number;
+  siteCount: number;
   ordersCount: number;
+  itemsCount: number;
   revenue: number;
+  commission: number;
+  netRevenue: number;
+  sites: RevenueSiteRow[];
 };
 
 export type RevenueAnalyticsPayload = {
@@ -57,17 +60,27 @@ export type RevenueAnalyticsPayload = {
   previousSummary: RevenueAnalyticsSummary;
   trend: RevenueTrendPoint[];
   trendGranularity: TrendGranularity;
-  byPaymentMethod: PaymentMethodRow[];
-  byOrderStatus: OrderStatusRow[];
+  byTier: RevenueTierRow[];
   dataSource: 'aggregated' | 'live';
+  month: string;
 };
 
-type TrendBucket = {
+type Metrics = {
   ordersCount: number;
   itemsCount: number;
   revenue: number;
   commission: number;
   netRevenue: number;
+};
+
+type StationMeta = {
+  id: string;
+  code: string;
+  name: string;
+  stationSizeId: string;
+  stationSizeCode: string;
+  stationSizeName: string;
+  sortOrder: number;
 };
 
 function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
@@ -78,482 +91,347 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function emptySummary(): RevenueAnalyticsSummary {
+function emptyMetrics(): Metrics {
   return {
-    revenue: 0,
-    netRevenue: 0,
-    commission: 0,
     ordersCount: 0,
     itemsCount: 0,
-    paymentsCollected: 0,
-    paymentCount: 0,
-    avgOrderValue: 0,
+    revenue: 0,
+    commission: 0,
+    netRevenue: 0,
   };
 }
 
-function finalizeSummary(partial: Omit<RevenueAnalyticsSummary, 'avgOrderValue'>): RevenueAnalyticsSummary {
+function addMetrics(target: Metrics, add: Metrics): void {
+  target.ordersCount += add.ordersCount;
+  target.itemsCount += add.itemsCount;
+  target.revenue += add.revenue;
+  target.commission += add.commission;
+  target.netRevenue += add.netRevenue;
+}
+
+function finalizeSummary(
+  metrics: Metrics,
+  siteCount: number,
+  tierCount: number
+): RevenueAnalyticsSummary {
   return {
-    ...partial,
-    revenue: roundMoney(partial.revenue),
-    netRevenue: roundMoney(partial.netRevenue),
-    commission: roundMoney(partial.commission),
-    paymentsCollected: roundMoney(partial.paymentsCollected),
-    avgOrderValue:
-      partial.ordersCount > 0 ? roundMoney(partial.revenue / partial.ordersCount) : 0,
+    revenue: roundMoney(metrics.revenue),
+    netRevenue: roundMoney(metrics.netRevenue),
+    commission: roundMoney(metrics.commission),
+    ordersCount: metrics.ordersCount,
+    itemsCount: metrics.itemsCount,
+    avgOrderValue: metrics.ordersCount > 0 ? roundMoney(metrics.revenue / metrics.ordersCount) : 0,
+    siteCount,
+    tierCount,
   };
 }
 
-export function resolvePeriodFromPreset(
-  preset: string,
-  periodTo: Date = new Date()
-): { periodFrom: Date; periodTo: Date } {
-  if (preset === '12m') {
-    const end = endOfAppDay(periodTo);
-    const start = appTz(periodTo).subtract(11, 'month').startOf('month').toDate();
-    return { periodFrom: start, periodTo: end };
+export function resolveSelectedMonth(value?: string | null): {
+  year: number;
+  month: number;
+  monthKey: string;
+  periodFrom: Date;
+  periodTo: Date;
+} {
+  const now = appNow();
+  const match = value?.trim().match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  let year = now.year();
+  let month = now.month() + 1;
+
+  if (match) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    if (year > now.year() || (year === now.year() && month > now.month() + 1)) {
+      year = now.year();
+      month = now.month() + 1;
+    }
   }
 
-  const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
-  return resolvePeriodFromPresetDays(days, periodTo);
+  const { from, to } = appCalendarMonthRange(year, month);
+  return {
+    year,
+    month,
+    monthKey: `${year}-${String(month).padStart(2, '0')}`,
+    periodFrom: from,
+    periodTo: to,
+  };
 }
 
-export function previousPeriod(periodFrom: Date, periodTo: Date): { from: Date; to: Date } {
-  return previousAppPeriod(periodFrom, periodTo);
+export function previousCalendarMonthOf(year: number, month: number): { year: number; month: number } {
+  if (month === 1) return { year: year - 1, month: 12 };
+  return { year, month: month - 1 };
 }
 
-export function resolveTrendGranularity(periodFrom: Date, periodTo: Date): TrendGranularity {
-  const days = Math.ceil((periodTo.getTime() - periodFrom.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-  if (days > 366) return 'yearly';
-  if (days > 93) return 'monthly';
-  return 'daily';
-}
-
-function monthKey(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, '0')}`;
-}
-
-function buildDailySeries(
-  buckets: Map<string, TrendBucket>,
-  periodFrom: Date,
-  periodTo: Date
-): RevenueTrendPoint[] {
-  const points: RevenueTrendPoint[] = [];
-  for (const cursor of eachAppDay(periodFrom, periodTo)) {
-    const key = utcDayKey(cursor);
-    const bucket = buckets.get(key) ?? {
-      ordersCount: 0,
-      itemsCount: 0,
-      revenue: 0,
-      commission: 0,
-      netRevenue: 0,
-    };
-    points.push({
-      periodKey: key,
-      label: key,
-      ordersCount: bucket.ordersCount,
-      itemsCount: bucket.itemsCount,
-      revenue: roundMoney(bucket.revenue),
-      commission: roundMoney(bucket.commission),
-      netRevenue: roundMoney(bucket.netRevenue),
-    });
-  }
-
-  return points;
-}
-
-function buildMonthlySeries(
-  buckets: Map<string, TrendBucket>,
-  periodFrom: Date,
-  periodTo: Date
-): RevenueTrendPoint[] {
-  const points: RevenueTrendPoint[] = [];
-  let cursor = appTz(periodFrom).startOf('month');
-  const end = appTz(periodTo).startOf('month');
-
-  while (cursor.isBefore(end) || cursor.isSame(end, 'month')) {
-    const key = monthKey(cursor.year(), cursor.month() + 1);
-    const bucket = buckets.get(key) ?? {
-      ordersCount: 0,
-      itemsCount: 0,
-      revenue: 0,
-      commission: 0,
-      netRevenue: 0,
-    };
-    points.push({
-      periodKey: key,
-      label: key,
-      ordersCount: bucket.ordersCount,
-      itemsCount: bucket.itemsCount,
-      revenue: roundMoney(bucket.revenue),
-      commission: roundMoney(bucket.commission),
-      netRevenue: roundMoney(bucket.netRevenue),
-    });
-    cursor = cursor.add(1, 'month');
-  }
-
-  return points;
-}
-
-function buildYearlySeries(
-  buckets: Map<string, TrendBucket>,
-  periodFrom: Date,
-  periodTo: Date
-): RevenueTrendPoint[] {
-  const points: RevenueTrendPoint[] = [];
-  for (let year = appTz(periodFrom).year(); year <= appTz(periodTo).year(); year += 1) {
-    const key = String(year);
-    const bucket = buckets.get(key) ?? {
-      ordersCount: 0,
-      itemsCount: 0,
-      revenue: 0,
-      commission: 0,
-      netRevenue: 0,
-    };
-    points.push({
-      periodKey: key,
-      label: key,
-      ordersCount: bucket.ordersCount,
-      itemsCount: bucket.itemsCount,
-      revenue: roundMoney(bucket.revenue),
-      commission: roundMoney(bucket.commission),
-      netRevenue: roundMoney(bucket.netRevenue),
-    });
-  }
-  return points;
-}
-
-function seriesFromBuckets(
-  buckets: Map<string, TrendBucket>,
-  granularity: TrendGranularity,
-  periodFrom: Date,
-  periodTo: Date
-): RevenueTrendPoint[] {
-  if (granularity === 'yearly') return buildYearlySeries(buckets, periodFrom, periodTo);
-  if (granularity === 'monthly') return buildMonthlySeries(buckets, periodFrom, periodTo);
-  return buildDailySeries(buckets, periodFrom, periodTo);
-}
-
-function summaryFromBuckets(buckets: Map<string, TrendBucket>): RevenueAnalyticsSummary {
-  const totals = emptySummary();
-  for (const bucket of buckets.values()) {
-    totals.ordersCount += bucket.ordersCount;
-    totals.itemsCount += bucket.itemsCount;
-    totals.revenue += bucket.revenue;
-    totals.commission += bucket.commission;
-    totals.netRevenue += bucket.netRevenue;
-  }
-  return finalizeSummary(totals);
-}
-
-async function loadPaymentBreakdown(
+async function loadStations(
   prisma: PrismaClient,
   orgId: string,
-  periodFrom: Date,
-  periodTo: Date
-): Promise<{ byPaymentMethod: PaymentMethodRow[]; paymentsCollected: number; paymentCount: number }> {
-  const payments = await prisma.payment.findMany({
-    where: { orgId, paidAt: { gte: periodFrom, lte: periodTo } },
-    select: { method: true, amount: true },
-  });
-
-  const methodMap = new Map<string, { paymentsCount: number; amount: number }>();
-  let paymentsCollected = 0;
-
-  for (const payment of payments) {
-    const amount = decimalToNumber(payment.amount);
-    paymentsCollected += amount;
-    const row = methodMap.get(payment.method) ?? { paymentsCount: 0, amount: 0 };
-    row.paymentsCount += 1;
-    row.amount += amount;
-    methodMap.set(payment.method, row);
-  }
-
-  return {
-    paymentsCollected: roundMoney(paymentsCollected),
-    paymentCount: payments.length,
-    byPaymentMethod: [...methodMap.entries()]
-      .map(([method, stats]) => ({
-        method,
-        paymentsCount: stats.paymentsCount,
-        amount: roundMoney(stats.amount),
-      }))
-      .sort((a, b) => b.amount - a.amount),
-  };
-}
-
-async function loadOrderStatusBreakdown(
-  prisma: PrismaClient,
-  orgId: string,
-  periodFrom: Date,
-  periodTo: Date
-): Promise<OrderStatusRow[]> {
-  const orders = await prisma.saleOrder.findMany({
+  allowedStationIds?: string[] | null
+): Promise<StationMeta[]> {
+  const stations = await prisma.wifiStation.findMany({
     where: {
       orgId,
-      OR: [
-        { soldAt: { gte: periodFrom, lte: periodTo } },
-        { status: 'DRAFT', createdAt: { gte: periodFrom, lte: periodTo } },
-      ],
+      deletedAt: null,
+      ...(allowedStationIds && allowedStationIds.length > 0 ? { id: { in: allowedStationIds } } : {}),
     },
-    select: { status: true, total: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      stationSizeId: true,
+      stationSize: { select: { code: true, name: true, sortOrder: true } },
+    },
+    orderBy: { name: 'asc' },
   });
 
-  const statusMap = new Map<string, { ordersCount: number; revenue: number }>();
-  for (const order of orders) {
-    const row = statusMap.get(order.status) ?? { ordersCount: 0, revenue: 0 };
-    row.ordersCount += 1;
-    if (order.status === 'PAID') {
-      row.revenue += decimalToNumber(order.total);
-    }
-    statusMap.set(order.status, row);
-  }
-
-  const statusOrder = ['PAID', 'DRAFT', 'VOID', 'REFUNDED'];
-  return statusOrder
-    .filter((s) => statusMap.has(s))
-    .map((status) => {
-      const row = statusMap.get(status)!;
-      return {
-        status,
-        ordersCount: row.ordersCount,
-        revenue: roundMoney(row.revenue),
-      };
-    });
+  return stations.map((station) => ({
+    id: station.id,
+    code: station.code,
+    name: station.name,
+    stationSizeId: station.stationSizeId ?? UNASSIGNED_TIER_ID,
+    stationSizeCode: station.stationSize?.code ?? 'UNASSIGNED',
+    stationSizeName: station.stationSize?.name ?? 'Unassigned',
+    sortOrder: station.stationSize?.sortOrder ?? 999,
+  }));
 }
 
-async function aggregateFromStats(
+function dailySeries(buckets: Map<string, Metrics>, periodFrom: Date, periodTo: Date): RevenueTrendPoint[] {
+  return eachAppDay(periodFrom, periodTo).map((day) => {
+    const key = appDayKey(day);
+    const bucket = buckets.get(key) ?? emptyMetrics();
+    return {
+      periodKey: key,
+      label: key,
+      ordersCount: bucket.ordersCount,
+      itemsCount: bucket.itemsCount,
+      revenue: roundMoney(bucket.revenue),
+      commission: roundMoney(bucket.commission),
+      netRevenue: roundMoney(bucket.netRevenue),
+    };
+  });
+}
+
+async function aggregateFromDailyStats(
   prisma: PrismaClient,
   orgId: string,
+  stationIds: string[],
   periodFrom: Date,
-  periodTo: Date,
-  granularity: TrendGranularity
-): Promise<{ summary: RevenueAnalyticsSummary; trend: RevenueTrendPoint[] } | null> {
-  const buckets = new Map<string, TrendBucket>();
+  periodTo: Date
+): Promise<{ byStation: Map<string, Metrics>; daily: Map<string, Metrics> } | null> {
+  const rows = await prisma.dailySalesStat.findMany({
+    where: {
+      orgId,
+      deletedAt: null,
+      date: { gte: periodFrom, lte: periodTo },
+      ...(stationIds.length > 0 ? { stationId: { in: stationIds } } : { stationId: { in: [] } }),
+    },
+    select: {
+      date: true,
+      stationId: true,
+      ordersCount: true,
+      itemsCount: true,
+      revenue: true,
+      commission: true,
+      netRevenue: true,
+    },
+  });
 
-  if (granularity === 'daily') {
-    const rows = await prisma.dailySalesStat.findMany({
-      where: { orgId, deletedAt: null, date: { gte: periodFrom, lte: periodTo } },
-      select: {
-        date: true,
-        ordersCount: true,
-        itemsCount: true,
-        revenue: true,
-        commission: true,
-        netRevenue: true,
-      },
-    });
-    if (rows.length === 0) return null;
+  if (rows.length === 0) return null;
 
-    for (const row of rows) {
-      const key = utcDayKey(row.date);
-      const bucket = buckets.get(key) ?? {
-        ordersCount: 0,
-        itemsCount: 0,
-        revenue: 0,
-        commission: 0,
-        netRevenue: 0,
-      };
-      bucket.ordersCount += row.ordersCount;
-      bucket.itemsCount += row.itemsCount;
-      bucket.revenue += decimalToNumber(row.revenue);
-      bucket.commission += decimalToNumber(row.commission);
-      bucket.netRevenue += decimalToNumber(row.netRevenue);
-      buckets.set(key, bucket);
+  const byStation = new Map<string, Metrics>();
+  const daily = new Map<string, Metrics>();
+
+  for (const row of rows) {
+    const metrics: Metrics = {
+      ordersCount: row.ordersCount,
+      itemsCount: row.itemsCount,
+      revenue: decimalToNumber(row.revenue),
+      commission: decimalToNumber(row.commission),
+      netRevenue: decimalToNumber(row.netRevenue),
+    };
+
+    if (row.stationId) {
+      const station = byStation.get(row.stationId) ?? emptyMetrics();
+      addMetrics(station, metrics);
+      byStation.set(row.stationId, station);
     }
-  } else if (granularity === 'monthly') {
-    const fromYear = appTz(periodFrom).year();
-    const toYear = appTz(periodTo).year();
-    const fromKey = fromYear * 100 + (appTz(periodFrom).month() + 1);
-    const toKey = toYear * 100 + (appTz(periodTo).month() + 1);
 
-    const rows = (
-      await prisma.monthlySalesStat.findMany({
-        where: {
-          orgId,
-          deletedAt: null,
-          year: {
-            gte: fromYear,
-            lte: toYear,
-          },
-        },
-        select: {
-          year: true,
-          month: true,
-          ordersCount: true,
-          itemsCount: true,
-          revenue: true,
-          commission: true,
-          netRevenue: true,
-        },
-      })
-    ).filter((row) => {
-      const key = row.year * 100 + row.month;
-      return key >= fromKey && key <= toKey;
-    });
-    if (rows.length === 0) return null;
-
-    for (const row of rows) {
-      const key = monthKey(row.year, row.month);
-      const bucket = buckets.get(key) ?? {
-        ordersCount: 0,
-        itemsCount: 0,
-        revenue: 0,
-        commission: 0,
-        netRevenue: 0,
-      };
-      bucket.ordersCount += row.ordersCount;
-      bucket.itemsCount += row.itemsCount;
-      bucket.revenue += decimalToNumber(row.revenue);
-      bucket.commission += decimalToNumber(row.commission);
-      bucket.netRevenue += decimalToNumber(row.netRevenue);
-      buckets.set(key, bucket);
-    }
-  } else {
-    const rows = await prisma.yearlySalesStat.findMany({
-      where: {
-        orgId,
-        deletedAt: null,
-        year: { gte: appTz(periodFrom).year(), lte: appTz(periodTo).year() },
-      },
-      select: {
-        year: true,
-        ordersCount: true,
-        itemsCount: true,
-        revenue: true,
-        commission: true,
-        netRevenue: true,
-      },
-    });
-    if (rows.length === 0) return null;
-
-    for (const row of rows) {
-      const key = String(row.year);
-      const bucket = buckets.get(key) ?? {
-        ordersCount: 0,
-        itemsCount: 0,
-        revenue: 0,
-        commission: 0,
-        netRevenue: 0,
-      };
-      bucket.ordersCount += row.ordersCount;
-      bucket.itemsCount += row.itemsCount;
-      bucket.revenue += decimalToNumber(row.revenue);
-      bucket.commission += decimalToNumber(row.commission);
-      bucket.netRevenue += decimalToNumber(row.netRevenue);
-      buckets.set(key, bucket);
-    }
+    const dayKey = appDayKey(row.date);
+    const day = daily.get(dayKey) ?? emptyMetrics();
+    addMetrics(day, metrics);
+    daily.set(dayKey, day);
   }
 
-  return {
-    summary: summaryFromBuckets(buckets),
-    trend: seriesFromBuckets(buckets, granularity, periodFrom, periodTo),
-  };
+  return { byStation, daily };
 }
 
 async function aggregateFromLiveOrders(
   prisma: PrismaClient,
   orgId: string,
+  stationIds: string[],
   periodFrom: Date,
-  periodTo: Date,
-  granularity: TrendGranularity
-): Promise<{ summary: RevenueAnalyticsSummary; trend: RevenueTrendPoint[] }> {
+  periodTo: Date
+): Promise<{ byStation: Map<string, Metrics>; daily: Map<string, Metrics> }> {
   const orders = await prisma.saleOrder.findMany({
     where: {
       orgId,
       status: 'PAID',
       soldAt: { gte: periodFrom, lte: periodTo },
+      ...(stationIds.length > 0 ? { stationId: { in: stationIds } } : { stationId: { in: [] } }),
     },
     select: {
-      total: true,
+      stationId: true,
       soldAt: true,
+      total: true,
       items: { select: { qty: true } },
     },
   });
 
-  const buckets = new Map<string, TrendBucket>();
+  const byStation = new Map<string, Metrics>();
+  const daily = new Map<string, Metrics>();
 
   for (const order of orders) {
     if (!order.soldAt) continue;
-    const revenue = decimalToNumber(order.total);
-    const itemsCount = order.items.reduce((s, i) => s + i.qty, 0);
+    const metrics: Metrics = {
+      ordersCount: 1,
+      itemsCount: order.items.reduce((sum, item) => sum + item.qty, 0),
+      revenue: decimalToNumber(order.total),
+      commission: 0,
+      netRevenue: decimalToNumber(order.total),
+    };
 
-    let key: string;
-    if (granularity === 'yearly') {
-      key = String(appTz(order.soldAt).year());
-    } else if (granularity === 'monthly') {
-      const d = appTz(order.soldAt);
-      key = monthKey(d.year(), d.month() + 1);
-    } else {
-      key = utcDayKey(order.soldAt);
+    if (order.stationId) {
+      const station = byStation.get(order.stationId) ?? emptyMetrics();
+      addMetrics(station, metrics);
+      byStation.set(order.stationId, station);
     }
 
-    const bucket = buckets.get(key) ?? {
-      ordersCount: 0,
-      itemsCount: 0,
-      revenue: 0,
-      commission: 0,
-      netRevenue: 0,
-    };
-    bucket.ordersCount += 1;
-    bucket.itemsCount += itemsCount;
-    bucket.revenue += revenue;
-    bucket.netRevenue += revenue;
-    buckets.set(key, bucket);
+    const dayKey = appDayKey(order.soldAt);
+    const day = daily.get(dayKey) ?? emptyMetrics();
+    addMetrics(day, metrics);
+    daily.set(dayKey, day);
   }
 
-  return {
-    summary: summaryFromBuckets(buckets),
-    trend: seriesFromBuckets(buckets, granularity, periodFrom, periodTo),
-  };
+  return { byStation, daily };
+}
+
+function buildByTier(
+  stations: StationMeta[],
+  byStation: Map<string, Metrics>
+): RevenueTierRow[] {
+  const tierMap = new Map<string, RevenueTierRow>();
+
+  for (const station of stations) {
+    const metrics = byStation.get(station.id) ?? emptyMetrics();
+    const tier =
+      tierMap.get(station.stationSizeId) ??
+      ({
+        stationSizeId: station.stationSizeId,
+        code: station.stationSizeCode,
+        name: station.stationSizeName,
+        sortOrder: station.sortOrder,
+        siteCount: 0,
+        ordersCount: 0,
+        itemsCount: 0,
+        revenue: 0,
+        commission: 0,
+        netRevenue: 0,
+        sites: [],
+      } satisfies RevenueTierRow);
+
+    tier.siteCount += 1;
+    tier.ordersCount += metrics.ordersCount;
+    tier.itemsCount += metrics.itemsCount;
+    tier.revenue += metrics.revenue;
+    tier.commission += metrics.commission;
+    tier.netRevenue += metrics.netRevenue;
+    tier.sites.push({
+      stationId: station.id,
+      code: station.code,
+      name: station.name,
+      ordersCount: metrics.ordersCount,
+      itemsCount: metrics.itemsCount,
+      revenue: roundMoney(metrics.revenue),
+      commission: roundMoney(metrics.commission),
+      netRevenue: roundMoney(metrics.netRevenue),
+    });
+    tierMap.set(station.stationSizeId, tier);
+  }
+
+  return [...tierMap.values()]
+    .map((tier) => ({
+      ...tier,
+      revenue: roundMoney(tier.revenue),
+      commission: roundMoney(tier.commission),
+      netRevenue: roundMoney(tier.netRevenue),
+      sites: [...tier.sites].sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+}
+
+async function loadMonthBreakdown(
+  prisma: PrismaClient,
+  orgId: string,
+  stations: StationMeta[],
+  periodFrom: Date,
+  periodTo: Date
+): Promise<{
+  byStation: Map<string, Metrics>;
+  daily: Map<string, Metrics>;
+  dataSource: 'aggregated' | 'live';
+}> {
+  const stationIds = stations.map((station) => station.id);
+  const aggregated = await aggregateFromDailyStats(prisma, orgId, stationIds, periodFrom, periodTo);
+  if (aggregated) {
+    return { ...aggregated, dataSource: 'aggregated' };
+  }
+  const live = await aggregateFromLiveOrders(prisma, orgId, stationIds, periodFrom, periodTo);
+  return { ...live, dataSource: 'live' };
 }
 
 export async function buildRevenueAnalytics(
   prisma: PrismaClient,
   orgId: string,
-  periodFrom: Date,
-  periodTo: Date
+  year: number,
+  month: number,
+  allowedStationIds?: string[] | null
 ): Promise<RevenueAnalyticsPayload> {
-  const trendGranularity = resolveTrendGranularity(periodFrom, periodTo);
+  const { from: periodFrom, to: periodTo } = appCalendarMonthRange(year, month);
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+  const stations = await loadStations(prisma, orgId, allowedStationIds);
 
-  const aggregated = await aggregateFromStats(prisma, orgId, periodFrom, periodTo, trendGranularity);
-  const live = aggregated ?? (await aggregateFromLiveOrders(prisma, orgId, periodFrom, periodTo, trendGranularity));
+  const current = await loadMonthBreakdown(prisma, orgId, stations, periodFrom, periodTo);
+  const byTier = buildByTier(stations, current.byStation);
 
-  const prev = previousPeriod(periodFrom, periodTo);
-  const prevAggregated = await aggregateFromStats(
+  const totals = emptyMetrics();
+  for (const tier of byTier) {
+    totals.ordersCount += tier.ordersCount;
+    totals.itemsCount += tier.itemsCount;
+    totals.revenue += tier.revenue;
+    totals.commission += tier.commission;
+    totals.netRevenue += tier.netRevenue;
+  }
+
+  const prev = previousCalendarMonthOf(year, month);
+  const prevRange = appCalendarMonthRange(prev.year, prev.month);
+  const previous = await loadMonthBreakdown(
     prisma,
     orgId,
-    prev.from,
-    prev.to,
-    resolveTrendGranularity(prev.from, prev.to)
+    stations,
+    prevRange.from,
+    prevRange.to
   );
-  const prevLive =
-    prevAggregated ??
-    (await aggregateFromLiveOrders(prisma, orgId, prev.from, prev.to, resolveTrendGranularity(prev.from, prev.to)));
-
-  const [payments, orderStatus] = await Promise.all([
-    loadPaymentBreakdown(prisma, orgId, periodFrom, periodTo),
-    loadOrderStatusBreakdown(prisma, orgId, periodFrom, periodTo),
-  ]);
-
-  const summary = finalizeSummary({
-    ...live.summary,
-    paymentsCollected: payments.paymentsCollected,
-    paymentCount: payments.paymentCount,
-  });
-
-  const previousSummary = finalizeSummary({
-    ...prevLive.summary,
-    paymentsCollected: 0,
-    paymentCount: 0,
-  });
+  const prevTotals = emptyMetrics();
+  for (const metrics of previous.byStation.values()) {
+    addMetrics(prevTotals, metrics);
+  }
 
   return {
-    summary,
-    previousSummary,
-    trend: live.trend,
-    trendGranularity,
-    byPaymentMethod: payments.byPaymentMethod,
-    byOrderStatus: orderStatus,
-    dataSource: aggregated ? 'aggregated' : 'live',
+    summary: finalizeSummary(totals, stations.length, byTier.length),
+    previousSummary: finalizeSummary(prevTotals, stations.length, byTier.length),
+    trend: dailySeries(current.daily, periodFrom, periodTo),
+    trendGranularity: 'daily',
+    byTier,
+    dataSource: current.dataSource,
+    month: monthKey,
   };
 }

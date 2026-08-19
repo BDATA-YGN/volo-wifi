@@ -1,89 +1,124 @@
 "use client";
 
 import React from "react";
-import { Alert, Select, Space, Typography } from "antd";
-import type { PartnerOption, SiteOption } from "../types";
+import { Select, Space, Typography } from "antd";
+import type { PlanOption, ProfileOption, SiteOption, StationSizeOption } from "../types";
 
 const { Text } = Typography;
 
 type Props = {
   stations: SiteOption[];
-  resellers: PartnerOption[];
+  stationSizes: StationSizeOption[];
+  profiles: ProfileOption[];
+  plans: PlanOption[];
   stationId?: string;
-  resellerId?: string;
+  stationSizeId?: string;
+  profile?: string;
+  planId?: string;
   loading?: boolean;
-  onStationChange: (value: string | undefined) => void;
-  onResellerChange: (value: string | undefined) => void;
+  onStationChange: (id: string | undefined) => void;
+  onStationSizeChange: (id: string | undefined) => void;
+  onProfileChange: (value: string | undefined) => void;
+  onPlanChange: (id: string | undefined) => void;
 };
 
 const LiveOpsFilterBar: React.FC<Props> = ({
   stations,
-  resellers,
+  stationSizes,
+  profiles,
+  plans,
   stationId,
-  resellerId,
+  stationSizeId,
+  profile,
+  planId,
   loading,
   onStationChange,
-  onResellerChange,
+  onStationSizeChange,
+  onProfileChange,
+  onPlanChange,
 }) => (
-  <div className="flex flex-col gap-3">
-    <Space wrap size="middle">
-      <div>
-        <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
-          Site
-        </Text>
-        <Select
-          allowClear
-          showSearch
-          placeholder="All sites"
-          style={{ minWidth: 200 }}
-          loading={loading}
-          value={stationId}
-          optionFilterProp="label"
-          onChange={(v) => onStationChange(v)}
-          options={stations.map((s) => ({
+  <Space wrap size="middle" align="end">
+    <div>
+      <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+        Site
+      </Text>
+      <Select
+        allowClear
+        showSearch
+        placeholder="All sites"
+        style={{ minWidth: 200 }}
+        loading={loading}
+        value={stationId}
+        optionFilterProp="label"
+        onChange={(v) => onStationChange(v ?? undefined)}
+        options={stations
+          .filter((s) => !stationSizeId || s.stationSizeId === stationSizeId)
+          .map((s) => ({
             value: s.id,
             label: `${s.name} (${s.code})`,
           }))}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
-          Partner
-        </Text>
-        <Select
-          allowClear
-          showSearch
-          placeholder="All partners"
-          style={{ minWidth: 200 }}
-          loading={loading}
-          value={resellerId}
-          optionFilterProp="label"
-          onChange={(v) => onResellerChange(v)}
-          options={resellers.map((r) => ({
-            value: r.id,
-            label: `${r.name} (${r.code})`,
-          }))}
-        />
-      </div>
-    </Space>
-    {stationId || resellerId ? (
-      <Alert
-        type="info"
-        showIcon
-        title={
-          <Text style={{ fontSize: 13 }}>
-            {stationId
-              ? `Site ${stations.find((s) => s.id === stationId)?.name ?? stationId}`
-              : null}
-            {stationId && resellerId ? " · " : null}
-            {resellerId
-              ? `Partner ${resellers.find((r) => r.id === resellerId)?.name ?? resellerId}`
-              : null}
-          </Text>
+      />
+    </div>
+    <div>
+      <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+        Profile
+      </Text>
+      <Select
+        allowClear
+        placeholder="All profiles"
+        style={{ minWidth: 160 }}
+        loading={loading}
+        value={profile}
+        onChange={(v) => onProfileChange(v ?? undefined)}
+        options={
+          profiles.length > 0
+            ? profiles
+            : [
+                { value: "MikroTik", label: "MikroTik" },
+                { value: "Ruijie", label: "Ruijie" },
+              ]
         }
       />
-    ) : null}
-  </div>
+    </div>
+    <div>
+      <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+        Tier
+      </Text>
+      <Select
+        allowClear
+        showSearch
+        placeholder="All tiers"
+        style={{ minWidth: 160 }}
+        loading={loading}
+        value={stationSizeId}
+        optionFilterProp="label"
+        onChange={(v) => onStationSizeChange(v ?? undefined)}
+        options={stationSizes.map((t) => ({
+          value: t.id,
+          label: `${t.name} (${t.code})`,
+        }))}
+      />
+    </div>
+    <div>
+      <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+        Plan
+      </Text>
+      <Select
+        allowClear
+        showSearch
+        placeholder="All plans"
+        style={{ minWidth: 220 }}
+        loading={loading}
+        value={planId}
+        optionFilterProp="label"
+        onChange={(v) => onPlanChange(v ?? undefined)}
+        options={plans.map((p) => ({
+          value: p.id,
+          label: `${p.name} (${p.code})`,
+        }))}
+      />
+    </div>
+  </Space>
 );
 
 export default LiveOpsFilterBar;

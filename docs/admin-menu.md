@@ -85,11 +85,12 @@ Source: derived from implemented Prisma models in `HR Prisma/version 1/prisma/mo
 | 1 | commerce | Partner Directory | `menus.wifi.commerce.partners.directory` | `/wifi/commerce/partners` | MVP | `Reseller`, `ResellerStation`, `ResellerPlanEntitlement` | **Step 4:** partner setup — site mapping and sellable plans |
 | 2 | commerce | Partner Workspace | `menus.wifi.commerce.partners.workspace` | `/wifi/commerce/partners/workspace` | MVP | `Reseller`, `ResellerStation` | Logged-in partner home |
 | 3 | commerce | Access Tokens | `menus.wifi.commerce.access-tokens` | `/wifi/commerce/access-tokens` | MVP | `Credential`, `CaptivePortalSession` | **Step 5:** partners sell/issue tokens (requires plans + pricing + entitlements) |
-| 4 | commerce | Orders | `menus.wifi.commerce.transactions.orders` | `/wifi/commerce/transactions/orders` | MVP | `SaleOrder`, `SaleItem` | Sales order ledger |
-| 5 | commerce | Payments | `menus.wifi.commerce.transactions.payments` | `/wifi/commerce/transactions/payments` | MVP | `Payment` | Tender and payment records |
-| 6 | commerce | Commission Rules | `menus.wifi.commerce.commissions.rules` | `/wifi/commerce/commissions/rules` | P2 | `CommissionRule` | Reseller commission configuration |
-| 7 | commerce | Commission Payouts | `menus.wifi.commerce.commissions.payouts` | `/wifi/commerce/commissions/payouts` | P2 | `CommissionPayout` | Payout workflow |
-| 8 | commerce | Partner Insights | `menus.wifi.commerce.partners.insights` | `/wifi/commerce/partners/insights` | MVP | `DailySalesStat`, `DailyRadiusUsageStat` | Reseller-scoped analytics |
+| 4 | commerce | Token Diagnose | `menus.wifi.commerce.token-diagnose` | `/wifi/commerce/token-diagnose` | MVP | `Credential`, `CaptivePortalSession`, `Radpostauth`, `RadiusSession` | Investigate captive vs RADIUS auth vs accounting for a token code |
+| 5 | commerce | Orders | `menus.wifi.commerce.transactions.orders` | `/wifi/commerce/transactions/orders` | MVP | `SaleOrder`, `SaleItem` | Sales order ledger |
+| 6 | commerce | Payments | `menus.wifi.commerce.transactions.payments` | `/wifi/commerce/transactions/payments` | MVP | `Payment` | Tender and payment records |
+| 7 | commerce | Commission Rules | `menus.wifi.commerce.commissions.rules` | `/wifi/commerce/commissions/rules` | P2 | `CommissionRule` | Reseller commission configuration |
+| 8 | commerce | Commission Payouts | `menus.wifi.commerce.commissions.payouts` | `/wifi/commerce/commissions/payouts` | P2 | `CommissionPayout` | Payout workflow |
+| 9 | commerce | Partner Insights | `menus.wifi.commerce.partners.insights` | `/wifi/commerce/partners/insights` | MVP | `DailySalesStat`, `DailyRadiusUsageStat` | Reseller-scoped analytics |
 | 1 | analytics | Tenant Analytics | `menus.wifi.analytics.tenants` | `/wifi/analytics/tenants` | P2 | `Org`, `DailySalesStat` | Cross-tenant summary |
 | 2 | analytics | Site Analytics | `menus.wifi.analytics.sites` | `/wifi/analytics/sites` | MVP | `WifiStation`, `StationSize`, `DailySalesStat`, `DailyRadiusUsageStat` | Usage and sales by site / tier |
 | 3 | analytics | Partner Analytics | `menus.wifi.analytics.partners` | `/wifi/analytics/partners` | MVP | `Reseller`, `DailySalesStat` | Partner sales performance |

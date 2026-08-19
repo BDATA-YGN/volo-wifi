@@ -20,6 +20,7 @@ const RunsPlanTable: React.FC<Props> = ({ rows, loading, selectedPlanId, onSelec
     {
       title: "Plan",
       key: "plan",
+      sorter: (a, b) => a.name.localeCompare(b.name) || a.code.localeCompare(b.code),
       render: (_, row) => (
         <div>
           <Text strong style={{ fontSize: 13 }}>
@@ -39,6 +40,7 @@ const RunsPlanTable: React.FC<Props> = ({ rows, loading, selectedPlanId, onSelec
       key: "batchCount",
       width: 70,
       align: "right",
+      sorter: (a, b) => a.batchCount - b.batchCount,
     },
     {
       title: "Issued",
@@ -46,6 +48,15 @@ const RunsPlanTable: React.FC<Props> = ({ rows, loading, selectedPlanId, onSelec
       key: "totalIssued",
       width: 80,
       align: "right",
+      sorter: (a, b) => a.totalIssued - b.totalIssued,
+    },
+    {
+      title: "Activated",
+      dataIndex: "activatedCount",
+      key: "activatedCount",
+      width: 90,
+      align: "right",
+      sorter: (a, b) => a.activatedCount - b.activatedCount,
     },
     {
       title: "Utilization",
@@ -60,7 +71,7 @@ const RunsPlanTable: React.FC<Props> = ({ rows, loading, selectedPlanId, onSelec
         />
       ),
       sorter: (a, b) => a.utilizationPercent - b.utilizationPercent,
-      defaultSortOrder: "descend",
+      defaultSortOrder: "ascend",
     },
   ];
 
@@ -72,13 +83,14 @@ const RunsPlanTable: React.FC<Props> = ({ rows, loading, selectedPlanId, onSelec
         loading={loading}
         dataSource={rows}
         columns={columns}
-        pagination={{ pageSize: 8, hideOnSinglePage: true, size: "small" }}
+        pagination={false}
+        sticky
         rowClassName={(row) => (row.planId === selectedPlanId ? "ant-table-row-selected" : "")}
         onRow={(row) => ({
           onClick: () => onSelectPlan?.(row.planId),
           style: { cursor: onSelectPlan ? "pointer" : undefined },
         })}
-        scroll={{ x: 400 }}
+        scroll={{ x: 480 }}
       />
     </Card>
   );

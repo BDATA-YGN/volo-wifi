@@ -1,58 +1,77 @@
 "use client";
 
 import React from "react";
-import { Button, Segmented, Space, Switch } from "antd";
+import { Button, DatePicker, Select, Space } from "antd";
 import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
 import { ReloadOutlined } from "@ant-design/icons";
-import dayjs from "dayjs";
-import type { WindowHours } from "../types";
-import { WINDOW_OPTIONS } from "../constant";
-
+import dayjs, { type Dayjs } from "dayjs";
+import { DATE_LOOKBACK_DAYS, REFRESH_INTERVAL_OPTIONS } from "../constant";
 
 type Props = {
-  windowHours: WindowHours;
+  date: string;
   generatedAt?: string;
-  autoRefresh: boolean;
+  refreshMs: number;
   loading?: boolean;
-  onWindowChange: (hours: WindowHours) => void;
-  onAutoRefreshChange: (value: boolean) => void;
+  onDateChange: (date: string) => void;
+  onRefreshMsChange: (ms: number) => void;
   onRefresh: () => void;
 };
 
 const LiveOpsToolbar: React.FC<Props> = ({
-  windowHours,
+  date,
   generatedAt,
-  autoRefresh,
+  refreshMs,
   loading,
-  onWindowChange,
-  onAutoRefreshChange,
+  onDateChange,
+  onRefreshMsChange,
   onRefresh,
-}) => (
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <Space wrap align="center">
-      <Segmented
-        value={windowHours}
-        options={WINDOW_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-        onChange={(v) => onWindowChange(v as WindowHours)}
-      />
-      <Space size="small">
-        <Switch size="small" checked={autoRefresh} onChange={onAutoRefreshChange} />
-        <WifiMutedText style={{ fontSize: 12 }}>
-          Auto-refresh 30s
-        </WifiMutedText>
+}) => {
+  const today = dayjs().startOf("day");
+  const earliest = today.subtract(DATE_LOOKBACK_DAYS - 1, "day");
+
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <Space wrap align="end">
+        <div>
+          <WifiMutedText style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+            Date
+          </WifiMutedText>
+          <DatePicker
+            allowClear={false}
+            value={dayjs(date)}
+            format="D MMM YYYY"
+            disabledDate={(current: Dayjs) =>
+              current.startOf("day").isAfter(today) || current.startOf("day").isBefore(earliest)
+            }
+            onChange={(value) => {
+              if (value) onDateChange(value.format("YYYY-MM-DD"));
+            }}
+          />
+        </div>
+        <div>
+          <WifiMutedText style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+            Refresh
+          </WifiMutedText>
+          <Select
+            value={refreshMs}
+            style={{ minWidth: 110 }}
+            options={REFRESH_INTERVAL_OPTIONS}
+            onChange={onRefreshMsChange}
+          />
+        </div>
       </Space>
-    </Space>
-    <Space>
-      <WifiMutedText style={{ fontSize: 12 }}>
-        {generatedAt
-          ? `Live snapshot · ${dayjs(generatedAt).format("HH:mm:ss")}`
-          : "Near-real-time operations"}
-      </WifiMutedText>
-      <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading}>
-        Refresh
-      </Button>
-    </Space>
-  </div>
-);
+      <Space>
+        <WifiMutedText style={{ fontSize: 12 }}>
+          {generatedAt
+            ? `Snapshot · ${dayjs(generatedAt).format("HH:mm:ss")}`
+            : "Live operations"}
+        </WifiMutedText>
+        <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading}>
+          Refresh
+        </Button>
+      </Space>
+    </div>
+  );
+};
 
 export default LiveOpsToolbar;

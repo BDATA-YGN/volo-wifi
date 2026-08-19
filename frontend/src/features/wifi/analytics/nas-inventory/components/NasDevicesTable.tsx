@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Card, Progress, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -137,13 +136,6 @@ const NasDevicesTable: React.FC<Props> = ({ rows, loading }) => {
     <Card
       size="small"
       title="Device fleet"
-      extra={
-        <Link href="/wifi/network/nas-devices">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Manage devices →
-          </Text>
-        </Link>
-      }
       styles={{ body: { padding: 0 } }}
     >
       <Table<NasInventoryDeviceRow>

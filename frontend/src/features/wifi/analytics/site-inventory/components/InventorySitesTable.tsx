@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Card, Progress, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
@@ -143,13 +142,6 @@ const InventorySitesTable: React.FC<Props> = ({
     <Card
       size="small"
       title="Site roll-up"
-      extra={
-        <Link href="/wifi/sites">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Manage sites →
-          </Text>
-        </Link>
-      }
       styles={{ body: { padding: 0 } }}
     >
       <Table<SiteInventorySiteRow>

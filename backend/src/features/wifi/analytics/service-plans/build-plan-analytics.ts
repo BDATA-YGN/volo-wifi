@@ -1,7 +1,9 @@
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import {
   appDayKey as utcDayKey,
+  appHourKey,
   eachAppDay,
+  eachAppHour,
   previousAppPeriod,
   resolvePeriodFromPresetDays,
 } from '@/utils/app-time';
@@ -21,14 +23,10 @@ export type PlanAnalyticsSummary = {
 };
 
 export type PlanDailyPoint = {
-  date: string;
-  ordersCount: number;
-  revenue: number;
-  commission: number;
+  bucket: string;
+  label: string;
   itemsCount: number;
-  sessionsCount: number;
-  totalBytes: number;
-  activePlans: number;
+  revenue: number;
 };
 
 export type PlanRow = {
@@ -48,23 +46,31 @@ export type PlanRow = {
 };
 
 export type PlanQuotaTypeRow = {
-  quotaType: string;
-  planCount: number;
-  activePlanCount: number;
+  tierId: string | null;
+  tierCode: string;
+  tierName: string;
+  siteCount: number;
   ordersCount: number;
   itemsCount: number;
   revenue: number;
-  commission: number;
   sessionsCount: number;
   totalBytes: number;
+};
+
+export type PlanTrendSeries = {
+  planId: string;
+  code: string;
+  name: string;
+  points: PlanDailyPoint[];
 };
 
 export type PlanAnalyticsPayload = {
   summary: PlanAnalyticsSummary;
   previousSummary: PlanAnalyticsSummary;
-  dailyTrend: PlanDailyPoint[];
+  trendGranularity: 'hourly' | 'daily';
+  trendByPlan: PlanTrendSeries[];
   byPlan: PlanRow[];
-  byQuotaType: PlanQuotaTypeRow[];
+  byTier: PlanQuotaTypeRow[];
   dataSource: 'aggregated' | 'live';
 };
 
@@ -76,14 +82,14 @@ type PlanMeta = {
   isActive: boolean;
 };
 
+type StationTierMeta = {
+  tierId: string | null;
+  tierCode: string;
+  tierName: string;
+};
+
 function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
   return Number(value ?? 0);
-}
-
-function bigintToNumber(value: bigint | null | undefined): number {
-  if (value == null) return 0;
-  const n = Number(value);
-  return Number.isSafeInteger(n) ? n : 0;
 }
 
 function emptySummary(planCount = 0): PlanAnalyticsSummary {
@@ -102,57 +108,152 @@ function emptySummary(planCount = 0): PlanAnalyticsSummary {
   };
 }
 
-function mergeDailyTrend(
-  salesByDay: Map<
-    string,
-    {
-      ordersCount: number;
-      revenue: number;
-      commission: number;
-      itemsCount: number;
-      planIds: Set<string>;
-    }
-  >,
-  usageByDay: Map<string, { sessionsCount: number; totalBytes: number; planIds: Set<string> }>,
+type SalesStatRow = {
+  date: Date;
+  planId: string | null;
+  stationId: string | null;
+  ordersCount: number;
+  itemsCount: number;
+  revenue: Prisma.Decimal;
+  commission: Prisma.Decimal;
+  netRevenue: Prisma.Decimal;
+};
+
+function dayLabel(date: Date): string {
+  const key = utcDayKey(date);
+  const parts = key.split('-');
+  return `${Number(parts[2])}/${Number(parts[1])}`;
+}
+
+function buildDailyBuckets(from: Date, to: Date): Array<{ key: string; label: string }> {
+  return eachAppDay(from, to).map((cursor) => ({
+    key: utcDayKey(cursor),
+    label: dayLabel(cursor),
+  }));
+}
+
+function buildHourlyBuckets(from: Date, to: Date): Array<{ key: string; label: string }> {
+  return eachAppHour(from, to).map((cursor) => ({
+    key: appHourKey(cursor),
+    label: appHourKey(cursor).slice(11, 16),
+  }));
+}
+
+function emptyTrendSeries(
+  plans: PlanMeta[],
+  buckets: Array<{ key: string; label: string }>
+): PlanTrendSeries[] {
+  return plans.map((plan) => ({
+    planId: plan.id,
+    code: plan.code,
+    name: plan.name,
+    points: buckets.map((b) => ({ bucket: b.key, label: b.label, itemsCount: 0, revenue: 0 })),
+  }));
+}
+
+function salesStatWhere(
+  orgId: string,
+  planIds: string[],
+  periodFrom: Date,
+  periodTo: Date,
+  filters?: { stationId?: string; resellerId?: string; allowedStationIds?: string[] }
+) {
+  const stationScope =
+    filters?.stationId
+      ? { stationId: filters.stationId }
+      : filters?.allowedStationIds
+        ? { stationId: { in: filters.allowedStationIds } }
+        : {};
+  return {
+    orgId,
+    deletedAt: null,
+    date: { gte: periodFrom, lte: periodTo },
+    ...stationScope,
+    ...(filters?.resellerId ? { resellerId: filters.resellerId } : {}),
+    planId: { in: planIds },
+  };
+}
+
+function buildTrendFromSalesRows(
+  plans: PlanMeta[],
+  rows: SalesStatRow[],
   periodFrom: Date,
   periodTo: Date
-): PlanDailyPoint[] {
-  const points: PlanDailyPoint[] = [];
-  for (const cursor of eachAppDay(periodFrom, periodTo)) {
-    const key = utcDayKey(cursor);
-    const sales = salesByDay.get(key) ?? {
-      ordersCount: 0,
-      revenue: 0,
-      commission: 0,
-      itemsCount: 0,
-      planIds: new Set<string>(),
-    };
-    const usage = usageByDay.get(key) ?? {
-      sessionsCount: 0,
-      totalBytes: 0,
-      planIds: new Set<string>(),
-    };
-    const activePlans = new Set([...sales.planIds, ...usage.planIds]);
-    points.push({
-      date: key,
-      ordersCount: sales.ordersCount,
-      revenue: sales.revenue,
-      commission: sales.commission,
-      itemsCount: sales.itemsCount,
-      sessionsCount: usage.sessionsCount,
-      totalBytes: usage.totalBytes,
-      activePlans: activePlans.size,
-    });
+): PlanTrendSeries[] {
+  const buckets = buildDailyBuckets(periodFrom, periodTo);
+  const bucketIndex = new Map(buckets.map((b, i) => [b.key, i]));
+  const series = emptyTrendSeries(plans, buckets);
+  const seriesIndex = new Map(series.map((s, i) => [s.planId, i]));
+
+  for (const row of rows) {
+    if (!row.planId) continue;
+    const sidx = seriesIndex.get(row.planId);
+    const pointIdx = bucketIndex.get(utcDayKey(row.date));
+    if (sidx == null || pointIdx == null) continue;
+    const point = series[sidx].points[pointIdx];
+    point.itemsCount += row.itemsCount;
+    point.revenue += decimalToNumber(row.revenue);
   }
 
-  return points;
+  return series;
+}
+
+function buildTierFromSalesRows(
+  rows: SalesStatRow[],
+  stationTierMap: Map<string, StationTierMeta>
+): PlanQuotaTypeRow[] {
+  const map = new Map<
+    string,
+    PlanQuotaTypeRow & { stationIds: Set<string> }
+  >();
+
+  for (const row of rows) {
+    const meta = row.stationId ? stationTierMap.get(row.stationId) : null;
+    const tierId = meta?.tierId ?? null;
+    const tierCode = meta?.tierCode ?? 'UNKNOWN';
+    const tierName = meta?.tierName ?? 'Unknown';
+    const key = tierId ?? 'unknown';
+    const bucket =
+      map.get(key) ??
+      ({
+        tierId,
+        tierCode,
+        tierName,
+        siteCount: 0,
+        ordersCount: 0,
+        itemsCount: 0,
+        revenue: 0,
+        sessionsCount: 0,
+        totalBytes: 0,
+        stationIds: new Set<string>(),
+      } as PlanQuotaTypeRow & { stationIds: Set<string> });
+    if (row.stationId) bucket.stationIds.add(row.stationId);
+    bucket.ordersCount += row.ordersCount;
+    bucket.itemsCount += row.itemsCount;
+    bucket.revenue += decimalToNumber(row.revenue);
+    map.set(key, bucket);
+  }
+
+  return [...map.values()]
+    .map((row) => ({
+      tierId: row.tierId,
+      tierCode: row.tierCode,
+      tierName: row.tierName,
+      siteCount: row.stationIds.size,
+      ordersCount: row.ordersCount,
+      itemsCount: row.itemsCount,
+      revenue: Math.round(row.revenue * 100) / 100,
+      sessionsCount: 0,
+      totalBytes: 0,
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
 }
 
 export function resolvePeriodFromPreset(
   preset: string,
   periodTo: Date = new Date()
 ): { periodFrom: Date; periodTo: Date } {
-  const days = preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
+  const days = preset === 'today' ? 1 : preset === '7d' ? 7 : preset === '90d' ? 90 : 30;
   return resolvePeriodFromPresetDays(days, periodTo);
 }
 
@@ -198,8 +299,7 @@ function mergePlanRows(
   salesMap: Map<
     string,
     { ordersCount: number; itemsCount: number; revenue: number; commission: number; netRevenue: number }
-  >,
-  usageMap: Map<string, { sessionsCount: number; uniqueCredentials: number; totalBytes: number }>
+  >
 ): PlanRow[] {
   return plans
     .map((plan) => {
@@ -209,11 +309,6 @@ function mergePlanRows(
         revenue: 0,
         commission: 0,
         netRevenue: 0,
-      };
-      const usage = usageMap.get(plan.id) ?? {
-        sessionsCount: 0,
-        uniqueCredentials: 0,
-        totalBytes: 0,
       };
       return {
         planId: plan.id,
@@ -226,134 +321,26 @@ function mergePlanRows(
         revenue: Math.round(sales.revenue * 100) / 100,
         commission: Math.round(sales.commission * 100) / 100,
         netRevenue: Math.round(sales.netRevenue * 100) / 100,
-        sessionsCount: usage.sessionsCount,
-        uniqueCredentials: usage.uniqueCredentials,
-        totalBytes: usage.totalBytes,
+        sessionsCount: 0,
+        uniqueCredentials: 0,
+        totalBytes: 0,
       };
     })
     .sort((a, b) => b.revenue - a.revenue || b.itemsCount - a.itemsCount);
 }
 
-function buildByQuotaType(byPlan: PlanRow[]): PlanQuotaTypeRow[] {
-  const typeMap = new Map<string, PlanQuotaTypeRow>();
-
-  for (const plan of byPlan) {
-    const row =
-      typeMap.get(plan.quotaType) ??
-      ({
-        quotaType: plan.quotaType,
-        planCount: 0,
-        activePlanCount: 0,
-        ordersCount: 0,
-        itemsCount: 0,
-        revenue: 0,
-        commission: 0,
-        sessionsCount: 0,
-        totalBytes: 0,
-      } as PlanQuotaTypeRow);
-
-    row.planCount += 1;
-    if (plan.ordersCount > 0 || plan.sessionsCount > 0) row.activePlanCount += 1;
-    row.ordersCount += plan.ordersCount;
-    row.itemsCount += plan.itemsCount;
-    row.revenue += plan.revenue;
-    row.commission += plan.commission;
-    row.sessionsCount += plan.sessionsCount;
-    row.totalBytes += plan.totalBytes;
-    typeMap.set(plan.quotaType, row);
-  }
-
-  return [...typeMap.values()]
-    .map((r) => ({
-      ...r,
-      revenue: Math.round(r.revenue * 100) / 100,
-      commission: Math.round(r.commission * 100) / 100,
-    }))
-    .sort((a, b) => b.revenue - a.revenue);
-}
-
-async function aggregateFromDailyStats(
-  prisma: PrismaClient,
-  orgId: string,
-  planIds: string[],
-  plans: PlanMeta[],
-  periodFrom: Date,
-  periodTo: Date
-): Promise<PlanAnalyticsPayload | null> {
-  const planIdSet = new Set(planIds);
-  const baseWhere =
-    planIds.length > 0
-      ? {
-          orgId,
-          deletedAt: null,
-          date: { gte: periodFrom, lte: periodTo },
-          planId: { in: planIds },
-        }
-      : {
-          orgId,
-          deletedAt: null,
-          date: { gte: periodFrom, lte: periodTo },
-          planId: { in: [] as string[] },
-        };
-
-  const [salesRows, usageRows] = await Promise.all([
-    prisma.dailySalesStat.findMany({
-      where: baseWhere,
-      select: {
-        date: true,
-        planId: true,
-        ordersCount: true,
-        itemsCount: true,
-        revenue: true,
-        commission: true,
-        netRevenue: true,
-      },
-    }),
-    prisma.dailyRadiusUsageStat.findMany({
-      where: baseWhere,
-      select: {
-        date: true,
-        planId: true,
-        sessionsCount: true,
-        uniqueCredentials: true,
-        totalBytes: true,
-        totalSessionTimeSec: true,
-      },
-    }),
-  ]);
-
-  if (salesRows.length === 0 && usageRows.length === 0) {
-    return null;
-  }
-
+function summarizeSalesRows(plans: PlanMeta[], rows: SalesStatRow[]): {
+  summary: PlanAnalyticsSummary;
+  byPlan: PlanRow[];
+} {
   const salesMap = new Map<
     string,
     { ordersCount: number; itemsCount: number; revenue: number; commission: number; netRevenue: number }
   >();
-  const usageMap = new Map<
-    string,
-    { sessionsCount: number; uniqueCredentials: number; totalBytes: number }
-  >();
-  const salesByDay = new Map<
-    string,
-    {
-      ordersCount: number;
-      revenue: number;
-      commission: number;
-      itemsCount: number;
-      planIds: Set<string>;
-    }
-  >();
-  const usageByDay = new Map<
-    string,
-    { sessionsCount: number; totalBytes: number; planIds: Set<string> }
-  >();
-
   const summary = emptySummary(plans.length);
 
-  for (const row of salesRows) {
-    if (!row.planId || !planIdSet.has(row.planId)) continue;
-
+  for (const row of rows) {
+    if (!row.planId) continue;
     summary.ordersCount += row.ordersCount;
     summary.itemsCount += row.itemsCount;
     summary.revenue += decimalToNumber(row.revenue);
@@ -373,179 +360,97 @@ async function aggregateFromDailyStats(
     plan.commission += decimalToNumber(row.commission);
     plan.netRevenue += decimalToNumber(row.netRevenue);
     salesMap.set(row.planId, plan);
-
-    const dayKey = utcDayKey(row.date);
-    const day = salesByDay.get(dayKey) ?? {
-      ordersCount: 0,
-      revenue: 0,
-      commission: 0,
-      itemsCount: 0,
-      planIds: new Set<string>(),
-    };
-    day.ordersCount += row.ordersCount;
-    day.revenue += decimalToNumber(row.revenue);
-    day.commission += decimalToNumber(row.commission);
-    day.itemsCount += row.itemsCount;
-    if (row.ordersCount > 0) day.planIds.add(row.planId);
-    salesByDay.set(dayKey, day);
-  }
-
-  for (const row of usageRows) {
-    if (!row.planId || !planIdSet.has(row.planId)) continue;
-
-    summary.sessionsCount += row.sessionsCount;
-    summary.uniqueCredentials += row.uniqueCredentials;
-    summary.totalBytes += bigintToNumber(row.totalBytes);
-    summary.totalSessionTimeSec += row.totalSessionTimeSec;
-
-    const plan = usageMap.get(row.planId) ?? {
-      sessionsCount: 0,
-      uniqueCredentials: 0,
-      totalBytes: 0,
-    };
-    plan.sessionsCount += row.sessionsCount;
-    plan.uniqueCredentials += row.uniqueCredentials;
-    plan.totalBytes += bigintToNumber(row.totalBytes);
-    usageMap.set(row.planId, plan);
-
-    const dayKey = utcDayKey(row.date);
-    const day = usageByDay.get(dayKey) ?? {
-      sessionsCount: 0,
-      totalBytes: 0,
-      planIds: new Set<string>(),
-    };
-    day.sessionsCount += row.sessionsCount;
-    day.totalBytes += bigintToNumber(row.totalBytes);
-    if (row.sessionsCount > 0) day.planIds.add(row.planId);
-    usageByDay.set(dayKey, day);
   }
 
   summary.revenue = Math.round(summary.revenue * 100) / 100;
   summary.commission = Math.round(summary.commission * 100) / 100;
   summary.netRevenue = Math.round(summary.netRevenue * 100) / 100;
-
-  const byPlan = mergePlanRows(plans, salesMap, usageMap);
-  summary.activePlanCount = byPlan.filter((p) => p.ordersCount > 0 || p.sessionsCount > 0).length;
-
-  return {
-    summary,
-    previousSummary: emptySummary(plans.length),
-    dailyTrend: mergeDailyTrend(salesByDay, usageByDay, periodFrom, periodTo),
-    byPlan,
-    byQuotaType: buildByQuotaType(byPlan),
-    dataSource: 'aggregated',
-  };
+  const byPlan = mergePlanRows(plans, salesMap);
+  summary.activePlanCount = byPlan.filter((p) => p.ordersCount > 0 || p.itemsCount > 0).length;
+  return { summary, byPlan };
 }
 
-async function aggregateFromLiveOrders(
+async function loadHourlyTrendFromOrders(
+  prisma: PrismaClient,
+  orgId: string,
+  plans: PlanMeta[],
+  periodFrom: Date,
+  periodTo: Date,
+  filters?: { stationId?: string; resellerId?: string; allowedStationIds?: string[] }
+): Promise<PlanTrendSeries[]> {
+  const planIds = plans.map((p) => p.id);
+  const buckets = buildHourlyBuckets(periodFrom, periodTo);
+  if (planIds.length === 0) return [];
+  if (filters?.allowedStationIds && filters.allowedStationIds.length === 0) {
+    return emptyTrendSeries(plans, buckets);
+  }
+
+  const stationFilter = filters?.stationId
+    ? Prisma.sql`AND so.station_id = ${filters.stationId}`
+    : filters?.allowedStationIds
+      ? Prisma.sql`AND so.station_id IN (${Prisma.join(filters.allowedStationIds)})`
+      : Prisma.empty;
+  const resellerFilter = filters?.resellerId
+    ? Prisma.sql`AND so.reseller_id = ${filters.resellerId}`
+    : Prisma.empty;
+
+  type HourlyRow = { bucket: string; planId: string; itemsCount: number; revenue: number };
+  const rows = await prisma.$queryRaw<HourlyRow[]>`
+    SELECT
+      to_char(timezone('Asia/Yangon', so.sold_at), 'YYYY-MM-DD"T"HH24":00:00') AS bucket,
+      si.plan_id AS "planId",
+      COALESCE(SUM(si.qty), 0)::int AS "itemsCount",
+      COALESCE(SUM(si.line_total), 0)::float AS revenue
+    FROM wf_sale_order so
+    INNER JOIN wf_sale_item si ON si.order_id = so.id
+    WHERE so.org_id = ${orgId}
+      AND so.status = 'PAID'
+      AND so.sold_at >= ${periodFrom}
+      AND so.sold_at <= ${periodTo}
+      AND si.plan_id IN (${Prisma.join(planIds)})
+      ${stationFilter}
+      ${resellerFilter}
+    GROUP BY 1, 2
+  `;
+
+  const series = emptyTrendSeries(plans, buckets);
+  const seriesIndex = new Map(series.map((s, i) => [s.planId, i]));
+  const bucketIndex = new Map(buckets.map((b, i) => [b.key, i]));
+
+  for (const row of rows) {
+    const sidx = seriesIndex.get(row.planId);
+    const pointIdx = bucketIndex.get(row.bucket);
+    if (sidx == null || pointIdx == null) continue;
+    const point = series[sidx].points[pointIdx];
+    point.itemsCount += Number(row.itemsCount) || 0;
+    point.revenue += Number(row.revenue) || 0;
+  }
+
+  return series;
+}
+
+async function loadDailySalesRows(
   prisma: PrismaClient,
   orgId: string,
   planIds: string[],
-  plans: PlanMeta[],
   periodFrom: Date,
-  periodTo: Date
-): Promise<PlanAnalyticsPayload> {
-  const planIdSet = new Set(planIds);
-
-  const orders =
-    planIds.length === 0
-      ? []
-      : await prisma.saleOrder.findMany({
-          where: {
-            orgId,
-            status: 'PAID',
-            soldAt: { gte: periodFrom, lte: periodTo },
-            items: { some: { planId: { in: planIds } } },
-          },
-          select: {
-            id: true,
-            soldAt: true,
-            items: {
-              where: { planId: { in: planIds } },
-              select: { planId: true, qty: true, lineTotal: true },
-            },
-          },
-        });
-
-  const salesMap = new Map<
-    string,
-    { ordersCount: number; itemsCount: number; revenue: number; commission: number; netRevenue: number }
-  >();
-  const salesByDay = new Map<
-    string,
-    {
-      ordersCount: number;
-      revenue: number;
-      commission: number;
-      itemsCount: number;
-      planIds: Set<string>;
-    }
-  >();
-  const planOrderCounts = new Map<string, Set<string>>();
-
-  for (const order of orders) {
-    if (!order.soldAt) continue;
-
-    for (const item of order.items) {
-      if (!item.planId || !planIdSet.has(item.planId)) continue;
-      const revenue = decimalToNumber(item.lineTotal);
-
-      const plan = salesMap.get(item.planId) ?? {
-        ordersCount: 0,
-        itemsCount: 0,
-        revenue: 0,
-        commission: 0,
-        netRevenue: 0,
-      };
-      plan.itemsCount += item.qty;
-      plan.revenue += revenue;
-      plan.netRevenue += revenue;
-      salesMap.set(item.planId, plan);
-
-      const orderSet = planOrderCounts.get(item.planId) ?? new Set<string>();
-      orderSet.add(order.id);
-      planOrderCounts.set(item.planId, orderSet);
-    }
-
-    const dayKey = utcDayKey(order.soldAt);
-    const day = salesByDay.get(dayKey) ?? {
-      ordersCount: 0,
-      revenue: 0,
-      commission: 0,
-      itemsCount: 0,
-      planIds: new Set<string>(),
-    };
-    day.ordersCount += 1;
-    for (const item of order.items) {
-      if (!item.planId) continue;
-      day.revenue += decimalToNumber(item.lineTotal);
-      day.itemsCount += item.qty;
-      day.planIds.add(item.planId);
-    }
-    salesByDay.set(dayKey, day);
-  }
-
-  for (const [planId, orderSet] of planOrderCounts) {
-    const plan = salesMap.get(planId);
-    if (plan) plan.ordersCount = orderSet.size;
-  }
-
-  const byPlan = mergePlanRows(plans, salesMap, new Map());
-  const summary = emptySummary(plans.length);
-  summary.ordersCount = orders.length;
-  summary.itemsCount = byPlan.reduce((s, r) => s + r.itemsCount, 0);
-  summary.revenue = byPlan.reduce((s, r) => s + r.revenue, 0);
-  summary.netRevenue = summary.revenue;
-  summary.activePlanCount = byPlan.filter((p) => p.ordersCount > 0).length;
-
-  return {
-    summary,
-    previousSummary: emptySummary(plans.length),
-    dailyTrend: mergeDailyTrend(salesByDay, new Map(), periodFrom, periodTo),
-    byPlan,
-    byQuotaType: buildByQuotaType(byPlan),
-    dataSource: 'live',
-  };
+  periodTo: Date,
+  filters?: { stationId?: string; resellerId?: string; allowedStationIds?: string[] }
+): Promise<SalesStatRow[]> {
+  if (planIds.length === 0) return [];
+  return prisma.dailySalesStat.findMany({
+    where: salesStatWhere(orgId, planIds, periodFrom, periodTo, filters),
+    select: {
+      date: true,
+      planId: true,
+      stationId: true,
+      ordersCount: true,
+      itemsCount: true,
+      revenue: true,
+      commission: true,
+      netRevenue: true,
+    },
+  });
 }
 
 export async function buildPlanAnalytics(
@@ -553,7 +458,13 @@ export async function buildPlanAnalytics(
   orgId: string,
   periodFrom: Date,
   periodTo: Date,
-  filters?: { planId?: string; quotaType?: string }
+  filters?: {
+    planId?: string;
+    quotaType?: string;
+    stationId?: string;
+    resellerId?: string;
+    allowedStationIds?: string[];
+  }
 ): Promise<PlanAnalyticsPayload> {
   const plans = await loadPlanMeta(prisma, orgId, filters);
   const planIds = plans.map((p) => p.id);
@@ -562,40 +473,56 @@ export async function buildPlanAnalytics(
     return {
       summary: emptySummary(0),
       previousSummary: emptySummary(0),
-      dailyTrend: mergeDailyTrend(new Map(), new Map(), periodFrom, periodTo),
+      trendGranularity: 'daily',
+      trendByPlan: [],
       byPlan: [],
-      byQuotaType: [],
+      byTier: [],
       dataSource: 'aggregated',
     };
   }
 
-  const aggregated = await aggregateFromDailyStats(
-    prisma,
-    orgId,
-    planIds,
-    plans,
-    periodFrom,
-    periodTo
-  );
-  const current =
-    aggregated ??
-    (await aggregateFromLiveOrders(prisma, orgId, planIds, plans, periodFrom, periodTo));
-
   const prev = previousPeriod(periodFrom, periodTo);
-  const prevAggregated = await aggregateFromDailyStats(
-    prisma,
-    orgId,
-    planIds,
-    plans,
-    prev.from,
-    prev.to
+  const sameDay = utcDayKey(periodFrom) === utcDayKey(periodTo);
+  const [salesRows, prevRows, stations, hourlyTrend] = await Promise.all([
+    loadDailySalesRows(prisma, orgId, planIds, periodFrom, periodTo, filters),
+    loadDailySalesRows(prisma, orgId, planIds, prev.from, prev.to, filters),
+    prisma.wifiStation.findMany({
+      where: {
+        orgId,
+        deletedAt: null,
+        ...(filters?.allowedStationIds ? { id: { in: filters.allowedStationIds } } : {}),
+        ...(filters?.stationId ? { id: filters.stationId } : {}),
+      },
+      select: {
+        id: true,
+        stationSize: { select: { id: true, code: true, name: true } },
+      },
+    }),
+    sameDay
+      ? loadHourlyTrendFromOrders(prisma, orgId, plans, periodFrom, periodTo, filters)
+      : Promise.resolve(null),
+  ]);
+
+  const current = summarizeSalesRows(plans, salesRows);
+  const previous = summarizeSalesRows(plans, prevRows);
+  const stationTierMap = new Map<string, StationTierMeta>(
+    stations.map((s) => [
+      s.id,
+      {
+        tierId: s.stationSize?.id ?? null,
+        tierCode: s.stationSize?.code ?? 'UNKNOWN',
+        tierName: s.stationSize?.name ?? 'Unknown',
+      },
+    ])
   );
-  const previousSummary =
-    prevAggregated?.summary ??
-    (await aggregateFromLiveOrders(prisma, orgId, planIds, plans, prev.from, prev.to)).summary;
 
   return {
-    ...current,
-    previousSummary,
+    summary: current.summary,
+    previousSummary: previous.summary,
+    trendGranularity: sameDay ? 'hourly' : 'daily',
+    trendByPlan: hourlyTrend ?? buildTrendFromSalesRows(plans, salesRows, periodFrom, periodTo),
+    byPlan: current.byPlan,
+    byTier: buildTierFromSalesRows(salesRows, stationTierMap),
+    dataSource: 'aggregated',
   };
 }

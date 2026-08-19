@@ -256,6 +256,13 @@ const TokenDetailDrawer: React.FC<Props> = ({
                 Revoke
               </Button>
             ) : null}
+            {row.token || row.username ? (
+              <Link
+                href={`/wifi/commerce/token-diagnose?code=${encodeURIComponent(row.token || row.username || "")}`}
+              >
+                <Button size="small">Diagnose</Button>
+              </Link>
+            ) : null}
           </div>
         ) : null
       }

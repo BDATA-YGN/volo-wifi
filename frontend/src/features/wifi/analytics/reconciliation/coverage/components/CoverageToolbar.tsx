@@ -1,11 +1,10 @@
 "use client";
 
 import React from "react";
-import { Button, Typography } from "antd";
+import { Button, Space } from "antd";
+import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
 import { ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-
-const { Text } = Typography;
 
 type Props = {
   generatedAt?: string;
@@ -14,16 +13,16 @@ type Props = {
 };
 
 const CoverageToolbar: React.FC<Props> = ({ generatedAt, loading, onRefresh }) => (
-  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-    <Text type="secondary" style={{ fontSize: 12 }}>
+  <Space>
+    <WifiMutedText style={{ fontSize: 12 }}>
       {generatedAt
-        ? `Coverage snapshot as of ${dayjs(generatedAt).format("D MMM YYYY, HH:mm")}`
-        : "Sealed period and purge eligibility report"}
-    </Text>
+        ? `Snapshot · ${dayjs(generatedAt).format("D MMM YYYY, HH:mm")}`
+        : "Sealed horizon"}
+    </WifiMutedText>
     <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading}>
       Refresh
     </Button>
-  </div>
+  </Space>
 );
 
 export default CoverageToolbar;

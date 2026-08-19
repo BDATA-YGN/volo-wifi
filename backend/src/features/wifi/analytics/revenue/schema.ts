@@ -1,14 +1,9 @@
 import Joi from 'joi';
-import { PERIOD_PRESETS } from './constants';
 
-const isoDate = Joi.date().iso();
+const monthKey = Joi.string().pattern(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 export const AnalyticsRevenueQuerySchema = Joi.object({
-  preset: Joi.string()
-    .valid(...PERIOD_PRESETS)
-    .optional(),
-  periodFrom: isoDate.optional(),
-  periodTo: isoDate.optional(),
+  month: monthKey.optional(),
   orgId: Joi.string().uuid().optional(),
   formOptions: Joi.string().valid('true').optional(),
 }).unknown(true);

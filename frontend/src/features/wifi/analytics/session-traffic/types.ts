@@ -1,6 +1,8 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
 
-export type PeriodPreset = "7d" | "30d" | "90d";
+export type PeriodPreset = "today" | "7d" | "30d" | "90d";
+
+export type TrendGranularity = "daily" | "hourly";
 
 export type SiteOption = {
   id: string;
@@ -75,6 +77,7 @@ export type SessionTrafficData = {
   summary: SessionTrafficSummary;
   previousSummary: SessionTrafficSummary;
   dailyTrend: SessionTrafficDailyPoint[];
+  trendGranularity?: TrendGranularity;
   bySite: SessionTrafficSiteRow[];
   byPlan: SessionTrafficPlanRow[];
   byTerminateCause: SessionTrafficTerminateRow[];

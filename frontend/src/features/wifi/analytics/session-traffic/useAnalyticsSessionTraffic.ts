@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
+import dayjs from "dayjs";
 import * as Query from "./query";
 import type {
   PeriodPreset,
@@ -26,7 +27,10 @@ export function useAnalyticsSessionTraffic() {
   const [customPeriod, setCustomPeriod] = useState<{
     periodFrom?: string;
     periodTo?: string;
-  }>({});
+  }>(() => ({
+    periodFrom: dayjs().startOf("day").toISOString(),
+    periodTo: dayjs().endOf("day").toISOString(),
+  }));
   const [formOptions, setFormOptions] = useState<SessionTrafficFormOptions>(emptyFormOptions);
 
   const params: SessionTrafficParams = {
@@ -65,7 +69,6 @@ export function useAnalyticsSessionTraffic() {
       setOrgId(id);
       setStationId(undefined);
       setPlanId(undefined);
-      setCustomPeriod({});
       void loadFormOptions(id);
     },
     [loadFormOptions]
@@ -85,7 +88,11 @@ export function useAnalyticsSessionTraffic() {
   }, []);
 
   const selectCustomPeriod = useCallback((periodFrom: string, periodTo: string) => {
-    setCustomPeriod({ periodFrom, periodTo });
+    setCustomPeriod((prev) =>
+      prev.periodFrom === periodFrom && prev.periodTo === periodTo
+        ? prev
+        : { periodFrom, periodTo },
+    );
   }, []);
 
   const clearCustomPeriod = useCallback(() => {

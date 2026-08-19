@@ -9,8 +9,10 @@ import type {
   CoverageAnalyticsParams,
   CoverageDetail,
   CoverageFormOptions,
+  CoverageTab,
   EligibilityStatus,
 } from "./types";
+import { DEFAULT_TAB } from "./constant";
 
 const emptyFormOptions: CoverageFormOptions = {
   memberships: [],
@@ -23,6 +25,7 @@ export function useAnalyticsReconciliationCoverage() {
   const [stationId, setStationId] = useState<string | undefined>(undefined);
   const [resellerId, setResellerId] = useState<string | undefined>(undefined);
   const [eligibility, setEligibility] = useState<EligibilityStatus | undefined>(undefined);
+  const [tab, setTab] = useState<CoverageTab>(DEFAULT_TAB);
   const [formOptions, setFormOptions] = useState<CoverageFormOptions>(emptyFormOptions);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<CoverageDetail | null>(null);
@@ -44,8 +47,13 @@ export function useAnalyticsReconciliationCoverage() {
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as CoverageFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
+    setFormOptions({
+      ...emptyFormOptions,
+      ...opts,
+      stations: opts.stations ?? [],
+      resellers: opts.resellers ?? [],
+    });
+    if (!targetOrgId && opts.memberships.length === 1 && !opts.canSwitchOrg) {
       setOrgId(opts.memberships[0].id);
     }
     return opts;
@@ -73,6 +81,14 @@ export function useAnalyticsReconciliationCoverage() {
 
   const selectEligibility = useCallback((value: EligibilityStatus | undefined) => {
     setEligibility(value);
+  }, []);
+
+  const toggleEligibility = useCallback((value: EligibilityStatus) => {
+    setEligibility((current) => (current === value ? undefined : value));
+  }, []);
+
+  const selectTab = useCallback((value: CoverageTab) => {
+    setTab(value);
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -110,6 +126,7 @@ export function useAnalyticsReconciliationCoverage() {
     stationId,
     resellerId,
     eligibility,
+    tab,
     formOptions,
     selectedDetail,
     detailLoading,
@@ -117,6 +134,8 @@ export function useAnalyticsReconciliationCoverage() {
     selectStation,
     selectReseller,
     selectEligibility,
+    toggleEligibility,
+    selectTab,
     clearFilters,
     loadDetail,
     clearDetail,

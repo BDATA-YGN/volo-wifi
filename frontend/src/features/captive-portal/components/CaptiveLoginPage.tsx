@@ -8,6 +8,8 @@ import { captiveLogin, CaptiveClientError } from "../api/client";
 import type { CredentialLoginType } from "../api/types";
 import {
   extractNasLocationDebug,
+  formatNasBranchName,
+  parseNasParamsFromSearch,
   resolveNasParamsForPage,
   storeNasParams,
 } from "../utils/nas-params";
@@ -29,7 +31,7 @@ interface FormState {
   password: string;
 }
 
-export default function CaptiveLoginPage() {
+export default function CaptiveLoginPage({ initialSearch = "" }: { initialSearch?: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<LoginMode>("VOUCHER_TOKEN");
   const [error, setError] = useState<string | null>(null);
@@ -37,15 +39,19 @@ export default function CaptiveLoginPage() {
   const [siteMatchFailed, setSiteMatchFailed] = useState(false);
   const [form, setForm] = useState<FormState>({ token: "", username: "", password: "" });
 
-  const { nasParams, gatewayError } = useMemo(() => {
-    if (typeof window === "undefined") {
-      return { nasParams: undefined, gatewayError: undefined };
-    }
-    const resolved = resolveNasParamsForPage(window.location.search);
-    return { nasParams: resolved.active, gatewayError: resolved.gatewayError };
-  }, []);
+  const pageSearch =
+    typeof window !== "undefined" ? window.location.search : initialSearch;
 
-  const nasDebug = useMemo(() => extractNasLocationDebug(nasParams), [nasParams]);
+  const { nasParams, gatewayError } = useMemo(() => {
+    const resolved = resolveNasParamsForPage(pageSearch);
+    return { nasParams: resolved.active, gatewayError: resolved.gatewayError };
+  }, [pageSearch]);
+
+  const nasDebug = useMemo(
+    () => extractNasLocationDebug(nasParams) ?? extractNasLocationDebug(parseNasParamsFromSearch(pageSearch)),
+    [nasParams, pageSearch],
+  );
+  const branchName = useMemo(() => formatNasBranchName(nasDebug?.nasId), [nasDebug]);
   const nasHostname =
     typeof nasParams?.hostname === "string" && nasParams.hostname.trim()
       ? nasParams.hostname.trim()
@@ -114,11 +120,6 @@ export default function CaptiveLoginPage() {
     }
   };
 
-  const routerHint =
-    nasParams && hasNasRedirectContext(nasParams)
-      ? "Router မှ redirect လုပ်ထားပါသည် — login ပြီးရင် gateway သို့ အလိုအလျောက် ပြန်ပို့ပါမည်။"
-      : null;
-
   return (
     <CaptiveShell subtitle="WiFi သုံးရန် ဝင်ပါ">
       <div className={styles.card}>
@@ -128,23 +129,25 @@ export default function CaptiveLoginPage() {
           Voucher code သို့မဟုတ် အကောင့် ဖြင့် ဝင်ပြီး အင်တာနက် အသုံးပြုနိုင်ပါသည်။
         </p>
 
-        {routerHint ? <div className={styles.infoBanner}>{routerHint}</div> : null}
+        {branchName ? (
+          <p className={styles.branchLabel} role="status">
+            Branch: {branchName}
+          </p>
+        ) : null}
         {nasError ? <div className={styles.infoBanner}>{nasError}</div> : null}
         {error ? <div className={styles.errorBanner} role="alert">{error}</div> : null}
-        {nasDebug || siteMatchFailed ? (
+        {siteMatchFailed ? (
           <div
-            className={`${styles.nasDebug} ${siteMatchFailed ? styles.nasDebugError : ""}`}
+            className={`${styles.nasDebug} ${styles.nasDebugError}`}
             role="status"
           >
             <p className={styles.nasDebugTitle}>
-              {siteMatchFailed ? "ဆိုင် ရှာမတွေ့ပါ — NAS အချက်အလက်" : "Router NAS"}
+              ဆိုင် ရှာမတွေ့ပါ — NAS အချက်အလက်
             </p>
-            {siteMatchFailed ? (
-              <p className={styles.nasDebugHint}>
-                Site lock uses NAS-Identifier or NAS MAC only. NAS IP is not used. Compare
-                NAS-Identifier with Site Directory (MikroTik: /system identity).
-              </p>
-            ) : null}
+            <p className={styles.nasDebugHint}>
+              Site lock uses NAS-Identifier or NAS MAC only. NAS IP is not used. Compare
+              NAS-Identifier with Site Directory (MikroTik: /system identity).
+            </p>
             <dl className={styles.nasDebugList}>
               <div>
                 <dt>NAS-Identifier</dt>

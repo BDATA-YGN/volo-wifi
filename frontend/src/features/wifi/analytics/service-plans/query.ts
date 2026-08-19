@@ -18,8 +18,10 @@ export const loadAnalytics = async (
     const res = await apiClient.get(ANALYTICS_SERVICE_PLANS_API.listOrDetails(), {
       params: {
         orgId: params?.orgId || undefined,
+        stationId: params?.stationId || undefined,
+        resellerId: params?.resellerId || undefined,
+        profile: params?.profile || undefined,
         planId: params?.planId || undefined,
-        quotaType: params?.quotaType || undefined,
         preset: params?.preset || undefined,
         periodFrom: params?.periodFrom || undefined,
         periodTo: params?.periodTo || undefined,

@@ -446,6 +446,14 @@
       "kind": "menu"
     },
     {
+      "id": "a1c8e4f2-9b70-4d3e-8f61-2c5d7a90b4e1",
+      "settingKey": "/wifi/commerce/token-diagnose",
+      "description": "menus.wifi.commerce.token-diagnose",
+      "parentId": "commerce",
+      "level": "app",
+      "kind": "menu"
+    },
+    {
       "id": "15655da2-360a-4e2e-85c4-994897b6d311",
       "settingKey": "/wifi/commerce/transactions/orders",
       "description": "menus.wifi.commerce.transactions.orders",
@@ -910,6 +918,14 @@
       "enable": true,
       "visibility": true,
       "mngRoleSettingKey": "/wifi/commerce/access-tokens"
+    },
+    {
+      "id": "b2d9f5a3-0c81-4e4f-9a72-3d6e8b01c5f2",
+      "roleId": 1,
+      "settingKey": "a1c8e4f2-9b70-4d3e-8f61-2c5d7a90b4e1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/token-diagnose"
     },
     {
       "id": "deb0f6a6-4871-447a-8b0b-3e1c9f136729",
@@ -1504,6 +1520,14 @@
       "mngRoleSettingKey": "/wifi/commerce/access-tokens"
     },
     {
+      "id": "c3e0a6b4-1d92-4f50-ab83-4e7f9c12d603",
+      "roleId": 3,
+      "settingKey": "a1c8e4f2-9b70-4d3e-8f61-2c5d7a90b4e1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/token-diagnose"
+    },
+    {
       "id": "86b19def-4f60-46e1-b328-ff3ef47ea300",
       "roleId": 3,
       "settingKey": "15655da2-360a-4e2e-85c4-994897b6d311",
@@ -1904,6 +1928,22 @@
       "mngRoleSettingKey": "/wifi/analytics/live-ops"
     },
     {
+      "id": "d4f1b7c5-2e03-4061-bc94-5f80ad23e714",
+      "roleId": 5,
+      "settingKey": "ce8c31d2-945b-4302-a3ce-50efe4349c40",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "commerce"
+    },
+    {
+      "id": "e5a2c8d6-3f14-4172-cd05-6091be34f825",
+      "roleId": 5,
+      "settingKey": "a1c8e4f2-9b70-4d3e-8f61-2c5d7a90b4e1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/token-diagnose"
+    },
+    {
       "id": "797da5bd-39ac-460a-88ac-8aee11ea2c6b",
       "roleId": 6,
       "settingKey": "4dd5efb7-3731-4909-9ef6-e829f3d1bef7",
@@ -2112,6 +2152,14 @@
       "mngRoleSettingKey": "/wifi/commerce/partners"
     },
     {
+      "id": "f6b3d9e7-4025-4283-de16-71a2cf450936",
+      "roleId": 6,
+      "settingKey": "a1c8e4f2-9b70-4d3e-8f61-2c5d7a90b4e1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/token-diagnose"
+    },
+    {
       "id": "f4d42509-ba76-4c32-b7ea-9f2fc672d2ad",
       "roleId": 6,
       "settingKey": "7a93b378-2095-419c-98bb-87225367218d",
@@ -2262,6 +2310,14 @@
       "enable": true,
       "visibility": true,
       "mngRoleSettingKey": "/wifi/commerce/access-tokens"
+    },
+    {
+      "id": "a7c4e0f8-5136-4394-ef27-82b3d0561a47",
+      "roleId": 7,
+      "settingKey": "a1c8e4f2-9b70-4d3e-8f61-2c5d7a90b4e1",
+      "enable": true,
+      "visibility": true,
+      "mngRoleSettingKey": "/wifi/commerce/token-diagnose"
     },
     {
       "id": "60b99bcf-4baa-4a76-bc5c-1224fa51dc15",

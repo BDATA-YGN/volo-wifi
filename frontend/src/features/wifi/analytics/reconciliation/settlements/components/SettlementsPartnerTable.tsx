@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Card, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { SettlementPartnerRow } from "../types";
@@ -74,13 +73,6 @@ const SettlementsPartnerTable: React.FC<Props> = ({
     <Card
       size="small"
       title="By partner"
-      extra={
-        <Link href="/wifi/commerce/partners">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Partners →
-          </Text>
-        </Link>
-      }
       styles={{ body: { padding: 0 } }}
     >
       <Table<SettlementPartnerRow>

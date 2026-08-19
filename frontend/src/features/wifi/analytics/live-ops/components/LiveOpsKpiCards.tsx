@@ -86,7 +86,7 @@ const LiveOpsKpiCards: React.FC<Props> = ({ summary, currency, loading }) => (
     </Col>
     <Col xs={24} sm={12} lg={6}>
       <Card size="small" styles={{ body: { padding: 16 } }}>
-        <Statistic loading={loading} title="Today orders (stats)" value={summary.todayOrders} />
+        <Statistic loading={loading} title="Day orders (stats)" value={summary.todayOrders} />
         <WifiMutedText style={{ fontSize: 12 }}>
           {formatMoney(summary.todayRevenue, currency)} revenue
         </WifiMutedText>
@@ -94,7 +94,7 @@ const LiveOpsKpiCards: React.FC<Props> = ({ summary, currency, loading }) => (
     </Col>
     <Col xs={24} sm={12} lg={6}>
       <Card size="small" styles={{ body: { padding: 16 } }}>
-        <Statistic loading={loading} title="Today sessions (stats)" value={summary.todaySessions} />
+        <Statistic loading={loading} title="Day sessions (stats)" value={summary.todaySessions} />
         <WifiMutedText style={{ fontSize: 12 }}>
           {formatBytes(summary.todayBytes)}
         </WifiMutedText>

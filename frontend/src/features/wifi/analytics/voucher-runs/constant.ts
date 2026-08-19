@@ -1,13 +1,21 @@
 import { buildWifiApiRoutes } from "@/features/wifi/shared/utils";
-import type { PeriodPreset } from "./types";
+import dayjs from "dayjs";
 
 /** Console API paths — mirrors backend `/wifi/analytics/voucher-runs` */
 export const ANALYTICS_VOUCHER_RUNS_API = buildWifiApiRoutes("/wifi/analytics/voucher-runs");
 
-export const PERIOD_PRESETS: { value: PeriodPreset; label: string }[] = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "90d", label: "Last 90 days" },
-];
+export function currentMonthKey(): string {
+  return dayjs().format("YYYY-MM");
+}
 
-export const DEFAULT_PRESET: PeriodPreset = "30d";
+export function monthPeriod(monthKey: string): { periodFrom: string; periodTo: string } {
+  const start = dayjs(`${monthKey}-01`).startOf("month");
+  return {
+    periodFrom: start.toISOString(),
+    periodTo: start.endOf("month").toISOString(),
+  };
+}
+
+export function formatMonthLabel(monthKey: string): string {
+  return dayjs(`${monthKey}-01`).format("MMM YYYY");
+}

@@ -2,9 +2,10 @@
 
 import React from "react";
 import { Card, Table, Typography } from "antd";
+import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
 import type { ColumnsType } from "antd/es/table";
 import type { CoverageSiteRow } from "../types";
-import { formatGapDays } from "../utils";
+import { formatCount, formatGapDays, formatPercent, sealedPct } from "../utils";
 
 const { Text } = Typography;
 
@@ -25,6 +26,9 @@ const CoverageSiteTable: React.FC<Props> = ({
     {
       title: "Site",
       key: "name",
+      fixed: "left",
+      width: 220,
+      sorter: (a, b) => a.name.localeCompare(b.name),
       render: (_, row) => (
         <div>
           <Text strong={row.stationId === selectedStationId} style={{ fontSize: 13 }}>
@@ -42,37 +46,85 @@ const CoverageSiteTable: React.FC<Props> = ({
       title: "Scopes",
       dataIndex: "scopeCount",
       key: "scopeCount",
-      width: 70,
+      width: 90,
       align: "right",
-    },
-    {
-      title: "Gaps",
-      dataIndex: "gapCount",
-      key: "gapCount",
-      width: 60,
-      align: "right",
-      render: (count: number) => (
-        <Text type={count > 0 ? "warning" : "secondary"}>{count}</Text>
-      ),
+      sorter: (a, b) => a.scopeCount - b.scopeCount,
+      render: (n: number) => formatCount(n),
     },
     {
       title: "Sealed",
       dataIndex: "sealedCount",
       key: "sealedCount",
-      width: 60,
+      width: 90,
       align: "right",
+      sorter: (a, b) => a.sealedCount - b.sealedCount,
+      render: (n: number) => formatCount(n),
+    },
+    {
+      title: "Sealed %",
+      key: "sealedPct",
+      width: 100,
+      align: "right",
+      sorter: (a, b) =>
+        (a.sealedPct ?? sealedPct(a.sealedCount, a.scopeCount)) -
+        (b.sealedPct ?? sealedPct(b.sealedCount, b.scopeCount)),
+      render: (_, row) =>
+        formatPercent(row.sealedPct ?? sealedPct(row.sealedCount, row.scopeCount)),
+    },
+    {
+      title: "Gaps",
+      dataIndex: "gapCount",
+      key: "gapCount",
+      width: 80,
+      align: "right",
+      defaultSortOrder: "descend",
+      sorter: (a, b) => a.gapCount - b.gapCount,
+      render: (count: number) => (
+        <Text type={count > 0 ? "warning" : "secondary"}>{formatCount(count)}</Text>
+      ),
+    },
+    {
+      title: "Unsealed",
+      dataIndex: "unsealedCount",
+      key: "unsealedCount",
+      width: 100,
+      align: "right",
+      sorter: (a, b) => (a.unsealedCount ?? 0) - (b.unsealedCount ?? 0),
+      render: (n: number | undefined) => formatCount(n ?? 0),
+    },
+    {
+      title: "Uncovered",
+      dataIndex: "uncoveredPaymentCount",
+      key: "uncoveredPaymentCount",
+      width: 110,
+      align: "right",
+      sorter: (a, b) => (a.uncoveredPaymentCount ?? 0) - (b.uncoveredPaymentCount ?? 0),
+      render: (n: number | undefined) => {
+        const count = n ?? 0;
+        return <Text type={count > 0 ? "warning" : "secondary"}>{formatCount(count)}</Text>;
+      },
     },
     {
       title: "Avg gap",
       key: "avgGapDays",
-      width: 80,
+      width: 100,
       align: "right",
+      sorter: (a, b) => a.avgGapDays - b.avgGapDays,
       render: (_, row) => formatGapDays(row.avgGapDays),
     },
   ];
 
   return (
-    <Card size="small" title="By site" styles={{ body: { padding: 0 } }}>
+    <Card
+      size="small"
+      title="By site"
+      extra={
+        <WifiMutedText style={{ fontSize: 12 }}>
+          {formatCount(rows.length)} sites · click to filter
+        </WifiMutedText>
+      }
+      styles={{ body: { padding: 0 } }}
+    >
       <Table<CoverageSiteRow>
         size="small"
         rowKey="stationId"
@@ -80,6 +132,8 @@ const CoverageSiteTable: React.FC<Props> = ({
         dataSource={rows}
         columns={columns}
         pagination={false}
+        sticky
+        scroll={{ x: 980, y: "calc(var(--content-body-height) - 280px)" }}
         onRow={(row) => ({
           onClick: () => onSelectSite(row.stationId),
           style: { cursor: "pointer" },

@@ -1,7 +1,9 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
 import type { CredentialStatus } from "@/features/wifi/commerce/access-tokens/types";
 
-export type PeriodPreset = "7d" | "30d" | "90d";
+export type PeriodPreset = "today" | "7d" | "30d" | "90d";
+
+export type TrendGranularity = "daily" | "hourly";
 
 export type CredentialType = "VOUCHER_TOKEN" | "USER_PASSWORD";
 
@@ -32,35 +34,34 @@ export type CredentialDailyPoint = {
   archived: number;
 };
 
-export type CredentialStatusRow = {
-  status: string;
-  count: number;
+export type CredentialPeriodCounts = {
+  sold: number;
+  activated: number;
+  expired: number;
+  revoked: number;
+  consumed: number;
+  archived: number;
 };
 
-export type CredentialTypeRow = {
-  type: string;
-  inventoryCount: number;
-  activeCount: number;
-  soldInPeriod: number;
-};
-
-export type CredentialPlanRow = {
+export type CredentialSitePlanRow = CredentialPeriodCounts & {
   planId: string;
   code: string;
   name: string;
-  inventoryCount: number;
-  activeCount: number;
-  soldInPeriod: number;
-  expiredInPeriod: number;
+};
+
+export type CredentialSiteRow = CredentialPeriodCounts & {
+  stationId: string | null;
+  code: string;
+  name: string;
+  byPlan: CredentialSitePlanRow[];
 };
 
 export type CredentialAnalyticsData = {
   summary: CredentialAnalyticsSummary;
   previousSummary: CredentialAnalyticsSummary;
   dailyTrend: CredentialDailyPoint[];
-  byStatus: CredentialStatusRow[];
-  byType: CredentialTypeRow[];
-  byPlan: CredentialPlanRow[];
+  trendGranularity?: TrendGranularity;
+  bySite: CredentialSiteRow[];
   periodFrom: string;
   periodTo: string;
   preset: PeriodPreset | null;

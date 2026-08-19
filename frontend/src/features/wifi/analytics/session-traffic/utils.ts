@@ -14,6 +14,11 @@ export function formatDuration(seconds: number): string {
   return `${minutes}m`;
 }
 
+export function avgTimePerUserSec(totalSessionTimeSec: number, uniqueUsers: number): number {
+  if (uniqueUsers <= 0 || totalSessionTimeSec <= 0) return 0;
+  return Math.round(totalSessionTimeSec / uniqueUsers);
+}
+
 export function percentChange(current: number, previous: number): number | null {
   if (previous === 0) {
     return current === 0 ? 0 : null;

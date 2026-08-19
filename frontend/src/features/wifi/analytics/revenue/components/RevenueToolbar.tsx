@@ -1,70 +1,51 @@
 "use client";
 
 import React from "react";
-import { Button, DatePicker, Segmented, Space, Tag } from "antd";
+import { Button, DatePicker, Space } from "antd";
 import { WifiMutedText } from "@/features/wifi/shared/components/WifiMutedText";
 import { ReloadOutlined } from "@ant-design/icons";
-import type { Dayjs } from "dayjs";
-import type { PeriodPreset } from "../types";
-import { PERIOD_PRESETS } from "../constant";
-import { granularityLabel } from "../utils";
-import type { TrendGranularity } from "../types";
-
-const { RangePicker } = DatePicker;
+import dayjs, { type Dayjs } from "dayjs";
 
 type Props = {
-  preset: PeriodPreset;
-  customRange: [Dayjs | null, Dayjs | null] | null;
-  trendGranularity?: TrendGranularity;
-  dataSource?: "aggregated" | "live";
+  month: string;
   loading?: boolean;
-  onPresetChange: (preset: PeriodPreset) => void;
-  onCustomRangeChange: (range: [Dayjs | null, Dayjs | null] | null) => void;
+  onMonthChange: (month: string) => void;
   onRefresh: () => void;
 };
 
 const RevenueToolbar: React.FC<Props> = ({
-  preset,
-  customRange,
-  trendGranularity,
-  dataSource,
+  month,
   loading,
-  onPresetChange,
-  onCustomRangeChange,
+  onMonthChange,
   onRefresh,
-}) => (
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <Space wrap align="center">
-      <Segmented
-        value={customRange ? undefined : preset}
-        options={PERIOD_PRESETS.map((p) => ({ value: p.value, label: p.label }))}
-        onChange={(v) => onPresetChange(v as PeriodPreset)}
-      />
-      <RangePicker
-        allowClear
-        value={customRange}
-        onChange={(dates) => onCustomRangeChange(dates)}
-        format="D MMM YYYY"
-        placeholder={["Custom from", "Custom to"]}
-      />
-      {trendGranularity ? (
-        <Tag color="geekblue">{granularityLabel(trendGranularity)} trend</Tag>
-      ) : null}
-      {dataSource ? (
-        <Tag color={dataSource === "aggregated" ? "blue" : "orange"}>
-          {dataSource === "aggregated" ? "Aggregated stats" : "Live orders"}
-        </Tag>
-      ) : null}
+}) => {
+  const thisMonth = dayjs().startOf("month");
+
+  return (
+    <Space wrap align="end">
+      <div>
+        <WifiMutedText style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+          Month
+        </WifiMutedText>
+        <DatePicker
+          picker="month"
+          allowClear={false}
+          value={dayjs(`${month}-01`)}
+          format="MMM YYYY"
+          disabledDate={(current: Dayjs) => current.startOf("month").isAfter(thisMonth)}
+          onChange={(value) => {
+            if (value) onMonthChange(value.format("YYYY-MM"));
+          }}
+        />
+      </div>
+      <Space>
+        <WifiMutedText style={{ fontSize: 12 }}>vs previous month</WifiMutedText>
+        <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading}>
+          Refresh
+        </Button>
+      </Space>
     </Space>
-    <Space>
-      <WifiMutedText style={{ fontSize: 12 }}>
-        vs previous period
-      </WifiMutedText>
-      <Button icon={<ReloadOutlined />} onClick={onRefresh} loading={loading}>
-        Refresh
-      </Button>
-    </Space>
-  </div>
-);
+  );
+};
 
 export default RevenueToolbar;

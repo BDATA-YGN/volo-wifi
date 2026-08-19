@@ -102,10 +102,11 @@ const TrafficKpiCards: React.FC<Props> = ({ summary, previous, loading }) => (
     <Col xs={24} sm={12} lg={6}>
       <KpiCard
         loading={loading}
-        title="Avg session"
+        title="Avg per user"
         value={formatDuration(summary.avgSessionTimeSec)}
         delta={percentChange(summary.avgSessionTimeSec, previous.avgSessionTimeSec)}
         prefix={<ClockCircleOutlined style={{ color: "#8c8c8c" }} />}
+        subtitle="Total session time ÷ unique users"
       />
     </Col>
     <Col xs={24} sm={12} lg={6}>

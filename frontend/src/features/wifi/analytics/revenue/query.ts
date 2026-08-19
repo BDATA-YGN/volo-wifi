@@ -18,9 +18,7 @@ export const loadAnalytics = async (
     const res = await apiClient.get(ANALYTICS_REVENUE_API.listOrDetails(), {
       params: {
         orgId: params?.orgId || undefined,
-        preset: params?.preset || undefined,
-        periodFrom: params?.periodFrom || undefined,
-        periodTo: params?.periodTo || undefined,
+        month: params?.month || undefined,
       },
     });
     return res.data;

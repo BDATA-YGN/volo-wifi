@@ -1,24 +1,21 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
+import { Alert, Button, Card, Segmented, Tag, Typography, theme } from "antd";
 import { Gauge, X } from "lucide-react";
 import dayjs from "dayjs";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
 import { useAnalyticsLiveOps } from "./useAnalyticsLiveOps";
-import type { WindowHours } from "./types";
+import type { LiveOpsTab } from "./types";
 import { formatBytes } from "./utils";
+import { LIVE_OPS_TABS } from "./constant";
 import LiveOpsToolbar from "./components/LiveOpsToolbar";
 import LiveOpsFilterBar from "./components/LiveOpsFilterBar";
 import LiveOpsKpiCards from "./components/LiveOpsKpiCards";
 import LiveOpsTrendChart from "./components/LiveOpsTrendChart";
-import LiveOpsStatusTable from "./components/LiveOpsStatusTable";
 import LiveOpsSiteTable from "./components/LiveOpsSiteTable";
-import LiveOpsPartnerTable from "./components/LiveOpsPartnerTable";
-import LiveOpsRecentSessionsTable from "./components/LiveOpsRecentSessionsTable";
-import LiveOpsRecentOrdersTable from "./components/LiveOpsRecentOrdersTable";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -33,15 +30,21 @@ const AnalyticsLiveOpsPage: React.FC = () => {
     error,
     orgId,
     stationId,
-    resellerId,
-    windowHours,
-    autoRefresh,
+    stationSizeId,
+    planId,
+    profile,
+    date,
+    refreshMs,
+    tab,
     formOptions,
     selectOrg,
     selectStation,
-    selectReseller,
-    selectWindowHours,
-    toggleAutoRefresh,
+    selectStationSize,
+    selectPlan,
+    selectProfile,
+    selectDate,
+    selectRefreshMs,
+    selectTab,
     clearFilters,
     refresh,
     loadFormOptions,
@@ -52,30 +55,44 @@ const AnalyticsLiveOpsPage: React.FC = () => {
   }, [loadFormOptions]);
 
   useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
+    if (
+      initDone &&
+      meta?.memberships?.length === 1 &&
+      !orgId &&
+      !(meta?.canSwitchOrg ?? formOptions.canSwitchOrg)
+    ) {
       selectOrg(meta.memberships[0].id);
     }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
+  }, [initDone, meta?.memberships, meta?.canSwitchOrg, formOptions.canSwitchOrg, orgId, selectOrg]);
 
   useEffect(() => {
-    if (meta?.orgId && !orgId) {
+    if (meta?.orgId && !orgId && !(meta?.canSwitchOrg ?? formOptions.canSwitchOrg)) {
       selectOrg(meta.orgId);
     }
-  }, [meta?.orgId, orgId, selectOrg]);
+  }, [meta?.orgId, meta?.canSwitchOrg, formOptions.canSwitchOrg, orgId, selectOrg]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
   const stations = formOptions.stations;
-  const resellers = formOptions.resellers;
-  const showOrgSwitcher = memberships.length > 1;
+  const stationSizes = formOptions.stationSizes ?? [];
+  const plans = formOptions.plans ?? [];
+  const profiles =
+    formOptions.profiles && formOptions.profiles.length > 0
+      ? formOptions.profiles
+      : [
+          { value: "MikroTik", label: "MikroTik" },
+          { value: "Ruijie", label: "Ruijie" },
+        ];
+  const showOrgSwitcher =
+    memberships.length > 1 ||
+    Boolean(meta?.requiresOrgSelection || formOptions.requiresOrgSelection);
   const needsOrg = Boolean(meta?.requiresOrgSelection) && !orgId;
   const currency = analytics?.org.currency ?? "MMK";
+  const hasFilters = Boolean(stationId || stationSizeId || planId || profile);
 
   const windowLabel = useMemo(() => {
     if (!analytics) return null;
-    return `${dayjs(analytics.windowFrom).format("HH:mm")} – ${dayjs(analytics.windowTo).format("HH:mm")} · ${analytics.windowHours}h window`;
+    return dayjs(analytics.date || analytics.windowFrom).format("D MMM YYYY");
   }, [analytics]);
-
-  const hasFilters = Boolean(stationId || resellerId);
 
   return (
     <div className="p-0">
@@ -141,7 +158,13 @@ const AnalyticsLiveOpsPage: React.FC = () => {
                         <Tag color="warning">{analytics.summary.stalledSessions} stalled</Tag>
                       ) : null}
                       <Tag color="purple">{analytics.summary.ordersCount} orders</Tag>
-                      {autoRefresh ? <Tag color="success">Auto-refresh on</Tag> : null}
+                      {refreshMs > 0 ? (
+                        <Tag color="success">
+                          Auto-refresh {REFRESH_LABEL[refreshMs] ?? `${refreshMs / 1000}s`}
+                        </Tag>
+                      ) : (
+                        <Tag>Auto-refresh off</Tag>
+                      )}
                       {hasFilters ? (
                         <Button
                           type="link"
@@ -167,97 +190,87 @@ const AnalyticsLiveOpsPage: React.FC = () => {
                     </Text>
                   </div>
                 </div>
+
+                <div style={{ marginTop: 16, paddingTop: 14 }}>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <LiveOpsFilterBar
+                      stations={stations}
+                      stationSizes={stationSizes}
+                      profiles={profiles}
+                      plans={plans}
+                      stationId={stationId}
+                      stationSizeId={stationSizeId}
+                      profile={profile}
+                      planId={planId}
+                      loading={loading}
+                      onStationChange={selectStation}
+                      onStationSizeChange={selectStationSize}
+                      onProfileChange={selectProfile}
+                      onPlanChange={selectPlan}
+                    />
+                    <LiveOpsToolbar
+                      date={date}
+                      generatedAt={analytics.generatedAt}
+                      refreshMs={refreshMs}
+                      loading={loading}
+                      onDateChange={selectDate}
+                      onRefreshMsChange={selectRefreshMs}
+                      onRefresh={refresh}
+                    />
+                  </div>
+                </div>
               </Card>
 
-              <Card
-                styles={{ body: { padding: 16 } }}
-                style={{ borderRadius: token.borderRadiusLG }}
-              >
-                <LiveOpsToolbar
-                  windowHours={windowHours}
-                  generatedAt={analytics.generatedAt}
-                  autoRefresh={autoRefresh}
-                  loading={loading}
-                  onWindowChange={(v: WindowHours) => selectWindowHours(v)}
-                  onAutoRefreshChange={toggleAutoRefresh}
-                  onRefresh={refresh}
-                />
-              </Card>
-
-              <LiveOpsFilterBar
-                stations={stations}
-                resellers={resellers}
-                stationId={stationId}
-                resellerId={resellerId}
-                loading={loading}
-                onStationChange={selectStation}
-                onResellerChange={selectReseller}
+              <Segmented
+                value={tab}
+                options={LIVE_OPS_TABS.map((item) => ({
+                  value: item.key,
+                  label: item.label,
+                }))}
+                onChange={(value) => selectTab(value as LiveOpsTab)}
               />
 
-              <LiveOpsKpiCards
-                summary={analytics.summary}
-                currency={currency}
-                loading={loading}
-              />
-
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={16}>
+              {tab === "stats" ? (
+                <div className="flex flex-col gap-4">
+                  <LiveOpsKpiCards
+                    summary={analytics.summary}
+                    currency={currency}
+                    loading={loading}
+                  />
                   <LiveOpsTrendChart
                     points={analytics.hourlyTrend}
                     currency={currency}
                     loading={loading}
                   />
-                </Col>
-                <Col xs={24} lg={8}>
-                  <LiveOpsStatusTable rows={analytics.byStatus} loading={loading} />
-                </Col>
-              </Row>
-
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={12}>
-                  <LiveOpsSiteTable
-                    rows={analytics.bySite}
-                    currency={currency}
-                    loading={loading}
-                    selectedStationId={stationId}
-                    onSelectSite={(id) => selectStation(id)}
-                  />
-                </Col>
-                <Col xs={24} lg={12}>
-                  <LiveOpsPartnerTable
-                    rows={analytics.byPartner}
-                    currency={currency}
-                    loading={loading}
-                    selectedResellerId={resellerId}
-                    onSelectPartner={(id) => selectReseller(id)}
-                  />
-                </Col>
-              </Row>
-
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={12}>
-                  <LiveOpsRecentSessionsTable
-                    rows={analytics.recentSessions}
-                    loading={loading}
-                  />
-                </Col>
-                <Col xs={24} lg={12}>
-                  <LiveOpsRecentOrdersTable rows={analytics.recentOrders} loading={loading} />
-                </Col>
-              </Row>
+                </div>
+              ) : (
+                <LiveOpsSiteTable
+                  rows={analytics.bySite}
+                  loading={loading}
+                  selectedStationId={stationId}
+                  onSelectSite={(id) => selectStation(id)}
+                />
+              )}
             </>
           ) : initDone && orgId && !loading && !needsOrg && !error ? (
             <Alert
               type="info"
               showIcon
               title="No live activity"
-              description="There is no session or order activity in the selected window."
+              description="There is no session or order activity for the selected date and filters."
             />
           ) : null}
         </div>
       </div>
     </div>
   );
+};
+
+const REFRESH_LABEL: Record<number, string> = {
+  15000: "15s",
+  30000: "30s",
+  60000: "1 min",
+  300000: "5 min",
 };
 
 export default AnalyticsLiveOpsPage;

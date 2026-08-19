@@ -1,11 +1,10 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { Card, Table, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { SessionTrafficPlanRow } from "../types";
-import { formatBytes, formatDuration } from "../utils";
+import { avgTimePerUserSec, formatBytes, formatDuration } from "../utils";
 
 const { Text } = Typography;
 
@@ -26,6 +25,7 @@ const TrafficPlanTable: React.FC<Props> = ({
     {
       title: "Plan",
       key: "plan",
+      sorter: (a, b) => a.name.localeCompare(b.name) || a.code.localeCompare(b.code),
       render: (_, row) => (
         <div>
           <Text strong style={{ fontSize: 13 }}>
@@ -48,6 +48,14 @@ const TrafficPlanTable: React.FC<Props> = ({
       defaultSortOrder: "descend",
     },
     {
+      title: "Users",
+      dataIndex: "uniqueCredentials",
+      key: "uniqueCredentials",
+      width: 80,
+      align: "right",
+      sorter: (a, b) => a.uniqueCredentials - b.uniqueCredentials,
+    },
+    {
       title: "Data",
       key: "totalBytes",
       width: 100,
@@ -56,16 +64,14 @@ const TrafficPlanTable: React.FC<Props> = ({
       sorter: (a, b) => a.totalBytes - b.totalBytes,
     },
     {
-      title: "Avg time",
+      title: "Avg / user",
       key: "avgTime",
-      width: 90,
+      width: 100,
       align: "right",
-      render: (_, row) =>
-        formatDuration(
-          row.sessionsCount > 0
-            ? Math.round(row.totalSessionTimeSec / row.sessionsCount)
-            : 0
-        ),
+      sorter: (a, b) =>
+        avgTimePerUserSec(a.totalSessionTimeSec, a.uniqueCredentials) -
+        avgTimePerUserSec(b.totalSessionTimeSec, b.uniqueCredentials),
+      render: (_, row) => formatDuration(avgTimePerUserSec(row.totalSessionTimeSec, row.uniqueCredentials)),
     },
   ];
 
@@ -73,13 +79,6 @@ const TrafficPlanTable: React.FC<Props> = ({
     <Card
       size="small"
       title="By plan"
-      extra={
-        <Link href="/wifi/analytics/service-plans">
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Plan analytics →
-          </Text>
-        </Link>
-      }
       styles={{ body: { padding: 0 } }}
     >
       <Table<SessionTrafficPlanRow>
@@ -88,7 +87,8 @@ const TrafficPlanTable: React.FC<Props> = ({
         loading={loading}
         dataSource={rows}
         columns={columns}
-        pagination={{ pageSize: 8, hideOnSinglePage: true, size: "small" }}
+        pagination={false}
+        sticky
         rowClassName={(row) => (row.planId === selectedPlanId ? "ant-table-row-selected" : "")}
         onRow={(row) => ({
           onClick: () => onSelectPlan?.(row.planId),

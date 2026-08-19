@@ -2,40 +2,48 @@
 
 import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
+import dayjs from "dayjs";
 import * as Query from "./query";
 import type {
   LiveOpsAnalyticsData,
   LiveOpsAnalyticsMeta,
   LiveOpsAnalyticsParams,
   LiveOpsFormOptions,
-  WindowHours,
+  LiveOpsTab,
 } from "./types";
-import { AUTO_REFRESH_MS, DEFAULT_WINDOW_HOURS } from "./constant";
+import { DEFAULT_REFRESH_MS, DEFAULT_TAB } from "./constant";
 
 const emptyFormOptions: LiveOpsFormOptions = {
   memberships: [],
   stations: [],
-  resellers: [],
+  stationSizes: [],
+  plans: [],
+  profiles: [],
 };
 
 export function useAnalyticsLiveOps() {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [stationId, setStationId] = useState<string | undefined>(undefined);
-  const [resellerId, setResellerId] = useState<string | undefined>(undefined);
-  const [windowHours, setWindowHours] = useState<WindowHours>(DEFAULT_WINDOW_HOURS);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [stationSizeId, setStationSizeId] = useState<string | undefined>(undefined);
+  const [planId, setPlanId] = useState<string | undefined>(undefined);
+  const [profile, setProfile] = useState<string | undefined>(undefined);
+  const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [refreshMs, setRefreshMs] = useState(DEFAULT_REFRESH_MS);
+  const [tab, setTab] = useState<LiveOpsTab>(DEFAULT_TAB);
   const [formOptions, setFormOptions] = useState<LiveOpsFormOptions>(emptyFormOptions);
 
   const params: LiveOpsAnalyticsParams = {
     orgId,
     stationId,
-    resellerId,
-    windowHours,
+    stationSizeId,
+    planId,
+    profile,
+    date,
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
-    refreshDeps: [orgId, stationId, resellerId, windowHours],
-    pollingInterval: autoRefresh && orgId ? AUTO_REFRESH_MS : undefined,
+    refreshDeps: [orgId, stationId, stationSizeId, planId, profile, date],
+    pollingInterval: refreshMs > 0 && orgId ? refreshMs : undefined,
     pollingWhenHidden: false,
   });
 
@@ -45,8 +53,15 @@ export function useAnalyticsLiveOps() {
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as LiveOpsFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
+    setFormOptions({
+      ...emptyFormOptions,
+      ...opts,
+      stations: opts.stations ?? [],
+      stationSizes: opts.stationSizes ?? [],
+      plans: opts.plans ?? [],
+      profiles: opts.profiles ?? [],
+    });
+    if (!targetOrgId && opts.memberships.length === 1 && !opts.canSwitchOrg) {
       setOrgId(opts.memberships[0].id);
     }
     return opts;
@@ -56,31 +71,33 @@ export function useAnalyticsLiveOps() {
     (id: string) => {
       setOrgId(id);
       setStationId(undefined);
-      setResellerId(undefined);
+      setStationSizeId(undefined);
+      setPlanId(undefined);
+      setProfile(undefined);
       void loadFormOptions(id);
     },
     [loadFormOptions]
   );
 
-  const selectStation = useCallback((id: string | undefined) => {
-    setStationId(id);
-  }, []);
+  const selectStationSize = useCallback((id: string | undefined) => {
+    setStationSizeId(id);
+    setStationId((prev) => {
+      if (!prev || !id) return prev;
+      const site = formOptions.stations.find((s) => s.id === prev);
+      return !site || site.stationSizeId === id ? prev : undefined;
+    });
+  }, [formOptions.stations]);
 
-  const selectReseller = useCallback((id: string | undefined) => {
-    setResellerId(id);
-  }, []);
-
-  const selectWindowHours = useCallback((value: WindowHours) => {
-    setWindowHours(value);
-  }, []);
-
-  const toggleAutoRefresh = useCallback((value: boolean) => {
-    setAutoRefresh(value);
+  const selectProfile = useCallback((value: string | undefined) => {
+    setProfile(value);
+    setStationId(undefined);
   }, []);
 
   const clearFilters = useCallback(() => {
     setStationId(undefined);
-    setResellerId(undefined);
+    setStationSizeId(undefined);
+    setPlanId(undefined);
+    setProfile(undefined);
   }, []);
 
   return {
@@ -90,15 +107,21 @@ export function useAnalyticsLiveOps() {
     error,
     orgId,
     stationId,
-    resellerId,
-    windowHours,
-    autoRefresh,
+    stationSizeId,
+    planId,
+    profile,
+    date,
+    refreshMs,
+    tab,
     formOptions,
     selectOrg,
-    selectStation,
-    selectReseller,
-    selectWindowHours,
-    toggleAutoRefresh,
+    selectStation: setStationId,
+    selectStationSize,
+    selectPlan: setPlanId,
+    selectProfile,
+    selectDate: setDate,
+    selectRefreshMs: setRefreshMs,
+    selectTab: setTab,
     clearFilters,
     refresh,
     loadFormOptions,

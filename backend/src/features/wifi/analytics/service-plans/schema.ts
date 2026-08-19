@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { PERIOD_PRESETS, PLAN_QUOTA_TYPES } from './constants';
+import { PERIOD_PRESETS } from './constants';
 
 const isoDate = Joi.date().iso();
 
@@ -10,9 +10,9 @@ export const AnalyticsServicePlansQuerySchema = Joi.object({
   periodFrom: isoDate.optional(),
   periodTo: isoDate.optional(),
   orgId: Joi.string().uuid().optional(),
+  stationId: Joi.string().uuid().optional(),
+  resellerId: Joi.string().uuid().optional(),
+  profile: Joi.string().trim().max(64).optional(),
   planId: Joi.string().uuid().optional(),
-  quotaType: Joi.string()
-    .valid(...PLAN_QUOTA_TYPES)
-    .optional(),
   formOptions: Joi.string().valid('true').optional(),
 }).unknown(true);

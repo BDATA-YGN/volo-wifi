@@ -1,29 +1,32 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
+import { Alert, Button, Card, Tag, Typography, theme } from "antd";
 import { KeyRound, X } from "lucide-react";
 import dayjs, { type Dayjs } from "dayjs";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
 import { useAnalyticsAccessTokens } from "./useAnalyticsAccessTokens";
-import type { PeriodPreset } from "./types";
 import { formatCredentialType } from "./utils";
 import TokensToolbar from "./components/TokensToolbar";
 import TokensFilterBar from "./components/TokensFilterBar";
 import TokensKpiCards from "./components/TokensKpiCards";
 import TokensLifecycleChart from "./components/TokensLifecycleChart";
-import TokensStatusTable from "./components/TokensStatusTable";
-import TokensPlanTable from "./components/TokensPlanTable";
-import TokensTypeTable from "./components/TokensTypeTable";
+import TokensSiteTable from "./components/TokensSiteTable";
+import TokensSitePlanModal from "./components/TokensSitePlanModal";
+import type { CredentialSiteRow } from "./types";
 
 const { Title, Paragraph, Text } = Typography;
 
 const AnalyticsAccessTokensPage: React.FC = () => {
   const { token } = theme.useToken();
   const [initDone, setInitDone] = useState(false);
-  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [selectedSite, setSelectedSite] = useState<CredentialSiteRow | null>(null);
+  const [customRange, setCustomRange] = useState<[Dayjs | null, Dayjs | null] | null>([
+    dayjs().startOf("day"),
+    dayjs().endOf("day"),
+  ]);
 
   const {
     analytics,
@@ -33,14 +36,11 @@ const AnalyticsAccessTokensPage: React.FC = () => {
     orgId,
     planId,
     credentialType,
-    preset,
     formOptions,
     selectOrg,
     selectPlan,
     selectCredentialType,
-    selectPreset,
     selectCustomPeriod,
-    clearCustomPeriod,
     clearFilters,
     refresh,
     loadFormOptions,
@@ -62,6 +62,21 @@ const AnalyticsAccessTokensPage: React.FC = () => {
     }
   }, [meta?.orgId, orgId, selectOrg]);
 
+  useEffect(() => {
+    if (customRange?.[0] && customRange?.[1]) {
+      selectCustomPeriod(
+        customRange[0].startOf("day").toISOString(),
+        customRange[1].endOf("day").toISOString(),
+      );
+    }
+    // initialize default period to today once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setSelectedSite(null);
+  }, [orgId, planId, credentialType, customRange]);
+
   const memberships = meta?.memberships ?? formOptions.memberships;
   const plans = formOptions.plans;
   const showOrgSwitcher = memberships.length > 1;
@@ -74,14 +89,11 @@ const AnalyticsAccessTokensPage: React.FC = () => {
 
   const periodLabel = useMemo(() => {
     if (!analytics) return null;
-    return `${dayjs(analytics.periodFrom).format("D MMM YYYY")} – ${dayjs(analytics.periodTo).format("D MMM YYYY")}`;
+    const from = dayjs(analytics.periodFrom);
+    const to = dayjs(analytics.periodTo);
+    if (from.isSame(to, "day")) return from.format("D MMM YYYY");
+    return `${from.format("D MMM YYYY")} – ${to.format("D MMM YYYY")}`;
   }, [analytics]);
-
-  const handlePresetChange = (value: PeriodPreset) => {
-    setCustomRange(null);
-    clearCustomPeriod();
-    selectPreset(value);
-  };
 
   const handleCustomRangeChange = (range: [Dayjs | null, Dayjs | null] | null) => {
     setCustomRange(range);
@@ -91,7 +103,9 @@ const AnalyticsAccessTokensPage: React.FC = () => {
         range[1].endOf("day").toISOString()
       );
     } else {
-      clearCustomPeriod();
+      const today: [Dayjs, Dayjs] = [dayjs().startOf("day"), dayjs().endOf("day")];
+      setCustomRange(today);
+      selectCustomPeriod(today[0].toISOString(), today[1].toISOString());
     }
   };
 
@@ -196,10 +210,8 @@ const AnalyticsAccessTokensPage: React.FC = () => {
                 style={{ borderRadius: token.borderRadiusLG }}
               >
                 <TokensToolbar
-                  preset={preset}
                   customRange={customRange}
                   loading={loading}
-                  onPresetChange={handlePresetChange}
                   onCustomRangeChange={handleCustomRangeChange}
                   onRefresh={refresh}
                 />
@@ -220,28 +232,23 @@ const AnalyticsAccessTokensPage: React.FC = () => {
                 loading={loading}
               />
 
-              <TokensLifecycleChart points={analytics.dailyTrend} loading={loading} />
+              <TokensLifecycleChart
+                points={analytics.dailyTrend}
+                granularity={analytics.trendGranularity}
+                loading={loading}
+              />
 
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={10}>
-                  <TokensStatusTable
-                    rows={analytics.byStatus}
-                    inventoryTotal={analytics.summary.inventoryCount}
-                    loading={loading}
-                  />
-                </Col>
-                <Col xs={24} lg={6}>
-                  <TokensTypeTable rows={analytics.byType} loading={loading} />
-                </Col>
-                <Col xs={24} lg={8}>
-                  <TokensPlanTable
-                    rows={analytics.byPlan}
-                    loading={loading}
-                    selectedPlanId={planId}
-                    onSelectPlan={(id) => selectPlan(id)}
-                  />
-                </Col>
-              </Row>
+              <TokensSiteTable
+                rows={analytics.bySite ?? []}
+                loading={loading}
+                onSelectSite={setSelectedSite}
+              />
+
+              <TokensSitePlanModal
+                open={Boolean(selectedSite)}
+                site={selectedSite}
+                onClose={() => setSelectedSite(null)}
+              />
             </>
           ) : initDone && orgId && !loading && !needsOrg && !error ? (
             <Alert

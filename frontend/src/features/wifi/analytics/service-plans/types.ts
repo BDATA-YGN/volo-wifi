@@ -1,14 +1,32 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
-import type { PlanQuotaType } from "@/features/wifi/catalog/service-plans/types";
 
-export type PeriodPreset = "7d" | "30d" | "90d";
+export type PeriodPreset = "today" | "7d" | "30d" | "90d";
 
 export type PlanOption = {
   id: string;
   code: string;
   name: string;
-  quotaType: PlanQuotaType;
+  quotaType: string;
   isActive: boolean;
+};
+
+export type SiteOption = {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+};
+
+export type PartnerOption = {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+};
+
+export type ProfileOption = {
+  value: string;
+  label: string;
 };
 
 export type PlanAnalyticsSummary = {
@@ -26,14 +44,17 @@ export type PlanAnalyticsSummary = {
 };
 
 export type PlanDailyPoint = {
-  date: string;
-  ordersCount: number;
-  revenue: number;
-  commission: number;
+  bucket: string;
+  label: string;
   itemsCount: number;
-  sessionsCount: number;
-  totalBytes: number;
-  activePlans: number;
+  revenue: number;
+};
+
+export type PlanTrendSeries = {
+  planId: string;
+  code: string;
+  name: string;
+  points: PlanDailyPoint[];
 };
 
 export type PlanRow = {
@@ -53,13 +74,13 @@ export type PlanRow = {
 };
 
 export type PlanQuotaTypeRow = {
-  quotaType: string;
-  planCount: number;
-  activePlanCount: number;
+  tierId: string | null;
+  tierCode: string;
+  tierName: string;
+  siteCount: number;
   ordersCount: number;
   itemsCount: number;
   revenue: number;
-  commission: number;
   sessionsCount: number;
   totalBytes: number;
 };
@@ -67,9 +88,10 @@ export type PlanQuotaTypeRow = {
 export type PlanAnalyticsData = {
   summary: PlanAnalyticsSummary;
   previousSummary: PlanAnalyticsSummary;
-  dailyTrend: PlanDailyPoint[];
+  trendGranularity: "hourly" | "daily";
+  trendByPlan: PlanTrendSeries[];
   byPlan: PlanRow[];
-  byQuotaType: PlanQuotaTypeRow[];
+  byTier: PlanQuotaTypeRow[];
   dataSource: "aggregated" | "live";
   periodFrom: string;
   periodTo: string;
@@ -82,19 +104,27 @@ export type PlanAnalyticsData = {
 export type PlansFormOptions = {
   memberships: OrgMembershipOption[];
   plans: PlanOption[];
+  stations: SiteOption[];
+  resellers: PartnerOption[];
+  profiles?: ProfileOption[];
   currency: string;
+  canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
 };
 
 export type PlanAnalyticsMeta = {
   memberships?: OrgMembershipOption[];
   orgId?: string;
   requiresOrgSelection?: boolean;
+  canSwitchOrg?: boolean;
 };
 
 export type PlanAnalyticsParams = {
   orgId?: string;
+  stationId?: string;
+  resellerId?: string;
+  profile?: string;
   planId?: string;
-  quotaType?: PlanQuotaType;
   preset?: PeriodPreset;
   periodFrom?: string;
   periodTo?: string;

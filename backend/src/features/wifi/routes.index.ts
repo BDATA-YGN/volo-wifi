@@ -18,6 +18,7 @@ import { CommerceCommissionsPayoutsRoute } from './commerce/commissions/payouts/
 import { CommerceCommissionsRulesRoute } from './commerce/commissions/rules/routes';
 import { CommerceTransactionsPaymentsRoute } from './commerce/transactions/payments/routes';
 import { CommerceTransactionsOrdersRoute } from './commerce/transactions/orders/routes';
+import { CommerceTokenDiagnoseRoute } from './commerce/token-diagnose/routes';
 import { CommerceAccessTokensRoute } from './commerce/access-tokens/routes';
 import { CommercePartnersWorkspaceRoute } from './commerce/partners/workspace/routes';
 import { CommercePartnersRoute } from './commerce/partners/routes';
@@ -68,6 +69,7 @@ export function createWifiRoutes(): Route[] {
     new CommerceCommissionsRulesRoute(),
     new CommerceTransactionsPaymentsRoute(),
     new CommerceTransactionsOrdersRoute(),
+    new CommerceTokenDiagnoseRoute(),
     new CommerceAccessTokensRoute(),
     new CommercePartnersWorkspaceRoute(),
     new CommercePartnersRoute(),

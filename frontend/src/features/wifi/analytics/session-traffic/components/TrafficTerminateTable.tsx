@@ -19,6 +19,8 @@ const TrafficTerminateTable: React.FC<Props> = ({ rows, loading }) => {
       title: "Terminate cause",
       dataIndex: "cause",
       key: "cause",
+      sorter: (a, b) =>
+        formatTerminateCause(a.cause).localeCompare(formatTerminateCause(b.cause)),
       render: (cause: string) => (
         <Text style={{ fontSize: 13 }}>{formatTerminateCause(cause)}</Text>
       ),

@@ -1,16 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Row, Tag, Typography, theme } from "antd";
+import React, { useEffect, useState } from "react";
+import { Alert, Button, Card, Col, Row, Segmented, Tag, Typography, theme } from "antd";
 import { Archive, X } from "lucide-react";
 import dayjs from "dayjs";
 
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
 import { useAnalyticsReconciliationCoverage } from "./useAnalyticsReconciliationCoverage";
-import type { CoverageScopeRow } from "./types";
-import { ELIGIBILITY_COLOR } from "./constant";
-import { formatEligibility } from "./utils";
+import type { CoverageScopeRow, CoverageTab, EligibilityStatus } from "./types";
+import { COVERAGE_TABS, ELIGIBILITY_COLOR } from "./constant";
+import { formatCount, formatEligibility, formatPercent } from "./utils";
 import CoverageToolbar from "./components/CoverageToolbar";
 import CoverageFilterBar from "./components/CoverageFilterBar";
 import CoverageKpiCards from "./components/CoverageKpiCards";
@@ -37,6 +37,7 @@ const AnalyticsReconciliationCoveragePage: React.FC = () => {
     stationId,
     resellerId,
     eligibility,
+    tab,
     formOptions,
     selectedDetail,
     detailLoading,
@@ -44,6 +45,8 @@ const AnalyticsReconciliationCoveragePage: React.FC = () => {
     selectStation,
     selectReseller,
     selectEligibility,
+    toggleEligibility,
+    selectTab,
     clearFilters,
     loadDetail,
     clearDetail,
@@ -56,30 +59,49 @@ const AnalyticsReconciliationCoveragePage: React.FC = () => {
   }, [loadFormOptions]);
 
   useEffect(() => {
-    if (initDone && meta?.memberships?.length === 1 && !orgId) {
+    if (
+      initDone &&
+      meta?.memberships?.length === 1 &&
+      !orgId &&
+      !(meta?.canSwitchOrg ?? formOptions.canSwitchOrg)
+    ) {
       selectOrg(meta.memberships[0].id);
     }
-  }, [initDone, meta?.memberships, orgId, selectOrg]);
+  }, [initDone, meta?.memberships, meta?.canSwitchOrg, formOptions.canSwitchOrg, orgId, selectOrg]);
 
   useEffect(() => {
-    if (meta?.orgId && !orgId) {
+    if (meta?.orgId && !orgId && !(meta?.canSwitchOrg ?? formOptions.canSwitchOrg)) {
       selectOrg(meta.orgId);
     }
-  }, [meta?.orgId, orgId, selectOrg]);
+  }, [meta?.orgId, meta?.canSwitchOrg, formOptions.canSwitchOrg, orgId, selectOrg]);
 
   const memberships = meta?.memberships ?? formOptions.memberships;
   const stations = formOptions.stations;
   const resellers = formOptions.resellers;
-  const showOrgSwitcher = memberships.length > 1;
-  const needsOrg = Boolean(meta?.requiresOrgSelection) && !orgId;
+  const showOrgSwitcher =
+    memberships.length > 1 ||
+    Boolean(meta?.requiresOrgSelection || formOptions.requiresOrgSelection);
+  const needsOrg = Boolean(meta?.requiresOrgSelection || formOptions.requiresOrgSelection) && !orgId;
   const currency = analytics?.org.currency ?? "MMK";
-
   const hasFilters = Boolean(stationId || resellerId || eligibility);
 
-  const horizonLabel = useMemo(() => {
-    if (!analytics?.summary.latestCoveredAt) return null;
-    return dayjs(analytics.summary.latestCoveredAt).format("D MMM YYYY, HH:mm");
-  }, [analytics?.summary.latestCoveredAt]);
+  const horizonLabel = analytics?.summary.latestCoveredAt
+    ? dayjs(analytics.summary.latestCoveredAt).format("D MMM YYYY, HH:mm")
+    : null;
+  const atRisk = analytics
+    ? (analytics.summary.atRiskCount ??
+      analytics.summary.gapCount + analytics.summary.unsealedCount + analytics.summary.noCoverageCount)
+    : 0;
+  const sealedPctValue = analytics?.summary.sealedPct ?? 0;
+
+  const drillEligibility = (status: EligibilityStatus | undefined) => {
+    if (!status) {
+      selectEligibility(undefined);
+      return;
+    }
+    toggleEligibility(status);
+    selectTab("ledger");
+  };
 
   const handleViewScope = async (row: CoverageScopeRow) => {
     if (!row.coverageId) return;
@@ -147,16 +169,17 @@ const AnalyticsReconciliationCoveragePage: React.FC = () => {
                     </Title>
                     <Paragraph type="secondary" style={{ marginBottom: 8, marginTop: 4 }}>
                       {analytics.org.name}
+                      {horizonLabel ? ` · sealed through ${horizonLabel}` : ""}
                     </Paragraph>
                     <div className="flex flex-wrap gap-2">
                       <Tag style={{ fontFamily: "monospace" }}>{analytics.org.code}</Tag>
-                      <Tag color="success">{analytics.summary.purgeEligibleCount} purge eligible</Tag>
-                      {analytics.summary.gapCount > 0 ? (
-                        <Tag color="warning">{analytics.summary.gapCount} gaps</Tag>
-                      ) : null}
-                      {analytics.summary.noCoverageCount > 0 ? (
-                        <Tag color="error">{analytics.summary.noCoverageCount} missing records</Tag>
-                      ) : null}
+                      <Tag color="success">{formatPercent(sealedPctValue)} sealed</Tag>
+                      <Tag>{formatCount(analytics.summary.scopeCount)} scopes</Tag>
+                      {atRisk > 0 ? (
+                        <Tag color="warning">{formatCount(atRisk)} at risk</Tag>
+                      ) : (
+                        <Tag color="success">All sealed</Tag>
+                      )}
                       {eligibility ? (
                         <Tag color={ELIGIBILITY_COLOR[eligibility]}>
                           {formatEligibility(eligibility)}
@@ -177,79 +200,102 @@ const AnalyticsReconciliationCoveragePage: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <Text type="secondary" style={{ fontSize: 12, display: "block" }}>
-                      Sealed horizon
+                      Uncovered payments
                     </Text>
                     <Title level={3} style={{ margin: 0 }}>
-                      {horizonLabel ?? "—"}
+                      {formatCount(analytics.summary.totalUncoveredPayments)}
                     </Title>
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      Latest max covered paid at across scopes
+                      After the sealed payment horizon
                     </Text>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 16, paddingTop: 14 }}>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <CoverageFilterBar
+                      stations={stations}
+                      resellers={resellers}
+                      stationId={stationId}
+                      resellerId={resellerId}
+                      eligibility={eligibility}
+                      loading={loading}
+                      onStationChange={selectStation}
+                      onResellerChange={selectReseller}
+                      onEligibilityChange={selectEligibility}
+                    />
+                    <CoverageToolbar
+                      generatedAt={analytics.generatedAt}
+                      loading={loading}
+                      onRefresh={refresh}
+                    />
                   </div>
                 </div>
               </Card>
 
-              <Card
-                styles={{ body: { padding: 16 } }}
-                style={{ borderRadius: token.borderRadiusLG }}
-              >
-                <CoverageToolbar
-                  generatedAt={analytics.generatedAt}
+              <Segmented
+                value={tab}
+                options={COVERAGE_TABS.map((item) => ({
+                  value: item.key,
+                  label: item.label,
+                }))}
+                onChange={(value) => selectTab(value as CoverageTab)}
+              />
+
+              {tab === "stats" ? (
+                <div className="flex flex-col gap-4">
+                  <CoverageKpiCards
+                    summary={analytics.summary}
+                    loading={loading}
+                    selectedEligibility={eligibility}
+                    onSelectEligibility={drillEligibility}
+                  />
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={8}>
+                      <CoverageEligibilityTable
+                        rows={analytics.byEligibility}
+                        loading={loading}
+                        selectedEligibility={eligibility}
+                        onSelectEligibility={drillEligibility}
+                      />
+                    </Col>
+                    <Col xs={24} lg={16}>
+                      <CoverageLagChart
+                        buckets={analytics.lagBuckets}
+                        loading={loading}
+                        selectedEligibility={eligibility}
+                        onSelectBucket={drillEligibility}
+                      />
+                    </Col>
+                  </Row>
+                </div>
+              ) : null}
+
+              {tab === "sites" ? (
+                <CoverageSiteTable
+                  rows={analytics.bySite}
                   loading={loading}
-                  onRefresh={refresh}
+                  selectedStationId={stationId}
+                  onSelectSite={(id) => selectStation(id)}
                 />
-              </Card>
+              ) : null}
 
-              <CoverageFilterBar
-                stations={stations}
-                resellers={resellers}
-                stationId={stationId}
-                resellerId={resellerId}
-                eligibility={eligibility}
-                loading={loading}
-                onStationChange={selectStation}
-                onResellerChange={selectReseller}
-                onEligibilityChange={selectEligibility}
-              />
+              {tab === "partners" ? (
+                <CoveragePartnerTable
+                  rows={analytics.byPartner}
+                  loading={loading}
+                  selectedResellerId={resellerId}
+                  onSelectPartner={(id) => selectReseller(id)}
+                />
+              ) : null}
 
-              <CoverageKpiCards summary={analytics.summary} loading={loading} />
-
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={8}>
-                  <CoverageEligibilityTable
-                    rows={analytics.byEligibility}
-                    loading={loading}
-                  />
-                </Col>
-                <Col xs={24} lg={16}>
-                  <CoverageLagChart buckets={analytics.lagBuckets} loading={loading} />
-                </Col>
-              </Row>
-
-              <Row gutter={[16, 16]}>
-                <Col xs={24} lg={12}>
-                  <CoveragePartnerTable
-                    rows={analytics.byPartner}
-                    loading={loading}
-                    selectedResellerId={resellerId}
-                    onSelectPartner={(id) => selectReseller(id)}
-                  />
-                </Col>
-                <Col xs={24} lg={12}>
-                  <CoverageSiteTable
-                    rows={analytics.bySite}
-                    loading={loading}
-                    selectedStationId={stationId}
-                    onSelectSite={(id) => selectStation(id)}
-                  />
-                </Col>
-              </Row>
-
-              <CoverageScopesTable
-                rows={analytics.scopes}
-                loading={loading}
-                onView={handleViewScope}
-              />
+              {tab === "ledger" ? (
+                <CoverageScopesTable
+                  rows={analytics.scopes}
+                  loading={loading}
+                  onView={handleViewScope}
+                />
+              ) : null}
 
               <CoverageDetailDrawer
                 open={drawerOpen}

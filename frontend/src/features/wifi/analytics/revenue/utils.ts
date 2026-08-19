@@ -12,6 +12,10 @@ export function formatMoney(amount: number, currency: string): string {
   }
 }
 
+export function formatCount(value: number): string {
+  return value.toLocaleString();
+}
+
 export function percentChange(current: number, previous: number): number | null {
   if (previous === 0) {
     return current === 0 ? 0 : null;
@@ -26,18 +30,15 @@ export function formatDelta(delta: number | null): string {
 }
 
 export function formatTrendLabel(periodKey: string, granularity: TrendGranularity): string {
-  if (granularity === "yearly") return periodKey;
-  if (granularity === "monthly") {
-    const [year, month] = periodKey.split("-");
-    const date = new Date(Number(year), Number(month) - 1, 1);
-    return date.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
-  }
   const date = new Date(periodKey);
-  return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  if (granularity === "daily") {
+    return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  }
+  return periodKey;
 }
 
-export function granularityLabel(granularity: TrendGranularity): string {
-  if (granularity === "yearly") return "Yearly";
-  if (granularity === "monthly") return "Monthly";
-  return "Daily";
+export function formatMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-");
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }

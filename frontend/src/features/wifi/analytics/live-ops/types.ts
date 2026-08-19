@@ -1,19 +1,32 @@
 import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
 
-export type WindowHours = 1 | 6 | 24;
+export type LiveOpsTab = "stats" | "sites";
 
 export type SiteOption = {
   id: string;
   code: string;
   name: string;
   status: string;
+  stationSizeId?: string;
 };
 
-export type PartnerOption = {
+export type StationSizeOption = {
   id: string;
   code: string;
   name: string;
-  status: string;
+  sortOrder?: number;
+};
+
+export type PlanOption = {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+};
+
+export type ProfileOption = {
+  value: string;
+  label: string;
 };
 
 export type LiveOpsSummary = {
@@ -40,91 +53,55 @@ export type LiveOpsHourlyPoint = {
   totalBytes: number;
 };
 
-export type LiveOpsStatusRow = {
-  status: string;
-  count: number;
-};
-
 export type LiveOpsSiteRow = {
   stationId: string;
   code: string;
   name: string;
   status: string;
-  activeSessions: number;
-  sessionsStarted: number;
-  ordersCount: number;
-  revenue: number;
+  radiusStart: number;
+  radiusInterim: number;
+  radiusStop: number;
   totalBytes: number;
-};
-
-export type LiveOpsPartnerRow = {
-  resellerId: string;
-  code: string;
-  name: string;
-  activeSessions: number;
-  sessionsStarted: number;
-  ordersCount: number;
-  revenue: number;
-  totalBytes: number;
-};
-
-export type LiveOpsRecentSessionRow = {
-  sessionId: string;
-  status: string;
-  userName: string | null;
-  stationCode: string | null;
-  stationName: string | null;
-  startedAt: string;
-  lastInterimAt: string | null;
-  totalBytes: number;
-  sessionTimeSec: number | null;
-  isStalled: boolean;
-};
-
-export type LiveOpsRecentOrderRow = {
-  orderId: string;
-  orderNo: string;
-  status: string;
-  resellerCode: string | null;
-  stationCode: string | null;
-  total: number;
-  currency: string;
-  soldAt: string | null;
-  createdAt: string;
+  tokenStatus: Array<{ status: string; count: number }>;
 };
 
 export type LiveOpsAnalyticsData = {
   summary: LiveOpsSummary;
-  byStatus: LiveOpsStatusRow[];
   hourlyTrend: LiveOpsHourlyPoint[];
   bySite: LiveOpsSiteRow[];
-  byPartner: LiveOpsPartnerRow[];
-  recentSessions: LiveOpsRecentSessionRow[];
-  recentOrders: LiveOpsRecentOrderRow[];
   generatedAt: string;
   windowFrom: string;
   windowTo: string;
-  windowHours: WindowHours;
+  date: string;
   scopeStationId: string | null;
-  scopeResellerId: string | null;
+  scopeStationSizeId: string | null;
+  scopePlanId: string | null;
+  scopeProfile: string | null;
   org: { id: string; name: string; code: string; currency: string };
 };
 
 export type LiveOpsFormOptions = {
   memberships: OrgMembershipOption[];
   stations: SiteOption[];
-  resellers: PartnerOption[];
+  stationSizes: StationSizeOption[];
+  plans: PlanOption[];
+  profiles: ProfileOption[];
+  canSwitchOrg?: boolean;
+  requiresOrgSelection?: boolean;
 };
 
 export type LiveOpsAnalyticsMeta = {
   memberships?: OrgMembershipOption[];
   orgId?: string;
   requiresOrgSelection?: boolean;
+  canSwitchOrg?: boolean;
 };
 
 export type LiveOpsAnalyticsParams = {
   orgId?: string;
   stationId?: string;
-  resellerId?: string;
-  windowHours?: WindowHours;
+  stationSizeId?: string;
+  planId?: string;
+  profile?: string;
+  date?: string;
 };

@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from "react";
 import { useRequest } from "ahooks";
-import type { PlanQuotaType } from "@/features/wifi/catalog/service-plans/types";
 import * as Query from "./query";
 import type {
   PeriodPreset,
@@ -16,13 +15,17 @@ import { DEFAULT_PRESET } from "./constant";
 const emptyFormOptions: PlansFormOptions = {
   memberships: [],
   plans: [],
+  stations: [],
+  resellers: [],
   currency: "MMK",
 };
 
 export function useAnalyticsServicePlans() {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
+  const [stationId, setStationId] = useState<string | undefined>(undefined);
+  const [resellerId, setResellerId] = useState<string | undefined>(undefined);
+  const [profile, setProfile] = useState<string | undefined>(undefined);
   const [planId, setPlanId] = useState<string | undefined>(undefined);
-  const [quotaType, setQuotaType] = useState<PlanQuotaType | undefined>(undefined);
   const [preset, setPreset] = useState<PeriodPreset>(DEFAULT_PRESET);
   const [customPeriod, setCustomPeriod] = useState<{
     periodFrom?: string;
@@ -32,13 +35,15 @@ export function useAnalyticsServicePlans() {
 
   const params: PlanAnalyticsParams = {
     orgId,
+    stationId,
+    resellerId,
+    profile,
     planId,
-    quotaType,
     ...(customPeriod.periodFrom && customPeriod.periodTo ? customPeriod : { preset }),
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
-    refreshDeps: [orgId, planId, quotaType, preset, customPeriod.periodFrom, customPeriod.periodTo],
+    refreshDeps: [orgId, stationId, resellerId, profile, planId, preset, customPeriod.periodFrom, customPeriod.periodTo],
   });
 
   const analytics = (data?.data ?? null) as PlanAnalyticsData | null;
@@ -48,7 +53,7 @@ export function useAnalyticsServicePlans() {
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as PlansFormOptions;
     setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
+    if (!targetOrgId && opts.memberships.length === 1 && !opts.canSwitchOrg) {
       setOrgId(opts.memberships[0].id);
     }
     return opts;
@@ -57,21 +62,30 @@ export function useAnalyticsServicePlans() {
   const selectOrg = useCallback(
     (id: string) => {
       setOrgId(id);
+      setStationId(undefined);
+      setResellerId(undefined);
+      setProfile(undefined);
       setPlanId(undefined);
-      setQuotaType(undefined);
       setCustomPeriod({});
       void loadFormOptions(id);
     },
     [loadFormOptions]
   );
 
-  const selectPlan = useCallback((id: string | undefined) => {
-    setPlanId(id);
+  const selectStation = useCallback((id: string | undefined) => {
+    setStationId(id);
   }, []);
 
-  const selectQuotaType = useCallback((value: PlanQuotaType | undefined) => {
-    setQuotaType(value);
-    setPlanId(undefined);
+  const selectReseller = useCallback((id: string | undefined) => {
+    setResellerId(id);
+  }, []);
+
+  const selectProfile = useCallback((value: string | undefined) => {
+    setProfile(value);
+  }, []);
+
+  const selectPlan = useCallback((id: string | undefined) => {
+    setPlanId(id);
   }, []);
 
   const selectPreset = useCallback((value: PeriodPreset) => {
@@ -88,8 +102,10 @@ export function useAnalyticsServicePlans() {
   }, []);
 
   const clearFilters = useCallback(() => {
+    setStationId(undefined);
+    setResellerId(undefined);
+    setProfile(undefined);
     setPlanId(undefined);
-    setQuotaType(undefined);
   }, []);
 
   return {
@@ -98,14 +114,18 @@ export function useAnalyticsServicePlans() {
     loading,
     error,
     orgId,
+    stationId,
+    resellerId,
+    profile,
     planId,
-    quotaType,
     preset,
     customPeriod,
     formOptions,
     selectOrg,
+    selectStation,
+    selectReseller,
+    selectProfile,
     selectPlan,
-    selectQuotaType,
     selectPreset,
     selectCustomPeriod,
     clearCustomPeriod,
