@@ -103,6 +103,10 @@ export class CommerceTokenDiagnoseController {
         code,
         resellerId: scope.mode === 'partner' ? scope.resellerId : scope.resellerId,
         allowedStationIds,
+        permissionCtx: {
+          mode: scope.mode === 'partner' ? 'partner' : 'preview',
+          isDeveloper,
+        },
       });
 
       return responseSuccess(res, {

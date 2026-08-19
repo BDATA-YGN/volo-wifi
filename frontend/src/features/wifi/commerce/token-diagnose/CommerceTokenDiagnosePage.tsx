@@ -30,7 +30,8 @@ import { STATUS_COLOR } from "@/features/wifi/commerce/access-tokens/constant";
 import { SEVERITY_ALERT } from "./constant";
 import { useCommerceTokenDiagnose } from "./useCommerceTokenDiagnose";
 import type { DiagnoseMeta, DiagnoseResult, DiagnoseTimelineEvent } from "./types";
-import { applyAllowNewDevice } from "./query";
+import type { CredentialLifecycleAction } from "@/features/wifi/commerce/access-tokens/types";
+import { applyDiagnoseTokenAction } from "./query";
 
 const { Paragraph, Text } = Typography;
 
@@ -166,32 +167,79 @@ const CommerceTokenDiagnosePage: React.FC = () => {
       ? meta
       : activeHistory?.meta ?? null;
 
-  const handleAllowNewDevice = async () => {
+  const handleTokenAction = async (action: CredentialLifecycleAction) => {
     if (!activeResult?.token?.id) return;
     if (!activeMeta?.orgId) {
       message.warning("Select a tenant first.");
       return;
     }
 
+    const copy: Record<
+      CredentialLifecycleAction,
+      { title: string; content: string; okText: string; success: string }
+    > = {
+      pause: {
+        title: "Pause this token?",
+        content: "The customer will not be able to log in until the token is unlocked.",
+        okText: "Pause",
+        success: "Token paused.",
+      },
+      unlock: {
+        title: "Unlock this token?",
+        content: "The customer can log in again if the plan quota allows.",
+        okText: "Unlock",
+        success: "Token unlocked.",
+      },
+      allowNewDevice: {
+        title: "Allow new device for this token?",
+        content:
+          "Clears recent captive portal holds and soft-ends open RADIUS sessions so another device can login. Status is not changed.",
+        okText: "Allow new device",
+        success: "Device slot released. Re-diagnosing…",
+      },
+      clearSessions: {
+        title: "Clear sessions for this token?",
+        content:
+          "Soft-ends any open RADIUS sessions and recent portal holds. Token status is not changed.",
+        okText: "Clear sessions",
+        success: "Sessions cleared. Re-diagnosing…",
+      },
+      restoreActivated: {
+        title: "Restore this token to Activated?",
+        content:
+          "Clears leftover sessions and sets status back to Activated (or Expired if calendar expiry already passed). Use this when the token was wrongly marked Consumed after real use.",
+        okText: "Restore to activated",
+        success: "Token restored. Re-diagnosing…",
+      },
+      revertToSold: {
+        title: "Revert this token to Sold?",
+        content:
+          "Clears leftover sessions, clears activatedAt, and sets status to Sold. Use this when the token was never used but still became Consumed.",
+        okText: "Revert to sold",
+        success: "Token reverted to sold. Re-diagnosing…",
+      },
+    };
+
+    const selected = copy[action];
     modal.confirm({
-      title: "Allow new device for this token?",
-      content:
-        "Clears recent captive portal holds and soft-ends open RADIUS sessions for this token so another device can login.",
-      okText: "Allow new device",
+      title: selected.title,
+      content: selected.content,
+      okText: selected.okText,
       onOk: async () => {
         try {
-          await applyAllowNewDevice({
+          await applyDiagnoseTokenAction({
             tokenId: activeResult.token.id,
+            action,
             orgId: activeMeta.orgId,
             resellerId: activeMeta.resellerId ?? undefined,
           });
-          message.success("Device slot released. Re-diagnosing…");
+          message.success(selected.success);
           if (activeCode) {
             runDiagnose(activeCode);
           }
           await refresh();
         } catch (err) {
-          message.error(getApiErrorMessage(err, "Failed to allow new device"));
+          message.error(getApiErrorMessage(err, "Failed to update token"));
         }
       },
     });
@@ -351,9 +399,39 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                 className="mb-4"
                 size="small"
                 extra={
-                  <Link href="/wifi/commerce/access-tokens">
-                    Open Access Tokens
-                  </Link>
+                  <Space wrap>
+                    {activeResult.token.actions?.canClearSessions ? (
+                      <Button size="small" onClick={() => void handleTokenAction("clearSessions")}>
+                        Clear sessions
+                      </Button>
+                    ) : null}
+                    {activeResult.token.actions?.canRestoreActivated ? (
+                      <Button size="small" type="primary" onClick={() => void handleTokenAction("restoreActivated")}>
+                        Restore to activated
+                      </Button>
+                    ) : null}
+                    {activeResult.token.actions?.canRevertToSold ? (
+                      <Button size="small" onClick={() => void handleTokenAction("revertToSold")}>
+                        Revert to sold
+                      </Button>
+                    ) : null}
+                    {activeResult.token.actions?.canAllowNewDevice ? (
+                      <Button size="small" onClick={() => void handleTokenAction("allowNewDevice")}>
+                        Allow new device
+                      </Button>
+                    ) : null}
+                    {activeResult.token.actions?.canPause ? (
+                      <Button size="small" onClick={() => void handleTokenAction("pause")}>
+                        Pause
+                      </Button>
+                    ) : null}
+                    {activeResult.token.actions?.canUnlock ? (
+                      <Button size="small" onClick={() => void handleTokenAction("unlock")}>
+                        Unlock
+                      </Button>
+                    ) : null}
+                    <Link href="/wifi/commerce/access-tokens">Open Access Tokens</Link>
+                  </Space>
                 }
               >
                 <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered>
@@ -386,11 +464,23 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                       ? ` / ${Math.round(activeResult.token.planQuotaSec / 3600)}h plan`
                       : ""}
                   </Descriptions.Item>
+                  <Descriptions.Item label="Created">
+                    {formatWifiDateTimeWithSeconds(activeResult.token.createdAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Last updated">
+                    {formatWifiDateTimeWithSeconds(activeResult.token.updatedAt)}
+                  </Descriptions.Item>
                   <Descriptions.Item label="Sold">
                     {formatWifiDateTimeWithSeconds(activeResult.token.soldAt)}
                   </Descriptions.Item>
                   <Descriptions.Item label="Activated">
                     {formatWifiDateTimeWithSeconds(activeResult.token.activatedAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Expires">
+                    {formatWifiDateTimeWithSeconds(activeResult.token.expiresAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Revoked">
+                    {formatWifiDateTimeWithSeconds(activeResult.token.revokedAt)}
                   </Descriptions.Item>
                 </Descriptions>
                 <div className="mt-3">
@@ -535,15 +625,26 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                 />
 
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
-                  {activeResult.token?.status === "ACTIVATED" ? (
-                    <Button type="primary" onClick={handleAllowNewDevice}>
-                      Allow new device (clear stale records)
+                  {activeResult.token?.actions?.canClearSessions ? (
+                    <Button type="primary" onClick={() => void handleTokenAction("clearSessions")}>
+                      Clear sessions
                     </Button>
-                  ) : (
-                    <Tag color="default">
-                      Clear is available only for <b>ACTIVATED</b> tokens.
-                    </Tag>
-                  )}
+                  ) : null}
+                  {activeResult.token?.actions?.canAllowNewDevice ? (
+                    <Button onClick={() => void handleTokenAction("allowNewDevice")}>
+                      Allow new device
+                    </Button>
+                  ) : null}
+                  {activeResult.token?.actions?.canRestoreActivated ? (
+                    <Button onClick={() => void handleTokenAction("restoreActivated")}>
+                      Restore to activated
+                    </Button>
+                  ) : null}
+                  {activeResult.token?.actions?.canRevertToSold ? (
+                    <Button onClick={() => void handleTokenAction("revertToSold")}>
+                      Revert to sold
+                    </Button>
+                  ) : null}
                 </div>
               </Card>
             ) : null}
@@ -584,6 +685,13 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                       title: "Started",
                       dataIndex: "startedAt",
                       render: (value: string) => formatWifiDateTimeWithSeconds(value),
+                    },
+                    {
+                      title: "Last RADIUS update",
+                      dataIndex: "lastInterimAt",
+                      width: 200,
+                      render: (value: string | null, row) =>
+                        formatWifiDateTimeWithSeconds(value ?? row.stoppedAt),
                     },
                     { title: "Status", dataIndex: "status" },
                     {

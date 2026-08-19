@@ -16,6 +16,8 @@ export const CREDENTIAL_LIFECYCLE_ACTIONS = [
   'pause',
   'unlock',
   'allowNewDevice',
+  'clearSessions',
+  'restoreActivated',
   'revertToSold',
 ] as const;
 

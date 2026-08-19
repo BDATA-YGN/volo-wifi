@@ -9,13 +9,21 @@ export type CredentialStatus =
   | "REVOKED"
   | "EXPIRED";
 
-export type CredentialLifecycleAction = "pause" | "unlock" | "allowNewDevice" | "revertToSold";
+export type CredentialLifecycleAction =
+  | "pause"
+  | "unlock"
+  | "allowNewDevice"
+  | "clearSessions"
+  | "restoreActivated"
+  | "revertToSold";
 
 export type CredentialActions = {
   canRevoke: boolean;
   canPause: boolean;
   canUnlock: boolean;
   canAllowNewDevice: boolean;
+  canClearSessions: boolean;
+  canRestoreActivated: boolean;
   canRevertToSold: boolean;
   revokeBlockedReason?: string;
 };

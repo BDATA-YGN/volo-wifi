@@ -1,10 +1,11 @@
-import type { OrgMembershipOption } from "@/features/wifi/tenant/access-control/types";
+import type { CredentialActions } from "@/features/wifi/commerce/access-tokens/types";
 
 export type DiagnoseSeverity = "ok" | "info" | "warning" | "error";
 
 export type DiagnoseVerdictCode =
   | "NOT_FOUND"
   | "UNUSED"
+  | "CONSUMED_WITHOUT_USE"
   | "PORTAL_WITHOUT_RADIUS_AUTH"
   | "AUTH_WITHOUT_ACCOUNTING"
   | "FIRST_SESSION_MISSING"
@@ -45,10 +46,13 @@ export type DiagnoseToken = {
   activatedAt: string | null;
   expiresAt: string | null;
   revokedAt: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   timeRemainingSec: number | null;
   dataRemainingMb: number | null;
   planQuotaSec: number | null;
   planDataMb: number | null;
+  actions?: CredentialActions;
   plan: { id: string; code: string; name: string; quotaType: string };
   station: { id: string; code: string; name: string; nasIdentifier: string | null } | null;
   reseller: { id: string; code: string; name: string } | null;
@@ -94,6 +98,7 @@ export type DiagnoseResult = {
     nasIpAddress: string | null;
     nasIdentifier: string | null;
     startedAt: string;
+    lastInterimAt: string | null;
     stoppedAt: string | null;
     sessionTimeSec: number | null;
     wallSeconds: number;

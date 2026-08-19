@@ -6,6 +6,11 @@ import {
 } from '@/features/shared/credentials/credential-sync.helpers';
 import { normalizeMacKey } from '@/utils/mac-address';
 import {
+  resolveCredentialActions,
+  type CredentialPermissionContext,
+} from '@/features/wifi/commerce/access-tokens/credential-permissions';
+import { loadAccessTokenRevokeWindowMinutes } from '@/features/wifi/commerce/access-tokens/commerce-settings';
+import {
   AUTH_PREVIEW_LIMIT,
   BYTES_500_MIB,
   CAPTIVE_PREVIEW_LIMIT,
@@ -19,6 +24,7 @@ export type DiagnoseSeverity = 'ok' | 'info' | 'warning' | 'error';
 export type DiagnoseVerdictCode =
   | 'NOT_FOUND'
   | 'UNUSED'
+  | 'CONSUMED_WITHOUT_USE'
   | 'PORTAL_WITHOUT_RADIUS_AUTH'
   | 'AUTH_WITHOUT_ACCOUNTING'
   | 'FIRST_SESSION_MISSING'
@@ -143,10 +149,12 @@ function authOutcome(reply: string | null): 'ACCEPT' | 'REJECT' | 'UNKNOWN' {
 
 function buildVerdict(args: {
   found: boolean;
+  status?: string;
   captiveCount: number;
   acceptCount: number;
   rejectCount: number;
   radiusCount: number;
+  billedSeconds: number;
   online: boolean;
   dataCap: boolean;
   inflated: boolean;
@@ -221,6 +229,23 @@ function buildVerdict(args: {
   }
 
   if (args.captiveCount === 0 && args.acceptCount === 0 && args.radiusCount === 0) {
+    if (args.status === 'CONSUMED') {
+      return {
+        verdict: {
+          code: 'CONSUMED_WITHOUT_USE',
+          severity: 'warning',
+          title: 'Consumed with no recorded usage',
+          summary:
+            'This token is Consumed, but there is no captive login, RADIUS auth, or accounting. Status was likely flipped by the credential-sync job (for example a SINGLE_SESSION clock from activatedAt, or a delayed/inflated session that was later gone). Use Last updated to see when that happened.',
+          actions: [
+            'Clear sessions if any leftover open RADIUS row still exists.',
+            'If the customer never used this token, Revert to sold (clears activatedAt so it will not be re-consumed).',
+            'If they already started using it, Restore to activated.',
+          ],
+        },
+        extra,
+      };
+    }
     return {
       verdict: {
         code: 'UNUSED',
@@ -231,6 +256,16 @@ function buildVerdict(args: {
       },
       extra,
     };
+  }
+
+  if (args.status === 'CONSUMED' && args.billedSeconds <= 0) {
+    extra.push({
+      code: 'CONSUMED_WITHOUT_USE',
+      severity: 'warning',
+      title: 'Consumed but billed time is 0',
+      detail:
+        'Status is Consumed even though billed accounting time is 0. Check Last updated, then Clear sessions and restore or revert status from this page.',
+    });
   }
 
   if (args.dataCap) {
@@ -340,6 +375,7 @@ export async function diagnoseAccessToken(
     code: string;
     resellerId?: string;
     allowedStationIds: string[] | null;
+    permissionCtx: CredentialPermissionContext;
   }
 ) {
   const code = input.code.trim();
@@ -368,6 +404,8 @@ export async function diagnoseAccessToken(
       activatedAt: true,
       expiresAt: true,
       revokedAt: true,
+      createdAt: true,
+      updatedAt: true,
       timeRemainingSec: true,
       dataRemainingMb: true,
       plan: {
@@ -397,6 +435,7 @@ export async function diagnoseAccessToken(
       acceptCount: 0,
       rejectCount: 0,
       radiusCount: 0,
+      billedSeconds: 0,
       online: false,
       dataCap: false,
       inflated: false,
@@ -492,10 +531,20 @@ export async function diagnoseAccessToken(
 
   const { verdict, extra } = buildVerdict({
     found: true,
+    status: credential.status,
     captiveCount: captiveRows.length,
     acceptCount,
     rejectCount,
     radiusCount: sessions.length,
+    billedSeconds: sessions.reduce(
+      (sum, row) =>
+        sum +
+        billedSessionSeconds(row.sessionTimeSec, row.startedAt, row.stoppedAt ?? now, {
+          createdAt: row.createdAt ?? null,
+          stoppedAt: row.stoppedAt,
+        }),
+      0
+    ),
     online,
     dataCap,
     inflated,
@@ -617,6 +666,12 @@ export async function diagnoseAccessToken(
   timeline.sort((a, b) => a.at.localeCompare(b.at));
 
   const quotaSec = planTimeQuotaSec(credential.plan);
+  const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(prisma);
+  const actions = resolveCredentialActions(
+    input.permissionCtx,
+    { status: credential.status, soldAt: credential.soldAt },
+    revokeWindowMinutes
+  );
 
   return {
     code: credential.token ?? credential.username ?? code,
@@ -639,10 +694,13 @@ export async function diagnoseAccessToken(
       activatedAt: iso(credential.activatedAt),
       expiresAt: iso(credential.expiresAt),
       revokedAt: iso(credential.revokedAt),
+      createdAt: credential.createdAt.toISOString(),
+      updatedAt: credential.updatedAt.toISOString(),
       timeRemainingSec: credential.timeRemainingSec,
       dataRemainingMb: credential.dataRemainingMb,
       planQuotaSec: quotaSec,
       planDataMb: credential.plan.dataMb,
+      actions,
       plan: {
         id: credential.plan.id,
         code: credential.plan.code,

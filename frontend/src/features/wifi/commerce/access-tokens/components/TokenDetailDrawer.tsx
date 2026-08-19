@@ -236,6 +236,16 @@ const TokenDetailDrawer: React.FC<Props> = ({
                 Unlock
               </Button>
             ) : null}
+            {actions.canClearSessions ? (
+              <Button size="small" onClick={() => onApplyAction(row, "clearSessions")}>
+                Clear sessions
+              </Button>
+            ) : null}
+            {actions.canRestoreActivated ? (
+              <Button size="small" type="primary" onClick={() => onApplyAction(row, "restoreActivated")}>
+                Restore to activated
+              </Button>
+            ) : null}
             {actions.canAllowNewDevice ? (
               <Button size="small" type="primary" onClick={() => onApplyAction(row, "allowNewDevice")}>
                 Allow new device
@@ -255,13 +265,6 @@ const TokenDetailDrawer: React.FC<Props> = ({
               <Button danger size="small" onClick={() => onRevoke(row)}>
                 Revoke
               </Button>
-            ) : null}
-            {row.token || row.username ? (
-              <Link
-                href={`/wifi/commerce/token-diagnose?code=${encodeURIComponent(row.token || row.username || "")}`}
-              >
-                <Button size="small">Diagnose</Button>
-              </Link>
             ) : null}
           </div>
         ) : null

@@ -35,7 +35,9 @@ import {
 } from './credential-permissions';
 import {
   allowNewDeviceAccessToken,
+  clearAccessTokenSessions,
   pauseAccessToken,
+  restoreConsumedAccessToken,
   revertAccessTokenToSold,
   unlockAccessToken,
 } from './credential-lifecycle';
@@ -1471,6 +1473,10 @@ export class CommerceAccessTokensController {
             await unlockAccessToken(tx, params);
           } else if (value.action === 'allowNewDevice') {
             await allowNewDeviceAccessToken(tx, params);
+          } else if (value.action === 'clearSessions') {
+            await clearAccessTokenSessions(tx, params);
+          } else if (value.action === 'restoreActivated') {
+            await restoreConsumedAccessToken(tx, params);
           } else {
             await revertAccessTokenToSold(tx, params);
           }
@@ -1485,6 +1491,8 @@ export class CommerceAccessTokensController {
           pause: 'paused',
           unlock: 'unlocked',
           allowNewDevice: 'ready for a new device',
+          clearSessions: 'sessions cleared',
+          restoreActivated: 'restored to activated',
           revertToSold: 'reverted to sold',
         };
 
@@ -1492,6 +1500,10 @@ export class CommerceAccessTokensController {
           message:
             value.action === 'allowNewDevice'
               ? 'Device binding cleared. The customer can log in from a new device now.'
+              : value.action === 'clearSessions'
+                ? 'Open RADIUS sessions and recent portal holds were cleared. Token status was not changed.'
+              : value.action === 'restoreActivated'
+                ? 'Open sessions were cleared and the token was restored (activated, or expired if the calendar expiry already passed).'
               : `Access token ${actionLabels[value.action] ?? 'updated'}`,
           data: row
             ? serializeCredential(row, { mode, isDeveloper }, revokeWindowMinutes)

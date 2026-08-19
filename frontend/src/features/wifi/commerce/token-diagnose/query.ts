@@ -45,10 +45,19 @@ export const applyAllowNewDevice = async (params: {
   orgId?: string;
   resellerId?: string;
 }): Promise<CommonResponse | null> => {
+  return applyDiagnoseTokenAction({ ...params, action: "allowNewDevice" });
+};
+
+export const applyDiagnoseTokenAction = async (params: {
+  tokenId: string;
+  action: CredentialLifecycleAction;
+  orgId?: string;
+  resellerId?: string;
+}): Promise<CommonResponse | null> => {
   try {
     const res = await apiClient.post(
       COMMERCE_ACCESS_TOKENS_API.action(params.tokenId),
-      { action: "allowNewDevice" as CredentialLifecycleAction },
+      { action: params.action },
       {
         params: {
           orgId: params.orgId || undefined,

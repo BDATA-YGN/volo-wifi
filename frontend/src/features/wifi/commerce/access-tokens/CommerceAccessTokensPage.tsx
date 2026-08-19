@@ -134,6 +134,8 @@ const CommerceAccessTokensPage: React.FC = () => {
     pause: "Pause this token?",
     unlock: "Unlock this token for login?",
     allowNewDevice: "Allow a new device to use this token?",
+    clearSessions: "Clear open RADIUS sessions for this token?",
+    restoreActivated: "Restore this consumed token to activated?",
     revertToSold: "Revert this token to sold status?",
   };
 
@@ -142,11 +144,15 @@ const CommerceAccessTokensPage: React.FC = () => {
       title: actionLabels[action],
       content:
         action === "revertToSold"
-          ? "Activation state will be cleared. Org staff and developers only."
+          ? "Activation state will be cleared and leftover sessions ended. Org staff and developers only."
           : action === "pause"
             ? "The customer will not be able to log in until the token is unlocked."
             : action === "allowNewDevice"
               ? "Releases the current device slot (online session / recent portal login) so another phone or laptop can log in with this token. This does not add permanent multi-device capacity."
+              : action === "clearSessions"
+                ? "Soft-ends open RADIUS sessions and recent portal holds. Token status is not changed."
+                : action === "restoreActivated"
+                  ? "Clears leftover sessions and sets status back to Activated (or Expired if calendar expiry already passed)."
               : "The customer can log in again if the plan quota allows.",
       okText:
         action === "pause"
@@ -155,7 +161,11 @@ const CommerceAccessTokensPage: React.FC = () => {
             ? "Unlock"
             : action === "allowNewDevice"
               ? "Allow new device"
-              : "Revert",
+              : action === "clearSessions"
+                ? "Clear sessions"
+                : action === "restoreActivated"
+                  ? "Restore"
+                  : "Revert",
       onOk: async () => {
         try {
           const updated = await applyTokenAction(record.id, action);
