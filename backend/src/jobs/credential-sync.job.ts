@@ -114,11 +114,12 @@ async function markExpiredCredentials(): Promise<number> {
 }
 
 /**
- * Recompute remaining seconds from RADIUS usage and mark CONSUMED when
- * remaining ≤ 0 (or SINGLE_SESSION activation window exceeded).
+ * Recompute remaining time/data from RADIUS usage and mark CONSUMED when
+ * remaining time ≤ 0, remaining data ≤ 0, or SINGLE_SESSION activation window exceeded.
  *
  * Open sessions bill from created_at when NAS started_at is backdated (delayed
- * accounting). CONSUMED tokens with leftover quota are restored after a real STOP.
+ * accounting). CONSUMED tokens are restored only when BOTH time and data still
+ * have leftover quota (so a data-cap disconnect cannot log in again on leftover time).
  */
 async function syncRemainingAndConsume(): Promise<number> {
   const result = await prisma.$executeRaw`
@@ -126,20 +127,28 @@ async function syncRemainingAndConsume(): Promise<number> {
       SELECT
         c.id,
         rem.remaining_sec,
+        rem.remaining_mb,
         rem.should_consume
       FROM wf_credential c
       INNER JOIN wf_plan p
         ON p.id = c.plan_id
         AND p.deleted_at IS NULL
       LEFT JOIN LATERAL (
-        SELECT COALESCE(SUM(
-          CASE
-            WHEN COALESCE(rs."sessionTimeSec", 0) > w.wall + 120
-              AND COALESCE(rs."sessionTimeSec", 0) > w.wall * 2
-            THEN w.wall
-            ELSE GREATEST(COALESCE(rs."sessionTimeSec", 0), w.wall)
-          END
-        ), 0)::integer AS used_sec
+        SELECT
+          COALESCE(SUM(
+            CASE
+              WHEN COALESCE(rs."sessionTimeSec", 0) > w.wall + 120
+                AND COALESCE(rs."sessionTimeSec", 0) > w.wall * 2
+              THEN w.wall
+              ELSE GREATEST(COALESCE(rs."sessionTimeSec", 0), w.wall)
+            END
+          ), 0)::integer AS used_sec,
+          COALESCE(SUM(
+            CASE
+              WHEN COALESCE(rs."totalBytes", 0) > 0 THEN rs."totalBytes"
+              ELSE COALESCE(rs."inputBytes", 0) + COALESCE(rs."outputBytes", 0)
+            END
+          ), 0)::bigint AS used_bytes
         FROM wf_radius_session rs
         CROSS JOIN LATERAL (
           SELECT GREATEST(
@@ -186,7 +195,11 @@ async function syncRemainingAndConsume(): Promise<number> {
                   ELSE 0
                 END)
             ELSE NULL
-          END AS quota_sec
+          END AS quota_sec,
+          CASE
+            WHEN COALESCE(p.data_mb, 0) > 0 THEN (p.data_mb::bigint * 1024 * 1024)
+            ELSE NULL
+          END AS quota_bytes
       ) q
       CROSS JOIN LATERAL (
         SELECT
@@ -195,10 +208,20 @@ async function syncRemainingAndConsume(): Promise<number> {
             ELSE GREATEST(0, q.quota_sec - COALESCE(used.used_sec, 0))
           END::integer AS remaining_sec,
           CASE
-            WHEN q.quota_sec IS NULL THEN false
-            WHEN COALESCE(used.used_sec, 0) >= q.quota_sec THEN true
+            WHEN q.quota_bytes IS NULL THEN NULL
+            ELSE GREATEST(
+              0,
+              FLOOR((q.quota_bytes - COALESCE(used.used_bytes, 0)) / (1024.0 * 1024))
+            )::integer
+          END AS remaining_mb,
+          CASE
+            WHEN q.quota_sec IS NOT NULL
+              AND COALESCE(used.used_sec, 0) >= q.quota_sec THEN true
+            WHEN q.quota_bytes IS NOT NULL
+              AND COALESCE(used.used_bytes, 0) >= q.quota_bytes THEN true
             WHEN p.time_usage_mode::text = 'SINGLE_SESSION'
               AND c.activated_at IS NOT NULL
+              AND q.quota_sec IS NOT NULL
               AND EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - c.activated_at)) >= q.quota_sec
             THEN true
             ELSE false
@@ -212,29 +235,30 @@ async function syncRemainingAndConsume(): Promise<number> {
           'PAUSED'::"CredentialStatus",
           'CONSUMED'::"CredentialStatus"
         )
-        AND q.quota_sec IS NOT NULL
+        AND (q.quota_sec IS NOT NULL OR q.quota_bytes IS NOT NULL)
         AND (
-          c."timeRemainingSec" IS DISTINCT FROM rem.remaining_sec
+          (q.quota_sec IS NOT NULL AND c."timeRemainingSec" IS DISTINCT FROM rem.remaining_sec)
+          OR (q.quota_bytes IS NOT NULL AND c.data_remaining_mb IS DISTINCT FROM rem.remaining_mb)
           OR (rem.should_consume AND c.status IS DISTINCT FROM 'CONSUMED'::"CredentialStatus")
           OR (
             NOT rem.should_consume
             AND c.status = 'CONSUMED'::"CredentialStatus"
-            AND rem.remaining_sec > 0
           )
         )
     )
     UPDATE wf_credential c
     SET
-      "timeRemainingSec" = computed.remaining_sec,
+      "timeRemainingSec" = COALESCE(computed.remaining_sec, c."timeRemainingSec"),
+      data_remaining_mb = COALESCE(computed.remaining_mb, c.data_remaining_mb),
       status = CASE
         WHEN computed.should_consume THEN 'CONSUMED'::"CredentialStatus"
         WHEN c.status = 'CONSUMED'::"CredentialStatus"
-          AND computed.remaining_sec > 0
+          AND NOT computed.should_consume
           AND c.expires_at IS NOT NULL
           AND c.expires_at < CURRENT_TIMESTAMP
           THEN 'EXPIRED'::"CredentialStatus"
         WHEN c.status = 'CONSUMED'::"CredentialStatus"
-          AND computed.remaining_sec > 0
+          AND NOT computed.should_consume
           THEN 'ACTIVATED'::"CredentialStatus"
         ELSE c.status
       END,

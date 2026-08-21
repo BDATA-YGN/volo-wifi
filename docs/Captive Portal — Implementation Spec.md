@@ -334,6 +334,7 @@ HTTP 400 unless noted. Response shape: `{ error: { code, message, details? } }`
 | `CREDENTIAL_INACTIVE` | EXPIRED / CONSUMED / REVOKED |
 | `CREDENTIAL_EXPIRED` | `expiresAt` past |
 | `CREDENTIAL_CONSUMED` | Time quota exhausted / activation window exceeded |
+| `NO_DATA_REMAINING` | Data quota exhausted (even if time remains on TIME_AND_DATA) |
 | `RADIUS_SESSION_ACTIVE` | Other device online and client MAC missing |
 | `DEVICE_LIMIT_REACHED` | Occupied slots ≥ maxDevices |
 | `TOKEN_DEVICE_MISMATCH` | Voucher already bound to another MAC |
@@ -343,7 +344,7 @@ HTTP 400 unless noted. Response shape: `{ error: { code, message, details? } }`
 | `INTERNAL_SERVER_ERROR` | 500 |
 
 Optional/reserved (may exist in i18n without current throw sites):  
-`CAPTIVE_LOGIN_WINDOW_EXPIRED`, `NO_TIME_REMAINING`, `NO_DATA_REMAINING`.
+`CAPTIVE_LOGIN_WINDOW_EXPIRED`, `NO_TIME_REMAINING`.
 
 ---
 
@@ -360,10 +361,11 @@ Optional/reserved (may exist in i18n without current throw sites):
 
 ### Credential sync effects (summary)
 
-- Recompute `timeRemainingSec`
+- Recompute `timeRemainingSec` and `dataRemainingMb`
 - Set `IN_USE` / `PAUSED` / `CONSUMED` / `EXPIRED` as appropriate
 - SINGLE_SESSION: pause on real STOP with time left
-- Consume when activation window exceeded or remaining ≤ 0 (and related thresholds)
+- Consume when activation window exceeded, remaining time ≤ 0, **or remaining data ≤ 0**
+- Do **not** restore CONSUMED → ACTIVATED when data quota is already exhausted
 
 Without this cron, power-loss NAS sessions stay “online” forever and block device slots / Simultaneous-Use.
 
@@ -440,6 +442,12 @@ async function login({ type, token, username, password, nasParams }) {
     if (used != null && used.usedSec >= used.quotaSec) {
       await markConsumed(tx, locked.id);
       throw CREDENTIAL_CONSUMED;
+    }
+
+    const usedData = await aggregateRadiusUsedBytes(locked, plan);
+    if (usedData != null && usedData.usedBytes >= usedData.quotaBytes) {
+      await markConsumed(tx, locked.id);
+      throw NO_DATA_REMAINING;
     }
 
     if (plan.timeUsageMode === SINGLE_SESSION) {

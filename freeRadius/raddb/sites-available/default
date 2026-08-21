@@ -671,6 +671,17 @@ preacct {
 
 
 	#
+	#
+	#  Ruijie EG often sends Acct-Status-Type 3 as Alive. Prefer the
+	#  Interim-Update name so SQL type.interim-update runs. type.alive
+	#  in queries.conf covers the case where the dictionary still prints Alive.
+	#
+	if (&Acct-Status-Type == Alive) {
+		update request {
+			&Acct-Status-Type := Interim-Update
+		}
+	}
+
 	#  Ensure that we have a semi-unique identifier for every
 	#  request, and many NAS boxes are broken.
 	acct_unique

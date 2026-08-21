@@ -245,6 +245,48 @@ If you set **NAS-Identifier** on the site record, configure the same value on th
 
 ---
 
+## Data usage (bytes) — Ruijie EG / NBR as NAS
+
+This applies when the **Ruijie router is the RADIUS NAS** (vendor profile Ruijie, `nasType = ruijie`), not when a Ruijie AP sits behind a MikroTik.
+
+External / third-party portal does **not** stop data accounting. Volo writes `wf_radius_session.inputBytes` / `outputBytes` / `totalBytes` only from IETF:
+
+- `Acct-Input-Octets` + `Acct-Input-Gigawords`
+- `Acct-Output-Octets` + `Acct-Output-Gigawords`
+
+on **Interim** and **Stop**. **Start** packets almost always have octets = 0; that is normal.
+
+### Enable on the Ruijie gateway (RGOS / Reyee)
+
+FreeRADIUS already maps IETF octets. If `wf_radius_session` has time but `inputBytes` / `outputBytes` / `totalBytes` stay 0, the EG is not putting those attributes in Interim/Stop packets. Change the gateway as follows.
+
+**Authentication → AAA** (RGOS) or **Authentication → RADIUS** (Reyee), plus the portal/web-auth profile bound to that AAA:
+
+| Setting | Required |
+|---------|----------|
+| RADIUS Accounting | **On**, UDP **1813** (auth 1812 is not enough) |
+| Accounting scheme / mode | **Start-Interim-Stop** — not Start-Stop only, not Start-only |
+| Carry **traffic / flow / octet** statistics | **On** (RGOS: “accounting includes flow”, “traffic accounting”, “flow statistics in accounting packets”) |
+| Interim interval | **300** s **on the EG locally** and plan reply `Acct-Interim-Interval := 300` (EG often ignores the RADIUS reply) |
+| Web auth / portal bound on the **LAN that NATs guest traffic** | If guests are bridged off the EG, or portal is on a VLAN the EG does not route, octets stay 0 |
+| Do not use “local accounting only” | Online-user traffic on the EG UI is not written to Volo unless it is also sent in RADIUS |
+
+After a real download, wait one interim (or disconnect for Stop). Inspect **INTERIM** / **STOP** rows — **START** rows never have bytes.
+
+### If sessions exist but bytes stay 0 / null
+
+| Cause | What it means |
+|-------|----------------|
+| Only **Start** rows | Wait for Interim/Stop; Start never has usage |
+| Accounting on, **flow/traffic off** | EG sends `Acct-Session-Time` only — turn on traffic in accounting packets |
+| EG ignores `Acct-Interim-Interval` | Set local interim on the router as well |
+| Reyee / MACC firmware | Some cloud EG builds never put IETF octets in RADIUS; time still works |
+| Bytes in **Ruijie VSAs** only (`Ruijie-Input-Octets`, vendor 4881) | Volo SQL maps **IETF names only**, so those packets look like “no data”. On the EG enable IETF / standard RADIUS traffic attributes (not Ruijie-only VSAs) |
+
+Confirm with FreeRADIUS accounting debug (`radiusd -X` or `radsniff -x -p 1813`). On Interim/Stop you must see `Acct-Input-Octets` / `Acct-Output-Octets` with non-zero values. If those attributes are missing, the NAS is not sending IETF traffic — Volo cannot invent it. If you see `Vendor-Specific` from Ruijie instead, the gateway is sending VSAs and the SQL mapping needs those names.
+
+---
+
 ## End-to-end authentication flow
 
 1. Client associates with guest WiFi → Ruijie redirects HTTP to `portalBaseUrl` with NAS parameters.
@@ -288,6 +330,7 @@ Replace `ABCD1234` with a valid issued token.
 | `Access-Reject` immediately | Secret mismatch or unknown NAS | Align NAS IP + secret across router, Volo, FreeRADIUS |
 | Session never ends at plan limit | Missing `Session-Timeout` policy | Add Plan RADIUS Policy with `{timeSeconds}` |
 | Usage not updating | Accounting disabled | Enable accounting + interim on router; set `Acct-Interim-Interval` |
+| Sessions exist but **bytes stay 0** | See **Data usage (bytes) on Ruijie** below | Enable traffic in accounting packets; confirm the NAS is the EG, not a bridge AP |
 | CoA disconnect fails | UDP 3799 blocked | Open firewall; confirm vendor profile CoA port |
 | Duplicate session blocked | Plan `maxDevices` / single-session guard | Expected behavior; revoke stale session or adjust plan |
 

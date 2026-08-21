@@ -32,6 +32,32 @@ export function planHasDataQuota(
   return plan.quotaType === 'DATA_ONLY' || plan.quotaType === 'TIME_AND_DATA';
 }
 
+/** Plan data cap in bytes, or null when data is unlimited / unset. */
+export function planDataQuotaBytes(
+  plan: Pick<Plan, 'dataMb'> | null | undefined,
+): bigint | null {
+  if (!plan?.dataMb || plan.dataMb <= 0) return null;
+  return BigInt(plan.dataMb) * 1024n * 1024n;
+}
+
+function toBigIntBytes(value: bigint | number | null | undefined): bigint {
+  if (value == null) return 0n;
+  if (typeof value === 'bigint') return value < 0n ? 0n : value;
+  if (!Number.isFinite(value) || value <= 0) return 0n;
+  return BigInt(Math.floor(value));
+}
+
+/** Prefer totalBytes; otherwise input + output (same as captive dashboard). */
+export function billedSessionBytes(session: {
+  totalBytes?: bigint | number | null;
+  inputBytes?: bigint | number | null;
+  outputBytes?: bigint | number | null;
+}): bigint {
+  const total = toBigIntBytes(session.totalBytes);
+  if (total > 0n) return total;
+  return toBigIntBytes(session.inputBytes) + toBigIntBytes(session.outputBytes);
+}
+
 export function planTimeQuotaSec(
   plan: Pick<Plan, 'timeAmount' | 'timeUnit'> | null | undefined,
 ): number | null {
@@ -189,6 +215,32 @@ export async function aggregateRadiusUsedSeconds(
   return total;
 }
 
+export async function aggregateRadiusUsedBytes(
+  credential: { id: string; username: string | null; token: string | null },
+  options: { since?: Date | null; includeActive?: boolean } = {},
+): Promise<bigint> {
+  const { since = null, includeActive = true } = options;
+  const sessions = await prisma.radiusSession.findMany({
+    where: {
+      ...radiusSessionUsageWhere(credential),
+      ...(since ? { startedAt: { gte: since } } : {}),
+    },
+    select: {
+      totalBytes: true,
+      inputBytes: true,
+      outputBytes: true,
+      stoppedAt: true,
+    },
+  });
+
+  let total = 0n;
+  for (const session of sessions) {
+    if (!session.stoppedAt && !includeActive) continue;
+    total += billedSessionBytes(session);
+  }
+  return total;
+}
+
 export function radiusUsageSinceForPlan(
   credential: Pick<
     CredentialTimeUsageIdentity,
@@ -224,6 +276,26 @@ export async function computeCredentialTimeRemainingSec(
     includeActive: true,
   });
   return Math.max(0, quotaSec - usedSec);
+}
+
+/** Remaining plan data in MB (quota − RADIUS used), or null when the plan has no data quota. */
+export async function computeCredentialDataRemainingMb(
+  credential: CredentialTimeUsageIdentity,
+  plan: Pick<Plan, 'quotaType' | 'dataMb' | 'timeUsageMode'>,
+): Promise<number | null> {
+  if (!planHasDataQuota(plan)) {
+    return null;
+  }
+  const quotaBytes = planDataQuotaBytes(plan);
+  if (quotaBytes == null || quotaBytes <= 0n) {
+    return null;
+  }
+  const usedBytes = await aggregateRadiusUsedBytes(credential, {
+    since: radiusUsageSinceForPlan(credential, plan),
+    includeActive: true,
+  });
+  const remainingBytes = quotaBytes > usedBytes ? quotaBytes - usedBytes : 0n;
+  return Number(remainingBytes / (1024n * 1024n));
 }
 
 /** Wall-clock voucher expiry from first activation (validityDays). */

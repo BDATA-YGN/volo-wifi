@@ -36,7 +36,7 @@ MikroTik Hotspot HTML **cannot** send a NAS MAC. There is no `$(nas-mac)`. `$(ma
 
 | Query key | MikroTik variable | Used for | Notes |
 |-----------|-------------------|----------|--------|
-| `NASID` | `$(identity)` | **Site lock** | Must equal Site Directory NAS-Identifier (`/system identity`). |
+| `NASID` | `$(identity)` or `$(server-name)` | **Site lock** | Prefer `/system identity`. If that is empty, Hotspot **name** is used — set it to the same site code. |
 | `nas_mac` | *(none)* | Site lock | Not available on MikroTik. Ruijie sends this. |
 | `nas_ip` | `$(server-address)` | Router login URL only | Hotspot IP for `http://{nas_ip}/login`. Not used to pick a site. |
 | `mac` | `$(mac)` | Session bind | **Client** MAC, not the router. |

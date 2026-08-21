@@ -7,9 +7,12 @@ import {
   StationTokenUsageScope,
 } from '@/generated/prisma/client';
 import {
+  aggregateRadiusUsedBytes,
   aggregateRadiusUsedSeconds,
   billedSessionSeconds,
   isPlanActivationWindowExceeded,
+  planDataQuotaBytes,
+  planHasDataQuota,
   planHasTimeQuota,
   planTimeQuotaSec,
   radiusUsageSinceForPlan,
@@ -113,6 +116,34 @@ export async function assertRadiusTimeQuotaAllowsLogin(
   });
 
   return { usedSec, quotaSec };
+}
+
+export async function assertRadiusDataQuotaAllowsLogin(
+  credential: {
+    id: string;
+    username: string | null;
+    token: string | null;
+    singleSessionResellerUnlockAt: Date | null;
+    activatedAt: Date | null;
+    soldAt: Date | null;
+  },
+  plan: Pick<Plan, 'quotaType' | 'dataMb' | 'timeUsageMode'>,
+): Promise<{ usedBytes: bigint; quotaBytes: bigint } | null> {
+  if (!planHasDataQuota(plan)) {
+    return null;
+  }
+
+  const quotaBytes = planDataQuotaBytes(plan);
+  if (quotaBytes == null || quotaBytes <= 0n) {
+    return null;
+  }
+
+  const usedBytes = await aggregateRadiusUsedBytes(credential, {
+    since: radiusUsageSinceForPlan(credential, plan),
+    includeActive: true,
+  });
+
+  return { usedBytes, quotaBytes };
 }
 
 /** Common Calling-Station-Id spellings for the same 12-hex MAC. */
@@ -250,6 +281,7 @@ export type CaptiveLoginGuardOptions = {
  * - No client MAC but someone else online → RADIUS_SESSION_ACTIVE.
  * - Capacity-tier tokenUsageScope SITE/TIER → request site must match (nasParams OR).
  * - Time remaining is always per credential/token, never per device.
+ * - Data remaining is also per credential/token (TIME_AND_DATA / DATA_ONLY).
  */
 export async function runCaptiveLoginGuards(
   credential: NonNullable<CaptiveLoginCredential>,
@@ -299,6 +331,15 @@ export async function runCaptiveLoginGuards(
       data: { status: CredentialStatus.CONSUMED },
     });
     throw Object.assign(new Error('CREDENTIAL_CONSUMED'), { code: 'CREDENTIAL_CONSUMED' });
+  }
+
+  const dataQuota = await assertRadiusDataQuotaAllowsLogin(credential, plan);
+  if (dataQuota && dataQuota.usedBytes >= dataQuota.quotaBytes) {
+    await prisma.credential.update({
+      where: { id: credential.id },
+      data: { status: CredentialStatus.CONSUMED, dataRemainingMb: 0 },
+    });
+    throw Object.assign(new Error('NO_DATA_REMAINING'), { code: 'NO_DATA_REMAINING' });
   }
 
   if (plan.timeUsageMode === PlanTimeUsageMode.SINGLE_SESSION) {

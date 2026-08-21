@@ -7,7 +7,7 @@
 	<AccessProcedure>1.0</AccessProcedure>
 	<AccessLocation>$(location-id)</AccessLocation>
 	<LocationName>$(location-name)</LocationName>
-	<LoginURL>https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&amp;ip=$(ip)&amp;nas_ip=$(server-address)&amp;NASID=$(identity)&amp;hostname=$(hostname)&amp;server-name=$(server-name)&amp;link-login=$(link-login-esc)&amp;link-logout=$(link-logout-esc)</LoginURL>
+	<LoginURL>https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&amp;ip=$(ip)&amp;nas_ip=$(server-address)&amp;NASID=$(if identity)$(identity)$(else)$(server-name)$(endif)&amp;hostname=$(hostname)&amp;server-name=$(server-name)&amp;link-login=$(link-login-esc)&amp;link-logout=$(link-logout-esc)</LoginURL>
 	<MessageType>100</MessageType>
 	<ResponseCode>0</ResponseCode>
     </Redirect>

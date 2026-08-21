@@ -31,7 +31,11 @@
             q.set('ip', '$(ip)');
             // Hotspot IP — do NOT use $(hostname) (DNS name, e.g. wifi.local)
             q.set('nas_ip', '$(server-address)');
-            q.set('NASID', '$(identity)');
+            // Site lock: NASID=$(identity). If identity is empty on this ROS,
+            // fall back to Hotspot server name (set that name to the site code).
+            var nasId = '$(identity)';
+            if (!nasId) nasId = '$(server-name)';
+            q.set('NASID', nasId);
             q.set('hostname', '$(hostname)');
             q.set('server-name', '$(server-name)');
             if ('$(username)' !== '') q.set('username', '$(username)');

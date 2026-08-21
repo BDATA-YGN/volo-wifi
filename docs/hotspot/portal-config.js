@@ -1,16 +1,23 @@
 /**
- * Captive portal auth URL (no trailing slash).
- * Edit before uploading hotspot/ to the router.
+ * Portal URLs — edit before uploading hotspot/ to the router.
+ *
+ * Auth query (MikroTik substitutes $(…)):
+ *   mac, ip, nas_ip=$(server-address), NASID=$(identity),
+ *   hostname, server-name, link-login, link-login-only, link-logout, link-orig
+ *
+ * Site lock uses NASID=$(identity) only (same as /system identity).
+ * NAS IP is not used to find the site. MikroTik has no NAS MAC variable.
  */
-window.VOLO_PORTAL_BASE = 'https://portal.volowifi.com/auth';
+window.VOLO_PORTAL_AUTH = 'https://portal-v2.volowifi.com/portal/auth';
+window.VOLO_PORTAL_AFTER_LOGIN = 'https://portal-v2.volowifi.com/portal';
+
+window.VOLO_PORTAL_BASE = window.VOLO_PORTAL_AUTH;
 
 window.voloPortalAuthUrl = function (queryString) {
-  var auth = (window.VOLO_PORTAL_BASE || 'https://portal.volowifi.com/auth').replace(/\/$/, '');
-  return queryString ? auth + '?' + queryString : auth;
+  var auth = (window.VOLO_PORTAL_AUTH || window.VOLO_PORTAL_BASE || '').replace(/\/$/, '');
+  return queryString ? auth + (auth.indexOf('?') >= 0 ? '&' : '?') + queryString : auth;
 };
 
 window.voloPortalDashboardUrl = function () {
-  var auth = (window.VOLO_PORTAL_BASE || 'https://portal.volowifi.com/auth').replace(/\/$/, '');
-  var origin = auth.replace(/\/auth$/, '');
-  return origin + '/dashboard';
+  return window.VOLO_PORTAL_AFTER_LOGIN || 'https://portal-v2.volowifi.com/portal';
 };

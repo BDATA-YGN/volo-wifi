@@ -25,6 +25,7 @@ import { CaptiveLoginSchema } from './schema';
 import { captiveLoginCredentialInclude, runCaptiveLoginGuards } from './login-guards';
 import { recordCaptivePortalSession } from '@/features/captive/services/captive-portal-session.service';
 import {
+  computeCredentialDataRemainingMb,
   computeCredentialTimeRemainingSec,
   planTimeQuotaSec,
   resolveActivationExpiresAt,
@@ -45,6 +46,8 @@ function mapLoginGuardError(error: unknown): never {
       throw new CustomException(400, 'RADIUS_SESSION_ACTIVE', captiveErrors.RADIUS_SESSION_ACTIVE);
     case 'CREDENTIAL_CONSUMED':
       throw new CustomException(400, 'CREDENTIAL_CONSUMED', captiveErrors.CREDENTIAL_CONSUMED);
+    case 'NO_DATA_REMAINING':
+      throw new CustomException(400, 'NO_DATA_REMAINING', captiveErrors.NO_DATA_REMAINING);
     case 'DEVICE_LIMIT_REACHED':
       throw new CustomException(
         400,
@@ -173,15 +176,23 @@ export class CaptiveAuthController {
         mapLoginGuardError(error);
       }
 
-      // Keep remaining-time cache aligned so FreeRADIUS/dashboard stay consistent.
+      // Keep remaining-time / remaining-data cache aligned so FreeRADIUS/dashboard stay consistent.
       if (credential.plan) {
         const remainingSec = await computeCredentialTimeRemainingSec(credential, credential.plan);
+        const remainingMb = await computeCredentialDataRemainingMb(credential, credential.plan);
+        const patch: { timeRemainingSec?: number; dataRemainingMb?: number } = {};
         if (remainingSec != null && remainingSec !== credential.timeRemainingSec) {
+          patch.timeRemainingSec = remainingSec;
+        }
+        if (remainingMb != null && remainingMb !== credential.dataRemainingMb) {
+          patch.dataRemainingMb = remainingMb;
+        }
+        if (Object.keys(patch).length > 0) {
           await prisma.credential.update({
             where: { id: credential.id },
-            data: { timeRemainingSec: remainingSec },
+            data: patch,
           });
-          credential = { ...credential, timeRemainingSec: remainingSec };
+          credential = { ...credential, ...patch };
         }
       }
 

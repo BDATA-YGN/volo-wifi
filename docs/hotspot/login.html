@@ -19,16 +19,26 @@
             return hex;
         }
 
+        function portalAuthBase() {
+            if (window.VOLO_PORTAL_AUTH) return window.VOLO_PORTAL_AUTH;
+            if (window.voloPortalAuthUrl) return window.voloPortalAuthUrl('');
+            return 'https://portal-v2.volowifi.com/portal/auth';
+        }
+
         function buildPortalAuthUrl() {
             var q = new URLSearchParams();
 
             q.set('mac', '$(mac)');
             q.set('ip', '$(ip)');
+            q.set('nas_ip', '$(server-address)');
+            q.set('NASID', '$(identity)');
+            q.set('hostname', '$(hostname)');
+            q.set('server-name', '$(server-name)');
             if ('$(username)' !== '') q.set('username', '$(username)');
-            q.set('link-login', '$(link-login)');
-            q.set('link-login-only', '$(link-login-only)');
-            q.set('link-logout', '$(link-logout)');
-            q.set('link-orig', '$(link-orig)');
+            q.set('link-login', '$(link-login-esc)');
+            q.set('link-login-only', '$(link-login-only-esc)');
+            q.set('link-logout', '$(link-logout-esc)');
+            q.set('link-orig', '$(link-orig-esc)');
             if ('$(error)' !== '') q.set('error', '$(error)');
 
             var chapId = '$(chap-id)';
@@ -36,12 +46,13 @@
             if (chapId) q.set('chap-id-hex', mikrotikToHex(chapId));
             if (chapChallenge) q.set('chap-challenge-hex', mikrotikToHex(chapChallenge));
 
-            return window.voloPortalAuthUrl(q.toString());
+            var base = portalAuthBase();
+            var sep = base.indexOf('?') >= 0 ? '&' : '?';
+            return base + sep + q.toString();
         }
 
         (function () {
-            var target = buildPortalAuthUrl();
-            location.replace(target);
+            location.replace(buildPortalAuthUrl());
         })();
     </script>
 </head>

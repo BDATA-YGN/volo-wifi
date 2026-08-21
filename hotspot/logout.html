@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Volo WiFi</title>
-    <meta http-equiv="refresh" content="0; url=https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(identity)&hostname=$(hostname)&server-name=$(server-name)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)">
+    <meta http-equiv="refresh" content="0; url=https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(if identity)$(identity)$(else)$(server-name)$(endif)&hostname=$(hostname)&server-name=$(server-name)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)">
     <script>
-        location.replace('https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(identity)&hostname=$(hostname)&server-name=$(server-name)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)');
+        location.replace('https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(if identity)$(identity)$(else)$(server-name)$(endif)&hostname=$(hostname)&server-name=$(server-name)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)');
     </script>
 </head>
 <body>
-    <p><a href="https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(identity)&hostname=$(hostname)&server-name=$(server-name)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)">Continue to Volo WiFi</a></p>
+    <p><a href="https://portal-v2.volowifi.com/portal/auth?mac=$(mac)&ip=$(ip)&nas_ip=$(server-address)&NASID=$(if identity)$(identity)$(else)$(server-name)$(endif)&hostname=$(hostname)&server-name=$(server-name)&link-login=$(link-login-esc)&link-login-only=$(link-login-only-esc)&link-logout=$(link-logout-esc)&link-orig=$(link-orig-esc)">Continue to Volo WiFi</a></p>
 </body>
 </html>
