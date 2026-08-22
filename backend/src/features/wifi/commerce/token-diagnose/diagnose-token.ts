@@ -1,7 +1,9 @@
 import type { PrismaClient } from '@/generated/prisma/client';
 import {
   billedSessionSeconds,
+  captivePortalSessionUsageWhere,
   planTimeQuotaSec,
+  radiusSessionUsageWhere,
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
 import { normalizeMacKey } from '@/utils/mac-address';
@@ -465,18 +467,15 @@ export async function diagnoseAccessToken(
 
   const userNames = radiusUserNameVariants(credential);
   const sessionWhere = {
-    OR: [
-      { credentialId: credential.id },
-      ...(userNames.length > 0
-        ? [{ credentialId: null as string | null, userName: { in: userNames } }]
-        : []),
+    AND: [
+      radiusSessionUsageWhere(credential),
+      { OR: [{ orgId: input.orgId }, { orgId: null }] },
     ],
-    AND: [{ OR: [{ orgId: input.orgId }, { orgId: null }] }],
   };
 
   const [captiveRows, authRows, hotSessions, archiveSessions] = await Promise.all([
     prisma.captivePortalSession.findMany({
-      where: { credentialId: credential.id, orgId: input.orgId },
+      where: captivePortalSessionUsageWhere(input.orgId, credential),
       select: { id: true, username: true, ip: true, mac: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
       take: CAPTIVE_PREVIEW_LIMIT,
@@ -592,7 +591,7 @@ export async function diagnoseAccessToken(
     const related = await prisma.radiusSession.findMany({
       where: {
         OR: [{ orgId: input.orgId }, { orgId: null }],
-        credentialId: { not: credential.id },
+        ...(userNames.length > 0 ? { userName: { notIn: userNames } } : {}),
         callingStationId: { not: null },
       },
       select: {

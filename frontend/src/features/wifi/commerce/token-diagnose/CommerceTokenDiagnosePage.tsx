@@ -200,7 +200,7 @@ const CommerceTokenDiagnosePage: React.FC = () => {
       clearSessions: {
         title: "Clear sessions for this token?",
         content:
-          "Soft-ends open RADIUS sessions, repairs inflated Session-Timeout accounting, and restores the token if time remains.",
+          "Deletes captive portal logins and RADIUS sessions for this token from the token page. Remaining time is recomputed from what is left.",
         okText: "Clear sessions",
         success: "Sessions cleared. Re-diagnosing…",
       },

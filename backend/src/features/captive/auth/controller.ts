@@ -28,6 +28,7 @@ import {
   computeCredentialDataRemainingMb,
   computeCredentialTimeRemainingSec,
   planTimeQuotaSec,
+  radiusUserNameVariants,
   resolveActivationExpiresAt,
 } from '@/features/shared/credentials/credential-sync.helpers';
 
@@ -256,8 +257,12 @@ export class CaptiveAuthController {
 
           if (cred) {
             const radiusUserName = cred.username ?? cred.token ?? '';
+            const userNames = radiusUserNameVariants(cred);
             const session = await prisma.captivePortalSession.findFirst({
-              where: { credentialId: cred.id },
+              where:
+                userNames.length > 0
+                  ? { orgId: cred.orgId, username: { in: userNames } }
+                  : { orgId: cred.orgId, username: radiusUserName || undefined },
               orderBy: { createdAt: 'desc' },
               select: { nasParams: true },
             });
@@ -325,12 +330,17 @@ export class CaptiveAuthController {
   public getSession = [
     asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const credentialId = req.credentialId ?? req.credential?.id;
-      if (!credentialId) {
+      const credential = req.credential;
+      if (!credentialId || !credential) {
         throw new CustomException(401, 'UNAUTHORIZED', captiveErrors.UNAUTHORIZED);
       }
 
+      const userNames = radiusUserNameVariants(credential);
       const session = await prisma.captivePortalSession.findFirst({
-        where: { credentialId },
+        where:
+          userNames.length > 0
+            ? { orgId: credential.orgId, username: { in: userNames } }
+            : { orgId: credential.orgId, username: credential.username ?? credential.token ?? '' },
         orderBy: { createdAt: 'desc' },
       });
 

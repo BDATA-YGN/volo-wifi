@@ -134,7 +134,7 @@ const CommerceAccessTokensPage: React.FC = () => {
     pause: "Pause this token?",
     unlock: "Unlock this token for login?",
     allowNewDevice: "Allow a new device to use this token?",
-    clearSessions: "Clear open RADIUS sessions for this token?",
+    clearSessions: "Clear session history for this token?",
     restoreActivated: "Restore this consumed token to activated?",
     revertToSold: "Revert this token to sold status?",
   };
@@ -150,7 +150,7 @@ const CommerceAccessTokensPage: React.FC = () => {
             : action === "allowNewDevice"
               ? "Releases the current device slot (online session / recent portal login) so another phone or laptop can log in with this token. This does not add permanent multi-device capacity."
               : action === "clearSessions"
-                ? "Soft-ends open RADIUS sessions, repairs inflated Session-Timeout accounting, and restores the token if time remains."
+                ? "Deletes captive portal logins and RADIUS sessions for this token from the token page. Remaining time is recomputed from what is left."
                 : action === "restoreActivated"
                   ? "Clears leftover sessions and sets status back to Activated (or Expired if calendar expiry already passed)."
               : "The customer can log in again if the plan quota allows.",

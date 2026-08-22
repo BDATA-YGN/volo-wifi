@@ -157,28 +157,25 @@ export function radiusSessionMatchWhere(
 }
 
 /**
- * Sessions that belong to this credential/token only.
- * Prefer credential_id; fall back to User-Name only when credential_id is unset.
- * Never count another credential's row just because User-Name was rewritten on the same device/session.
+ * Sessions billed to this token/username (RADIUS User-Name).
+ * Do not match on credential_id — leftover rows can keep an old FK after
+ * User-Name changes, which makes deleted sessions reappear on the token.
  */
 export function radiusSessionUsageWhere(credential: {
-  id: string;
   username: string | null;
   token: string | null;
-}): {
-  OR: Array<
-    | { credentialId: string }
-    | { credentialId: null; userName: { in: string[] } }
-  >;
-} {
+}): { userName: { in: string[] } } {
+  return radiusSessionMatchWhere(radiusUserNameVariants(credential));
+}
+
+/** Captive portal rows for this token/username (`wf_captive_portal_session.username`). */
+export function captivePortalSessionUsageWhere(
+  orgId: string,
+  credential: { username: string | null; token: string | null },
+): { orgId: string; username: { in: string[] } } {
   return {
-    OR: [
-      { credentialId: credential.id },
-      {
-        credentialId: null,
-        ...radiusSessionMatchWhere(radiusUserNameVariants(credential)),
-      },
-    ],
+    orgId,
+    username: radiusSessionMatchWhere(radiusUserNameVariants(credential)).userName,
   };
 }
 

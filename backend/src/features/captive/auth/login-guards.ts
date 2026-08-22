@@ -211,40 +211,41 @@ async function endOpenRadiusSessionsForSameDevice(params: {
 }
 
 async function collectOccupiedDeviceKeys(params: {
-  credentialId: string;
   userNameVariants: string[];
   nowMs?: number;
 }): Promise<Set<string>> {
-  const { credentialId, userNameVariants, nowMs = Date.now() } = params;
+  const { userNameVariants, nowMs = Date.now() } = params;
   const occupied = new Set<string>();
 
-  if (userNameVariants.length > 0) {
-    const radiusRows = await prisma.radiusSession.findMany({
-      where: {
-        userName: { in: userNameVariants },
-        status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
-        stoppedAt: null,
-      },
-      select: {
-        acctSessionId: true,
-        callingStationId: true,
-        status: true,
-        stoppedAt: true,
-        lastInterimAt: true,
-      },
-    });
+  if (userNameVariants.length === 0) {
+    return occupied;
+  }
 
-    for (const row of radiusRows) {
-      if (!isRadiusSessionEnded(row, nowMs)) {
-        occupied.add(radiusSessionDeviceKey(row));
-      }
+  const radiusRows = await prisma.radiusSession.findMany({
+    where: {
+      userName: { in: userNameVariants },
+      status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
+      stoppedAt: null,
+    },
+    select: {
+      acctSessionId: true,
+      callingStationId: true,
+      status: true,
+      stoppedAt: true,
+      lastInterimAt: true,
+    },
+  });
+
+  for (const row of radiusRows) {
+    if (!isRadiusSessionEnded(row, nowMs)) {
+      occupied.add(radiusSessionDeviceKey(row));
     }
   }
 
   const since = new Date(nowMs - PORTAL_LOGIN_SLOT_MS);
   const portalRows = await prisma.captivePortalSession.findMany({
     where: {
-      credentialId,
+      username: { in: userNameVariants },
       createdAt: { gte: since },
     },
     select: { mac: true },
@@ -280,8 +281,8 @@ export type CaptiveLoginGuardOptions = {
  * - Other devices at maxDevices → DEVICE_LIMIT_REACHED.
  * - No client MAC but someone else online → RADIUS_SESSION_ACTIVE.
  * - Capacity-tier tokenUsageScope SITE/TIER → request site must match (nasParams OR).
- * - Time remaining is always per credential/token, never per device.
- * - Data remaining is also per credential/token (TIME_AND_DATA / DATA_ONLY).
+ * - Time remaining is always per token/username (RADIUS User-Name), never per device.
+ * - Data remaining is also per token/username (TIME_AND_DATA / DATA_ONLY).
  */
 export async function runCaptiveLoginGuards(
   credential: NonNullable<CaptiveLoginCredential>,
@@ -304,7 +305,6 @@ export async function runCaptiveLoginGuards(
   }
 
   const occupied = await collectOccupiedDeviceKeys({
-    credentialId: credential.id,
     userNameVariants,
   });
 

@@ -107,32 +107,38 @@ async function softEndOpenRadiusSessions(
 ): Promise<{ endedRadiusSessions: number; clearedPortalSessions: number }> {
   const now = new Date();
   const userNameVariants = radiusUserNameVariants(credential);
-  const sessionOr: Prisma.RadiusSessionWhereInput[] = [{ credentialId: credential.id }];
+  const sessionOr: Prisma.RadiusSessionWhereInput[] = [];
   if (userNameVariants.length > 0) {
     sessionOr.push({ userName: { in: userNameVariants } });
   }
 
-  const ended = await tx.radiusSession.updateMany({
-    where: {
-      OR: sessionOr,
-      status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
-      stoppedAt: null,
-    },
-    data: {
-      stoppedAt: now,
-      status: RadiusAcctStatus.STOP,
-      terminateCause,
-      updatedAt: now,
-    },
-  });
+  const ended =
+    sessionOr.length > 0
+      ? await tx.radiusSession.updateMany({
+          where: {
+            OR: sessionOr,
+            status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
+            stoppedAt: null,
+          },
+          data: {
+            stoppedAt: now,
+            status: RadiusAcctStatus.STOP,
+            terminateCause,
+            updatedAt: now,
+          },
+        })
+      : { count: 0 };
 
   const since = new Date(now.getTime() - PORTAL_LOGIN_SLOT_MS);
-  const cleared = await tx.captivePortalSession.deleteMany({
-    where: {
-      credentialId: credential.id,
-      createdAt: { gte: since },
-    },
-  });
+  const cleared =
+    userNameVariants.length > 0
+      ? await tx.captivePortalSession.deleteMany({
+          where: {
+            username: { in: userNameVariants },
+            createdAt: { gte: since },
+          },
+        })
+      : { count: 0 };
 
   return {
     endedRadiusSessions: ended.count,
@@ -150,10 +156,9 @@ async function repairBackdatedRadiusStarts(
   credential: { id: string; username: string | null; token: string | null },
 ): Promise<number> {
   const names = radiusUserNameVariants(credential);
-  const nameFilter =
-    names.length > 0
-      ? Prisma.sql`OR (rs.credential_id IS NULL AND rs.user_name IN (${Prisma.join(names)}))`
-      : Prisma.empty;
+  if (names.length === 0) {
+    return 0;
+  }
 
   const result = await tx.$executeRaw`
     UPDATE wf_radius_session rs
@@ -161,10 +166,7 @@ async function repairBackdatedRadiusStarts(
       started_at = rs.created_at,
       updated_at = CURRENT_TIMESTAMP
     WHERE rs.started_at < rs.created_at - INTERVAL '120 seconds'
-      AND (
-        rs.credential_id = ${credential.id}
-        ${nameFilter}
-      )
+      AND rs.user_name IN (${Prisma.join(names)})
   `;
   return Number(result);
 }
@@ -225,8 +227,45 @@ async function refreshTimeRemainingAfterRepair(
 const SESSION_CLEARABLE = new Set(['ACTIVATED', 'PAUSED', 'CONSUMED']);
 
 /**
- * Soft-end open RADIUS rows, rewind backdated Session-Timeout starts, and
- * refresh remaining time. CONSUMED tokens with leftover quota become ACTIVATED.
+ * Operator Clear Sessions: remove this token's session history from the token
+ * page (captive logins + RADIUS hot/archive), not only the last 3-minute hold.
+ */
+async function purgeTokenSessionHistory(
+  tx: Prisma.TransactionClient,
+  params: {
+    orgId: string;
+    credential: { username: string | null; token: string | null };
+  },
+): Promise<{ endedRadiusSessions: number; clearedPortalSessions: number }> {
+  const userNameVariants = radiusUserNameVariants(params.credential);
+  if (userNameVariants.length === 0) {
+    return { endedRadiusSessions: 0, clearedPortalSessions: 0 };
+  }
+
+  const [hot, archive, portal] = await Promise.all([
+    tx.radiusSession.deleteMany({
+      where: { userName: { in: userNameVariants } },
+    }),
+    tx.radiusSessionArchive.deleteMany({
+      where: { userName: { in: userNameVariants } },
+    }),
+    tx.captivePortalSession.deleteMany({
+      where: {
+        orgId: params.orgId,
+        username: { in: userNameVariants },
+      },
+    }),
+  ]);
+
+  return {
+    endedRadiusSessions: hot.count + archive.count,
+    clearedPortalSessions: portal.count,
+  };
+}
+
+/**
+ * Delete captive portal logins and RADIUS history for this token, then
+ * recompute remaining time. CONSUMED tokens with leftover quota become ACTIVATED.
  */
 export async function clearAccessTokenSessions(
   tx: Prisma.TransactionClient,
@@ -241,8 +280,10 @@ export async function clearAccessTokenSessions(
     );
   }
 
-  await repairBackdatedRadiusStarts(tx, existing);
-  const result = await softEndOpenRadiusSessions(tx, existing, 'Operator-ClearSessions');
+  const result = await purgeTokenSessionHistory(tx, {
+    orgId: params.orgId,
+    credential: existing,
+  });
   await refreshTimeRemainingAfterRepair(tx, existing);
   return result;
 }

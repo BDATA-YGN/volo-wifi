@@ -53,6 +53,7 @@ import {
 import {
   radiusSessionUsageWhere,
   radiusUserNameVariants,
+  captivePortalSessionUsageWhere,
 } from '@/features/shared/credentials/credential-sync.helpers';
 import {
   loadOpsArchiveSettings,
@@ -204,7 +205,6 @@ async function loadFirstLoginAtMap(
     takeEarlier(map, c.id, c.activatedAt);
   }
 
-  const ids = credentials.map((c) => c.id);
   const userNameToCredentialId = new Map<string, string>();
   for (const c of credentials) {
     for (const variant of radiusUserNameVariants(c)) {
@@ -213,23 +213,15 @@ async function loadFirstLoginAtMap(
   }
   const userNames = [...userNameToCredentialId.keys()];
 
-  const [captiveMins, radiusByCredHot, radiusByCredArchive, radiusByUserHot, radiusByUserArchive] =
+  const [captiveMins, radiusByUserHot, radiusByUserArchive] =
     await Promise.all([
-      prisma.captivePortalSession.groupBy({
-        by: ['credentialId'],
-        where: { orgId, credentialId: { in: ids } },
-        _min: { createdAt: true },
-      }),
-      prisma.radiusSession.groupBy({
-        by: ['credentialId'],
-        where: { credentialId: { in: ids } },
-        _min: { startedAt: true },
-      }),
-      prisma.radiusSessionArchive.groupBy({
-        by: ['credentialId'],
-        where: { credentialId: { in: ids } },
-        _min: { startedAt: true },
-      }),
+      userNames.length > 0
+        ? prisma.captivePortalSession.groupBy({
+            by: ['username'],
+            where: { orgId, username: { in: userNames } },
+            _min: { createdAt: true },
+          })
+        : Promise.resolve([]),
       userNames.length > 0
         ? prisma.radiusSession.groupBy({
             by: ['userName'],
@@ -247,13 +239,8 @@ async function loadFirstLoginAtMap(
     ]);
 
   for (const row of captiveMins) {
-    takeEarlier(map, row.credentialId, row._min.createdAt);
-  }
-  for (const row of radiusByCredHot) {
-    if (row.credentialId) takeEarlier(map, row.credentialId, row._min.startedAt);
-  }
-  for (const row of radiusByCredArchive) {
-    if (row.credentialId) takeEarlier(map, row.credentialId, row._min.startedAt);
+    const credentialId = userNameToCredentialId.get(row.username);
+    if (credentialId) takeEarlier(map, credentialId, row._min.createdAt);
   }
   for (const row of radiusByUserHot) {
     if (!row.userName) continue;
@@ -391,7 +378,7 @@ async function loadTokenSessionHistory(
     archiveSettings,
   ] = await Promise.all([
     prisma.captivePortalSession.findMany({
-      where: { credentialId: credential.id, orgId },
+      where: captivePortalSessionUsageWhere(orgId, credential),
       select: {
         id: true,
         username: true,
@@ -404,7 +391,7 @@ async function loadTokenSessionHistory(
       take: CAPTIVE_SESSION_PREVIEW_LIMIT,
     }),
     prisma.captivePortalSession.count({
-      where: { credentialId: credential.id, orgId },
+      where: captivePortalSessionUsageWhere(orgId, credential),
     }),
     userNameVariants.length > 0
       ? prisma.radiusSession.findMany({
@@ -1504,7 +1491,7 @@ export class CommerceAccessTokensController {
             value.action === 'allowNewDevice'
               ? 'Device binding cleared. The customer can log in from a new device now.'
               : value.action === 'clearSessions'
-                ? 'Open sessions were cleared and inflated accounting was repaired. If time remains, the token was restored to activated.'
+                ? 'RADIUS and captive portal session history for this token was deleted. Remaining time was recomputed.'
               : value.action === 'restoreActivated'
                 ? 'Open sessions were cleared and the token was restored (activated, or expired if the calendar expiry already passed).'
               : `Access token ${actionLabels[value.action] ?? 'updated'}`,

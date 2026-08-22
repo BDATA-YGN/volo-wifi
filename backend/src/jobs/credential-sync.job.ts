@@ -75,19 +75,35 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
       status = 'STOP',
       stopped_at = COALESCE(stopped_at, CURRENT_TIMESTAMP),
       terminate_cause = COALESCE(NULLIF(terminate_cause, ''), 'Cleanup-Timeout'),
-      "sessionTimeSec" = (
-        SELECT CASE
-          WHEN nas_sec > wall_sec + 120 AND nas_sec > wall_sec * 2 THEN wall_sec
-          ELSE GREATEST(nas_sec, wall_sec)
-        END
-        FROM (
-          SELECT
-            COALESCE("sessionTimeSec", 0) AS nas_sec,
-            GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (
+      "sessionTimeSec" = CASE
+        WHEN COALESCE("sessionTimeSec", 0) > GREATEST(
+          0,
+          FLOOR(EXTRACT(EPOCH FROM (
+            CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
+          )))::integer
+        ) + 120
+        AND COALESCE("sessionTimeSec", 0) > GREATEST(
+          0,
+          FLOOR(EXTRACT(EPOCH FROM (
+            CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
+          )))::integer
+        ) * 2
+        THEN GREATEST(
+          0,
+          FLOOR(EXTRACT(EPOCH FROM (
+            CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
+          )))::integer
+        )
+        ELSE GREATEST(
+          COALESCE("sessionTimeSec", 0),
+          GREATEST(
+            0,
+            FLOOR(EXTRACT(EPOCH FROM (
               CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
-            )))::integer) AS wall_sec
-        ) _acct
-      ),
+            )))::integer
+          )
+        )
+      END,
       updated_at = CURRENT_TIMESTAMP
     WHERE stopped_at IS NULL
       AND status IN ('START', 'INTERIM')
@@ -163,18 +179,12 @@ async function syncRemainingAndConsume(): Promise<number> {
             FLOOR(EXTRACT(EPOCH FROM (
               COALESCE(rs.stopped_at, CURRENT_TIMESTAMP)
               - GREATEST(rs.started_at, rs.created_at)
-            )))::integer)
+            )))::integer
           ) AS wall
         ) w
         WHERE (
-          rs.credential_id = c.id
-          OR (
-            rs.credential_id IS NULL
-            AND (
-              (c.username IS NOT NULL AND rs.user_name = c.username)
-              OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
-            )
-          )
+          (c.username IS NOT NULL AND rs.user_name = c.username)
+          OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
         )
         AND (
           p.time_usage_mode::text IS DISTINCT FROM 'SINGLE_SESSION'

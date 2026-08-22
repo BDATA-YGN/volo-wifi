@@ -86,8 +86,8 @@ FROM (
 
 --
 -- View: radreply — per-user REPLY (station-scoped plan attributes + remaining quota)
--- {timeSeconds} expands to plan_quota − cumulative RADIUS used for THIS credential only
--- (credential_id match, or User-Name when credential_id is null). Not shared across devices/tokens.
+-- {timeSeconds} expands to plan_quota − cumulative RADIUS used for THIS token/username
+-- (User-Name = token or username). Not shared across devices/tokens.
 --
 CREATE OR REPLACE VIEW radreply AS
 SELECT
@@ -166,14 +166,8 @@ FROM (
 			) AS wall
 		) w
 		WHERE (
-			rs.credential_id = c.id
-			OR (
-				rs.credential_id IS NULL
-				AND (
-					(c.username IS NOT NULL AND rs.user_name = c.username)
-					OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
-				)
-			)
+			(c.username IS NOT NULL AND rs.user_name = c.username)
+			OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
 		)
 		AND (
 			p.time_usage_mode::text IS DISTINCT FROM 'SINGLE_SESSION'
