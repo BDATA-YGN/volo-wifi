@@ -75,11 +75,18 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
       status = 'STOP',
       stopped_at = COALESCE(stopped_at, CURRENT_TIMESTAMP),
       terminate_cause = COALESCE(NULLIF(terminate_cause, ''), 'Cleanup-Timeout'),
-      "sessionTimeSec" = GREATEST(
-        COALESCE("sessionTimeSec", 0),
-        GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (
-          CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
-        )))::integer)
+      "sessionTimeSec" = (
+        SELECT CASE
+          WHEN nas_sec > wall_sec + 120 AND nas_sec > wall_sec * 2 THEN wall_sec
+          ELSE GREATEST(nas_sec, wall_sec)
+        END
+        FROM (
+          SELECT
+            COALESCE("sessionTimeSec", 0) AS nas_sec,
+            GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (
+              CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
+            )))::integer) AS wall_sec
+        ) _acct
       ),
       updated_at = CURRENT_TIMESTAMP
     WHERE stopped_at IS NULL
@@ -155,11 +162,8 @@ async function syncRemainingAndConsume(): Promise<number> {
             0,
             FLOOR(EXTRACT(EPOCH FROM (
               COALESCE(rs.stopped_at, CURRENT_TIMESTAMP)
-              - CASE
-                  WHEN rs.stopped_at IS NULL THEN GREATEST(rs.started_at, rs.created_at)
-                  ELSE rs.started_at
-                END
-            )))::integer
+              - GREATEST(rs.started_at, rs.created_at)
+            )))::integer)
           ) AS wall
         ) w
         WHERE (

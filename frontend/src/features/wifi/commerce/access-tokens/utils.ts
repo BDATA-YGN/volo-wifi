@@ -40,9 +40,13 @@ export function billedDurationSeconds(
   sessionTimeSec: number | null | undefined,
   startedAt: string,
   stoppedAt: string | null,
-  status: string
+  status: string,
+  createdAt?: string | null
 ): number {
-  const start = new Date(startedAt).getTime();
+  const startMs = new Date(startedAt).getTime();
+  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+  const start =
+    Number.isFinite(createdMs) && createdMs > startMs ? createdMs : startMs;
   const end =
     stoppedAt != null
       ? new Date(stoppedAt).getTime()
@@ -60,9 +64,10 @@ export function formatSessionDuration(
   sessionTimeSec: number | null | undefined,
   startedAt: string,
   stoppedAt: string | null,
-  status: string
+  status: string,
+  createdAt?: string | null
 ): string {
-  let sec = billedDurationSeconds(sessionTimeSec, startedAt, stoppedAt, status);
+  let sec = billedDurationSeconds(sessionTimeSec, startedAt, stoppedAt, status, createdAt);
 
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);

@@ -87,9 +87,16 @@ function asNumber(value: bigint | number | null | undefined): number | null {
   return value;
 }
 
-function wallSeconds(startedAt: Date, endedAt: Date | null, now: Date): number {
+function wallSeconds(
+  startedAt: Date,
+  endedAt: Date | null,
+  now: Date,
+  createdAt?: Date | null,
+): number {
+  const start =
+    createdAt && createdAt.getTime() > startedAt.getTime() ? createdAt : startedAt;
   const end = endedAt ?? now;
-  return Math.max(0, Math.floor((end.getTime() - startedAt.getTime()) / 1000));
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
 }
 
 function isDataCapBytes(totalBytes: number | null, planDataMb: number | null): boolean {
@@ -103,13 +110,13 @@ function isDataCapBytes(totalBytes: number | null, planDataMb: number | null): b
 }
 
 function isInflated(session: SessionLike, now: Date): boolean {
-  const wall = wallSeconds(session.startedAt, session.stoppedAt, now);
+  const wall = wallSeconds(session.startedAt, session.stoppedAt, now, session.createdAt);
   const nas = session.sessionTimeSec ?? 0;
   return nas > wall + 120 && nas > wall * 2;
 }
 
 function serializeSession(session: SessionLike, now: Date) {
-  const wall = wallSeconds(session.startedAt, session.stoppedAt, now);
+  const wall = wallSeconds(session.startedAt, session.stoppedAt, now, session.createdAt);
   const billed = billedSessionSeconds(
     session.sessionTimeSec,
     session.startedAt,

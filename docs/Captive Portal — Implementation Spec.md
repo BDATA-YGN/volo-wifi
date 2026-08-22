@@ -366,6 +366,7 @@ Optional/reserved (may exist in i18n without current throw sites):
 - SINGLE_SESSION: pause on real STOP with time left
 - Consume when activation window exceeded, remaining time ≤ 0, **or remaining data ≤ 0**
 - Do **not** restore CONSUMED → ACTIVATED when data quota is already exhausted
+- Wall-clock usage uses `GREATEST(started_at, created_at)` so a MikroTik `Session-Timeout` copied into `Acct-Session-Time` cannot bill the full plan in one packet
 
 Without this cron, power-loss NAS sessions stay “online” forever and block device slots / Simultaneous-Use.
 

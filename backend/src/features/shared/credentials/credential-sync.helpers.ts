@@ -79,14 +79,17 @@ export function planTimeQuotaSec(
 export const ACCT_SESSION_TIME_SLACK_SEC = 120;
 
 /**
- * Delayed Accounting-Start can arrive hours later with a backdated `startedAt`
- * while the row is still open. Bill open sessions from insert time, not NAS start.
+ * MikroTik often copies Session-Timeout into Acct-Session-Time. Late Interim/Stop
+ * INSERT then sets started_at = now − that value (e.g. 30 days ago on a 30-day
+ * plan). Wall clock then equals NAS time, so the inflation guard never fires.
+ * Always bill from insert time when created_at is later than started_at, including
+ * already-stopped rows.
  */
 export function effectiveAccountingStart(
   startedAt: Date,
   options?: { createdAt?: Date | null; stoppedAt?: Date | null },
 ): Date {
-  if (options?.stoppedAt != null || !options?.createdAt) return startedAt;
+  if (!options?.createdAt) return startedAt;
   return options.createdAt.getTime() > startedAt.getTime() ? options.createdAt : startedAt;
 }
 

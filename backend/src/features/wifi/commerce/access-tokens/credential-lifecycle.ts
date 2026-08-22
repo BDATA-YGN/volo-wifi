@@ -1,6 +1,11 @@
-import type { Prisma } from '@/generated/prisma/client';
-import { RadiusAcctStatus } from '@/generated/prisma/client';
-import { radiusUserNameVariants } from '@/features/shared/credentials/credential-sync.helpers';
+import { Prisma, RadiusAcctStatus, type Plan } from '@/generated/prisma/client';
+import {
+  billedSessionSeconds,
+  planTimeQuotaSec,
+  planHasTimeQuota,
+  radiusSessionUsageWhere,
+  radiusUserNameVariants,
+} from '@/features/shared/credentials/credential-sync.helpers';
 
 const PAUSABLE = new Set(['ACTIVATED']);
 
@@ -70,7 +75,22 @@ async function loadCredentialForSessionOps(
 ) {
   const existing = await tx.credential.findFirst({
     where: { id: params.credentialId, orgId: params.orgId, resellerId: params.resellerId, deletedAt: null },
-    select: { id: true, status: true, username: true, token: true, activatedAt: true, expiresAt: true },
+    select: {
+      id: true,
+      status: true,
+      username: true,
+      token: true,
+      activatedAt: true,
+      expiresAt: true,
+      plan: {
+        select: {
+          quotaType: true,
+          timeAmount: true,
+          timeUnit: true,
+          timeUsageMode: true,
+        },
+      },
+    },
   });
 
   if (!existing) {
@@ -120,10 +140,93 @@ async function softEndOpenRadiusSessions(
   };
 }
 
+/**
+ * MikroTik copies Session-Timeout into Acct-Session-Time. Late accounting then
+ * sets started_at = now − quota (e.g. 30 days). Rewind those rows to insert time
+ * so remaining-time math can discard the fake NAS duration.
+ */
+async function repairBackdatedRadiusStarts(
+  tx: Prisma.TransactionClient,
+  credential: { id: string; username: string | null; token: string | null },
+): Promise<number> {
+  const names = radiusUserNameVariants(credential);
+  const nameFilter =
+    names.length > 0
+      ? Prisma.sql`OR (rs.credential_id IS NULL AND rs.user_name IN (${Prisma.join(names)}))`
+      : Prisma.empty;
+
+  const result = await tx.$executeRaw`
+    UPDATE wf_radius_session rs
+    SET
+      started_at = rs.created_at,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE rs.started_at < rs.created_at - INTERVAL '120 seconds'
+      AND (
+        rs.credential_id = ${credential.id}
+        ${nameFilter}
+      )
+  `;
+  return Number(result);
+}
+
+async function refreshTimeRemainingAfterRepair(
+  tx: Prisma.TransactionClient,
+  credential: {
+    id: string;
+    status: string;
+    username: string | null;
+    token: string | null;
+    expiresAt: Date | null;
+    plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode'> | null;
+  },
+): Promise<void> {
+  const plan = credential.plan;
+  if (!plan || !planHasTimeQuota(plan)) {
+    return;
+  }
+  const quotaSec = planTimeQuotaSec(plan);
+  if (quotaSec == null) {
+    return;
+  }
+
+  const sessions = await tx.radiusSession.findMany({
+    where: radiusSessionUsageWhere(credential),
+    select: {
+      sessionTimeSec: true,
+      startedAt: true,
+      stoppedAt: true,
+      createdAt: true,
+    },
+  });
+  const now = new Date();
+  let usedSec = 0;
+  for (const session of sessions) {
+    usedSec += billedSessionSeconds(
+      session.sessionTimeSec,
+      session.startedAt,
+      session.stoppedAt ?? now,
+      { createdAt: session.createdAt, stoppedAt: session.stoppedAt },
+    );
+  }
+  const remainingSec = Math.max(0, quotaSec - usedSec);
+  const expired = credential.expiresAt != null && credential.expiresAt.getTime() < now.getTime();
+  const restore =
+    credential.status === 'CONSUMED' && remainingSec > 0 && !expired;
+
+  await tx.credential.update({
+    where: { id: credential.id },
+    data: {
+      timeRemainingSec: remainingSec,
+      ...(restore ? { status: 'ACTIVATED' } : {}),
+    },
+  });
+}
+
 const SESSION_CLEARABLE = new Set(['ACTIVATED', 'PAUSED', 'CONSUMED']);
 
 /**
- * Soft-end open RADIUS rows and recent portal holds. Does not change token status.
+ * Soft-end open RADIUS rows, rewind backdated Session-Timeout starts, and
+ * refresh remaining time. CONSUMED tokens with leftover quota become ACTIVATED.
  */
 export async function clearAccessTokenSessions(
   tx: Prisma.TransactionClient,
@@ -138,7 +241,10 @@ export async function clearAccessTokenSessions(
     );
   }
 
-  return softEndOpenRadiusSessions(tx, existing, 'Operator-ClearSessions');
+  await repairBackdatedRadiusStarts(tx, existing);
+  const result = await softEndOpenRadiusSessions(tx, existing, 'Operator-ClearSessions');
+  await refreshTimeRemainingAfterRepair(tx, existing);
+  return result;
 }
 
 /**
@@ -175,7 +281,9 @@ export async function restoreConsumedAccessToken(
     });
   }
 
+  await repairBackdatedRadiusStarts(tx, existing);
   await softEndOpenRadiusSessions(tx, existing, 'Operator-RestoreActivated');
+  await refreshTimeRemainingAfterRepair(tx, { ...existing, status: 'CONSUMED' });
 
   const now = new Date();
   const expired = existing.expiresAt != null && existing.expiresAt.getTime() < now.getTime();

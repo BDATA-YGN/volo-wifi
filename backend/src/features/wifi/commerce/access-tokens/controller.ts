@@ -288,6 +288,7 @@ const radiusSessionSelect = {
   nasIpAddress: true,
   nasIdentifier: true,
   startedAt: true,
+  createdAt: true,
   lastInterimAt: true,
   stoppedAt: true,
   sessionTimeSec: true,
@@ -307,6 +308,7 @@ function serializeRadiusSessionRow(
     nasIpAddress: string | null;
     nasIdentifier: string | null;
     startedAt: Date;
+    createdAt?: Date;
     lastInterimAt: Date | null;
     stoppedAt: Date | null;
     sessionTimeSec: number | null;
@@ -327,6 +329,7 @@ function serializeRadiusSessionRow(
     nasIpAddress: row.nasIpAddress,
     nasIdentifier: row.nasIdentifier,
     startedAt: row.startedAt.toISOString(),
+    createdAt: row.createdAt?.toISOString(),
     lastInterimAt: row.lastInterimAt?.toISOString() ?? null,
     stoppedAt: row.stoppedAt?.toISOString() ?? null,
     sessionTimeSec: row.sessionTimeSec,
@@ -1501,7 +1504,7 @@ export class CommerceAccessTokensController {
             value.action === 'allowNewDevice'
               ? 'Device binding cleared. The customer can log in from a new device now.'
               : value.action === 'clearSessions'
-                ? 'Open RADIUS sessions and recent portal holds were cleared. Token status was not changed.'
+                ? 'Open sessions were cleared and inflated accounting was repaired. If time remains, the token was restored to activated.'
               : value.action === 'restoreActivated'
                 ? 'Open sessions were cleared and the token was restored (activated, or expired if the calendar expiry already passed).'
               : `Access token ${actionLabels[value.action] ?? 'updated'}`,

@@ -134,6 +134,7 @@ export type RadiusSessionPreview = {
   nasIpAddress: string | null;
   nasIdentifier: string | null;
   startedAt: string;
+  createdAt?: string;
   lastInterimAt: string | null;
   stoppedAt: string | null;
   sessionTimeSec: number | null;

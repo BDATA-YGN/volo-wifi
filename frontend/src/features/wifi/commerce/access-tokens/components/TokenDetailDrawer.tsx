@@ -203,7 +203,8 @@ const TokenDetailDrawer: React.FC<Props> = ({
           record.sessionTimeSec,
           record.startedAt,
           record.stoppedAt,
-          record.status
+          record.status,
+          record.createdAt
         ),
     },
     {
