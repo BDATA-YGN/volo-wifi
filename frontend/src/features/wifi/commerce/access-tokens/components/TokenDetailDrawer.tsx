@@ -22,6 +22,10 @@ import type {
 } from "../types";
 import { formatWifiDateTime } from "@/features/wifi/shared/format";
 import {
+  gateSessionLifecycleActions,
+  useCanManageTokenSessionLifecycle,
+} from "@/features/wifi/shared/session-lifecycle-role";
+import {
   VoucherCodeText,
   voucherCodeFontClassName,
   voucherCodeTextStyle,
@@ -86,7 +90,8 @@ const TokenDetailDrawer: React.FC<Props> = ({
   }, [open, tokenId, fallback, loadToken]);
 
   const row = token;
-  const actions = row?.actions;
+  const canManageSessionLifecycle = useCanManageTokenSessionLifecycle();
+  const actions = gateSessionLifecycleActions(row?.actions, canManageSessionLifecycle);
   const captiveSessions = row?.captiveSessions ?? [];
   const captiveSessionsTotal =
     row?.captiveSessionsTotal ?? row?.captiveSessionCount ?? captiveSessions.length;

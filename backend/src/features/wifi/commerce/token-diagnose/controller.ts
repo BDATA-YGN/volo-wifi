@@ -10,6 +10,7 @@ import {
   loadResellerPicker,
   resolveCommerceScope,
 } from '@/features/wifi/commerce/shared/resolve-commerce-scope';
+import { resolveCredentialPermissionContext } from '@/features/wifi/commerce/access-tokens/credential-permissions';
 import { CommerceTokenDiagnoseQuerySchema } from './schema';
 import { diagnoseAccessToken } from './diagnose-token';
 
@@ -98,15 +99,19 @@ export class CommerceTokenDiagnoseController {
         req.user!
       );
 
+      const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
+        adminId,
+        orgId: scope.orgId,
+        user: req.user!,
+        mode: scope.mode === 'partner' ? 'partner' : 'preview',
+      });
+
       const result = await diagnoseAccessToken(this.prisma, {
         orgId: scope.orgId,
         code,
         resellerId: scope.mode === 'partner' ? scope.resellerId : scope.resellerId,
         allowedStationIds,
-        permissionCtx: {
-          mode: scope.mode === 'partner' ? 'partner' : 'preview',
-          isDeveloper,
-        },
+        permissionCtx,
       });
 
       return responseSuccess(res, {

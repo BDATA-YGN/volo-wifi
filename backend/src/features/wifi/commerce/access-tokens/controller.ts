@@ -31,6 +31,7 @@ import { loadAccessTokenRevokeWindowMinutes } from './commerce-settings';
 import {
   assertCredentialActionAllowed,
   resolveCredentialActions,
+  resolveCredentialPermissionContext,
   type CredentialPermissionContext,
 } from './credential-permissions';
 import {
@@ -770,7 +771,6 @@ export class CommerceAccessTokensController {
   public listOrDetails = [
     asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
       const adminId = req.userId!;
-      const isDeveloper = isDeveloperAdmin(req.user!);
       const q = queryResellerParams(req.query);
 
       if (req.query.formOptions === 'true') {
@@ -852,7 +852,12 @@ export class CommerceAccessTokensController {
         }
 
         const { orgId, resellerId, mode, partnerLocked } = scope;
-        const permissionCtx: CredentialPermissionContext = { mode, isDeveloper };
+        const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
+          adminId,
+          orgId,
+          user: req.user!,
+          mode,
+        });
         const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
         const allowedStationIds = await resolveAllowedStationIds(
           this.prisma,
@@ -1036,6 +1041,12 @@ export class CommerceAccessTokensController {
 
         const { orgId, resellerId, mode } = context;
         const isDeveloper = isDeveloperAdmin(req.user!);
+        const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
+          adminId,
+          orgId,
+          user: req.user!,
+          mode,
+        });
         const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
         const elevated = isDeveloper || mode === 'preview';
 
@@ -1048,7 +1059,7 @@ export class CommerceAccessTokensController {
             return responseError(res, 404, { code: 'NOT_FOUND', message: 'Access token not found.' });
           }
           const actions = resolveCredentialActions(
-            { mode, isDeveloper },
+            permissionCtx,
             existing,
             revokeWindowMinutes
           );
@@ -1280,7 +1291,7 @@ export class CommerceAccessTokensController {
             credentials: result.credentials.map((row) =>
               serializeCredential(
                 row,
-                { mode, isDeveloper: isDeveloperAdmin(req.user!) },
+                permissionCtx,
                 revokeWindowMinutes
               )
             ),
@@ -1331,6 +1342,12 @@ export class CommerceAccessTokensController {
 
         const { orgId, resellerId, mode } = context;
         const isDeveloper = isDeveloperAdmin(req.user!);
+        const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
+          adminId,
+          orgId,
+          user: req.user!,
+          mode,
+        });
         const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
         const elevated = isDeveloper || mode === 'preview';
 
@@ -1342,7 +1359,7 @@ export class CommerceAccessTokensController {
           return responseError(res, 404, { code: 'NOT_FOUND', message: 'Access token not found.' });
         }
         const actions = resolveCredentialActions(
-          { mode, isDeveloper },
+          permissionCtx,
           existing,
           revokeWindowMinutes
         );
@@ -1407,7 +1424,6 @@ export class CommerceAccessTokensController {
           });
         }
 
-        const isDeveloper = isDeveloperAdmin(req.user!);
         const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
 
         let orgId: string;
@@ -1448,8 +1464,14 @@ export class CommerceAccessTokensController {
           existing = row;
         }
 
+        const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
+          adminId,
+          orgId,
+          user: req.user!,
+          mode,
+        });
         const actions = resolveCredentialActions(
-          { mode, isDeveloper },
+          permissionCtx,
           existing,
           revokeWindowMinutes
         );
@@ -1496,7 +1518,7 @@ export class CommerceAccessTokensController {
                 ? 'Open sessions were cleared and the token was restored (activated, or expired if the calendar expiry already passed).'
               : `Access token ${actionLabels[value.action] ?? 'updated'}`,
           data: row
-            ? serializeCredential(row, { mode, isDeveloper }, revokeWindowMinutes)
+            ? serializeCredential(row, permissionCtx, revokeWindowMinutes)
             : null,
         });
       } catch (err: unknown) {

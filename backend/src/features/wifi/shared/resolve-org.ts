@@ -22,6 +22,20 @@ export function isPlatformAdmin(user: AdminLike): boolean {
   return user.role?.roleName?.toLowerCase() === 'admin';
 }
 
+/** Console role ORG_ADMIN (legacy ORG_OWNER). */
+export function isConsoleOrgAdmin(user: AdminLike): boolean {
+  const role = user.role?.roleName?.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  return role === 'ORG_ADMIN' || role === 'ORG_OWNER';
+}
+
+/**
+ * Developer, platform Admin, or tenant ORG_ADMIN — destructive token session
+ * actions (clear sessions, revert to sold / activated).
+ */
+export function isSessionLifecycleAdmin(user: AdminLike): boolean {
+  return isDeveloperAdmin(user) || isPlatformAdmin(user) || isConsoleOrgAdmin(user);
+}
+
 /** Platform console roles that may browse any tenant on behalf of org members. */
 export function isPlatformOperator(user: AdminLike): boolean {
   return isDeveloperAdmin(user) || isPlatformAdmin(user);

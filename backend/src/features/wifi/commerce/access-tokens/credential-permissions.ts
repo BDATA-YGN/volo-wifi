@@ -1,3 +1,11 @@
+import { PrismaClient } from '@/generated/prisma/client';
+import {
+  isDeveloperAdmin,
+  isSessionLifecycleAdmin,
+  type AdminLike,
+} from '@/features/wifi/shared/resolve-org';
+import { normalizeMemberRoleCode } from '@/features/wifi/tenant/access-control/constants';
+
 export type CredentialActions = {
   canRevoke: boolean;
   canPause: boolean;
@@ -21,7 +29,60 @@ const REVERTABLE = new Set(['ACTIVATED', 'PAUSED', 'CONSUMED']);
 export type CredentialPermissionContext = {
   mode: 'partner' | 'preview';
   isDeveloper: boolean;
+  /** Developer, platform Admin, or tenant ORG_ADMIN. */
+  canManageSessionLifecycle: boolean;
 };
+
+export async function hasOrgAdminMembership(
+  prisma: PrismaClient,
+  adminId: string,
+  orgId: string,
+): Promise<boolean> {
+  const owned = await prisma.org.findFirst({
+    where: { id: orgId, adminId, deletedAt: null },
+    select: { id: true },
+  });
+  if (owned) return true;
+
+  const member = await prisma.orgMember.findFirst({
+    where: { orgId, adminId, deletedAt: null, status: 'ACTIVE' },
+    select: {
+      roles: {
+        where: { isActive: true, deletedAt: null },
+        select: { roleCode: true },
+      },
+    },
+  });
+
+  return (member?.roles ?? []).some(
+    (row) => String(normalizeMemberRoleCode(row.roleCode)) === 'ORG_ADMIN',
+  );
+}
+
+export async function resolveCredentialPermissionContext(
+  prisma: PrismaClient,
+  params: {
+    adminId: string;
+    orgId: string;
+    user: AdminLike;
+    mode: 'partner' | 'preview';
+  },
+): Promise<CredentialPermissionContext> {
+  const isDeveloper = isDeveloperAdmin(params.user);
+  let canManageSessionLifecycle = isSessionLifecycleAdmin(params.user);
+  if (!canManageSessionLifecycle) {
+    canManageSessionLifecycle = await hasOrgAdminMembership(
+      prisma,
+      params.adminId,
+      params.orgId,
+    );
+  }
+  return {
+    mode: params.mode,
+    isDeveloper,
+    canManageSessionLifecycle,
+  };
+}
 
 export function isRevokeWindowOpen(
   soldAt: Date | null | undefined,
@@ -59,12 +120,9 @@ export function resolveCredentialActions(
     canUnlock: UNLOCKABLE.has(status),
     // Partner + org staff: free device slots for ACTIVATED tokens (does not raise maxDevices).
     canAllowNewDevice: ALLOW_NEW_DEVICE.has(status),
-    canClearSessions: SESSION_CLEARABLE.has(status),
-    canRestoreActivated: RESTORABLE_CONSUMED.has(status),
-    // Developer role only — not other platform roles, even in preview mode.
-    canRevertToSold:
-      (ctx.isDeveloper && REVERTABLE.has(status)) ||
-      (isOpsElevated && RESTORABLE_CONSUMED.has(status)),
+    canClearSessions: ctx.canManageSessionLifecycle && SESSION_CLEARABLE.has(status),
+    canRestoreActivated: ctx.canManageSessionLifecycle && RESTORABLE_CONSUMED.has(status),
+    canRevertToSold: ctx.canManageSessionLifecycle && REVERTABLE.has(status),
     revokeBlockedReason,
   };
 }
@@ -96,11 +154,11 @@ export function assertCredentialActionAllowed(
         ? actions.revokeBlockedReason ??
           'Revoke is only allowed before the token has been used.'
         : action === 'revertToSold'
-          ? 'Revert to sold is only available to developers, or org staff for consumed tokens.'
+          ? 'Revert to sold is only available to Developer, Admin, or ORG_ADMIN.'
           : action === 'restoreActivated'
-            ? 'Restore to activated is only available for consumed tokens.'
+            ? 'Restore to activated is only available to Developer, Admin, or ORG_ADMIN.'
           : action === 'clearSessions'
-            ? 'Clear sessions is only available for activated, paused, or consumed tokens.'
+            ? 'Clear sessions is only available to Developer, Admin, or ORG_ADMIN.'
           : action === 'allowNewDevice'
             ? 'Allow new device is only available for activated tokens.'
             : `Action "${action}" is not allowed for this token.`;

@@ -24,6 +24,10 @@ import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import { getApiErrorMessage } from "@/common/exceptions/handleApiError";
 import WifiOrgScopeBar from "@/features/wifi/shared/components/WifiOrgScopeBar";
 import { formatWifiDateTimeWithSeconds } from "@/features/wifi/shared/format";
+import {
+  gateSessionLifecycleActions,
+  useCanManageTokenSessionLifecycle,
+} from "@/features/wifi/shared/session-lifecycle-role";
 import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
 import { formatBytes, formatSessionDuration, formatStatusLabel } from "@/features/wifi/commerce/access-tokens/utils";
 import { STATUS_COLOR } from "@/features/wifi/commerce/access-tokens/constant";
@@ -75,6 +79,7 @@ const CommerceTokenDiagnosePage: React.FC = () => {
     loadFormOptions,
     refresh,
   } = useCommerceTokenDiagnose();
+  const canManageSessionLifecycle = useCanManageTokenSessionLifecycle();
 
   const [history, setHistory] = React.useState<HistoryEntry[]>([]);
   const [historyActive, setHistoryActive] = React.useState<string>("");
@@ -166,9 +171,22 @@ const CommerceTokenDiagnosePage: React.FC = () => {
     activeCode && submittedCode?.trim().toUpperCase() === activeCode && meta
       ? meta
       : activeHistory?.meta ?? null;
+  const tokenActions = gateSessionLifecycleActions(
+    activeResult?.token?.actions,
+    canManageSessionLifecycle
+  );
 
   const handleTokenAction = async (action: CredentialLifecycleAction) => {
     if (!activeResult?.token?.id) return;
+    if (
+      (action === "clearSessions" ||
+        action === "restoreActivated" ||
+        action === "revertToSold") &&
+      !canManageSessionLifecycle
+    ) {
+      message.warning("This action is only available to Developer, Admin, or ORG_ADMIN.");
+      return;
+    }
     if (!activeMeta?.orgId) {
       message.warning("Select a tenant first.");
       return;
@@ -400,17 +418,17 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                 size="small"
                 extra={
                   <Space wrap>
-                    {activeResult.token.actions?.canClearSessions ? (
+                    {tokenActions?.canClearSessions ? (
                       <Button size="small" onClick={() => void handleTokenAction("clearSessions")}>
                         Clear sessions
                       </Button>
                     ) : null}
-                    {activeResult.token.actions?.canRestoreActivated ? (
+                    {tokenActions?.canRestoreActivated ? (
                       <Button size="small" type="primary" onClick={() => void handleTokenAction("restoreActivated")}>
                         Restore to activated
                       </Button>
                     ) : null}
-                    {activeResult.token.actions?.canRevertToSold ? (
+                    {tokenActions?.canRevertToSold ? (
                       <Button size="small" onClick={() => void handleTokenAction("revertToSold")}>
                         Revert to sold
                       </Button>
@@ -625,7 +643,7 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                 />
 
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
-                  {activeResult.token?.actions?.canClearSessions ? (
+                  {tokenActions?.canClearSessions ? (
                     <Button type="primary" onClick={() => void handleTokenAction("clearSessions")}>
                       Clear sessions
                     </Button>
@@ -635,12 +653,12 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                       Allow new device
                     </Button>
                   ) : null}
-                  {activeResult.token?.actions?.canRestoreActivated ? (
+                  {tokenActions?.canRestoreActivated ? (
                     <Button onClick={() => void handleTokenAction("restoreActivated")}>
                       Restore to activated
                     </Button>
                   ) : null}
-                  {activeResult.token?.actions?.canRevertToSold ? (
+                  {tokenActions?.canRevertToSold ? (
                     <Button onClick={() => void handleTokenAction("revertToSold")}>
                       Revert to sold
                     </Button>

@@ -8,6 +8,7 @@ import { KeyRound } from "lucide-react";
 import CommonHeader from "@/common/components/@bdata/CommonHeader";
 import OrgSwitcher from "@/features/wifi/tenant/profile/components/OrgSwitcher";
 import { useCommerceAccessTokens } from "./useCommerceAccessTokens";
+import { useCanManageTokenSessionLifecycle } from "@/features/wifi/shared/session-lifecycle-role";
 import type {
   AccessTokenRecord,
   CredentialLifecycleAction,
@@ -25,6 +26,7 @@ import IssueSuccessModal from "./components/IssueSuccessModal";
 const CommerceAccessTokensPage: React.FC = () => {
   const { message, modal } = App.useApp();
   const { token } = theme.useToken();
+  const canManageSessionLifecycle = useCanManageTokenSessionLifecycle();
 
   const [search, setSearchLocal] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -140,6 +142,15 @@ const CommerceAccessTokensPage: React.FC = () => {
   };
 
   const handleApplyAction = (record: AccessTokenRecord, action: CredentialLifecycleAction) => {
+    if (
+      (action === "clearSessions" ||
+        action === "restoreActivated" ||
+        action === "revertToSold") &&
+      !canManageSessionLifecycle
+    ) {
+      message.warning("This action is only available to Developer, Admin, or ORG_ADMIN.");
+      return;
+    }
     modal.confirm({
       title: actionLabels[action],
       content:
