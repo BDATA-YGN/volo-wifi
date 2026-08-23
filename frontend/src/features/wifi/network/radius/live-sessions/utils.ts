@@ -17,18 +17,26 @@ export function formatSessionDuration(
   sessionTimeSec: number | null | undefined,
   startedAt: string,
   stoppedAt: string | null,
-  status: RadiusAcctStatus
+  status: RadiusAcctStatus,
+  lastInterimAt?: string | null
 ): string {
-  let sec = sessionTimeSec ?? undefined;
-  if (sec == null) {
-    const start = new Date(startedAt).getTime();
-    const end =
-      stoppedAt != null
-        ? new Date(stoppedAt).getTime()
-        : status === "STOP"
-          ? start
-          : Date.now();
-    sec = Math.max(0, Math.floor((end - start) / 1000));
+  const start = new Date(startedAt).getTime();
+  const lastSeen = lastInterimAt ? new Date(lastInterimAt).getTime() : NaN;
+  const stop = stoppedAt != null ? new Date(stoppedAt).getTime() : NaN;
+  const end = Number.isFinite(lastSeen)
+    ? lastSeen
+    : Number.isFinite(stop)
+      ? stop
+      : status === "STOP"
+        ? start
+        : Date.now();
+  const lastSeenSec = Math.max(0, Math.floor((end - start) / 1000));
+  const nas = sessionTimeSec ?? 0;
+  let sec = lastSeenSec;
+  if (nas > 12 * 3600 && nas > lastSeenSec * 2) {
+    sec = lastSeenSec;
+  } else if (nas > 0) {
+    sec = nas;
   }
 
   const h = Math.floor(sec / 3600);

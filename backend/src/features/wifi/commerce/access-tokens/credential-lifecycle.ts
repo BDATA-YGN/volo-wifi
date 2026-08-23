@@ -198,6 +198,7 @@ async function refreshTimeRemainingAfterRepair(
       startedAt: true,
       stoppedAt: true,
       createdAt: true,
+      lastInterimAt: true,
     },
   });
   const now = new Date();
@@ -207,7 +208,11 @@ async function refreshTimeRemainingAfterRepair(
       session.sessionTimeSec,
       session.startedAt,
       session.stoppedAt ?? now,
-      { createdAt: session.createdAt, stoppedAt: session.stoppedAt },
+      {
+        createdAt: session.createdAt,
+        stoppedAt: session.stoppedAt,
+        lastInterimAt: session.lastInterimAt,
+      },
     );
   }
   const remainingSec = Math.max(0, quotaSec - usedSec);

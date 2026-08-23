@@ -189,7 +189,9 @@ const TokenDetailDrawer: React.FC<Props> = ({
         <div style={{ fontSize: 12 }}>
           <div>{formatWifiDateTime(record.startedAt)}</div>
           <Text type="secondary">
-            → {record.stoppedAt ? formatWifiDateTime(record.stoppedAt) : "online"}
+            → {record.stoppedAt
+              ? formatWifiDateTime(record.lastInterimAt ?? record.stoppedAt)
+              : "online"}
           </Text>
         </div>
       ),
@@ -204,7 +206,8 @@ const TokenDetailDrawer: React.FC<Props> = ({
           record.startedAt,
           record.stoppedAt,
           record.status,
-          record.createdAt
+          record.createdAt,
+          record.lastInterimAt
         ),
     },
     {

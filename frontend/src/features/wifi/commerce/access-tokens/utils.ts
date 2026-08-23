@@ -41,23 +41,27 @@ export function billedDurationSeconds(
   startedAt: string,
   stoppedAt: string | null,
   status: string,
-  createdAt?: string | null
+  createdAt?: string | null,
+  lastInterimAt?: string | null
 ): number {
   const startMs = new Date(startedAt).getTime();
   const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
   const start =
     Number.isFinite(createdMs) && createdMs > startMs ? createdMs : startMs;
-  const end =
-    stoppedAt != null
-      ? new Date(stoppedAt).getTime()
+  const lastSeenMs = lastInterimAt ? new Date(lastInterimAt).getTime() : NaN;
+  const stopMs = stoppedAt != null ? new Date(stoppedAt).getTime() : NaN;
+  const end = Number.isFinite(lastSeenMs)
+    ? lastSeenMs
+    : Number.isFinite(stopMs)
+      ? stopMs
       : status === "STOP"
         ? start
         : Date.now();
-  const wall = Math.max(0, Math.floor((end - start) / 1000));
+  const lastSeen = Math.max(0, Math.floor((end - start) / 1000));
   const nas = sessionTimeSec ?? 0;
-  if (sessionTimeSec == null) return wall;
-  if (nas > wall + 120 && nas > wall * 2) return wall;
-  return Math.max(nas, wall);
+  if (nas > 12 * 3600 && nas > lastSeen * 2) return lastSeen;
+  if (nas > 0) return nas;
+  return lastSeen;
 }
 
 export function formatSessionDuration(
@@ -65,9 +69,17 @@ export function formatSessionDuration(
   startedAt: string,
   stoppedAt: string | null,
   status: string,
-  createdAt?: string | null
+  createdAt?: string | null,
+  lastInterimAt?: string | null
 ): string {
-  let sec = billedDurationSeconds(sessionTimeSec, startedAt, stoppedAt, status, createdAt);
+  let sec = billedDurationSeconds(
+    sessionTimeSec,
+    startedAt,
+    stoppedAt,
+    status,
+    createdAt,
+    lastInterimAt
+  );
 
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);

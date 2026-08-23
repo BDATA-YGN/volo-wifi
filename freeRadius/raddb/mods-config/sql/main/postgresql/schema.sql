@@ -150,10 +150,12 @@ FROM (
 	LEFT JOIN LATERAL (
 		SELECT COALESCE(SUM(
 			CASE
-				WHEN COALESCE(rs."sessionTimeSec", 0) > w.wall + 120
-					AND COALESCE(rs."sessionTimeSec", 0) > w.wall * 2
-				THEN w.wall
-				ELSE GREATEST(COALESCE(rs."sessionTimeSec", 0), w.wall)
+				WHEN COALESCE(rs."sessionTimeSec", 0) > 43200
+					AND COALESCE(rs."sessionTimeSec", 0) > w.last_seen * 2
+				THEN w.last_seen
+				WHEN COALESCE(rs."sessionTimeSec", 0) > 0
+				THEN rs."sessionTimeSec"
+				ELSE w.last_seen
 			END
 		), 0)::integer AS used_sec
 		FROM wf_radius_session rs
@@ -161,9 +163,10 @@ FROM (
 			SELECT GREATEST(
 				0,
 				FLOOR(EXTRACT(EPOCH FROM (
-					COALESCE(rs.stopped_at, CURRENT_TIMESTAMP) - rs.started_at
+					COALESCE(rs.last_interim_at, rs.stopped_at, CURRENT_TIMESTAMP)
+					- GREATEST(rs.started_at, rs.created_at)
 				)))::integer
-			) AS wall
+			) AS last_seen
 		) w
 		WHERE (
 			(c.username IS NOT NULL AND rs.user_name = c.username)

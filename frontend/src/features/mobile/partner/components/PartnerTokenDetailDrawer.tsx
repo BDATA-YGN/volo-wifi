@@ -160,7 +160,9 @@ function RadiusSessionCard({ session }: { session: RadiusSessionPreview }) {
     session.sessionTimeSec,
     session.startedAt,
     session.stoppedAt,
-    session.status
+    session.status,
+    session.createdAt,
+    session.lastInterimAt
   );
 
   return (
@@ -186,7 +188,9 @@ function RadiusSessionCard({ session }: { session: RadiusSessionPreview }) {
       <p className={styles.sessionLine}>
         <span className={styles.sessionKey}>To</span>
         <span>
-          {session.stoppedAt ? formatWifiDateTime(session.stoppedAt) : "Still online"}
+          {session.stoppedAt
+            ? formatWifiDateTime(session.lastInterimAt ?? session.stoppedAt)
+            : "Still online"}
         </span>
       </p>
       <p className={styles.sessionLine}>

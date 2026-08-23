@@ -89,15 +89,16 @@ function asNumber(value: bigint | number | null | undefined): number | null {
   return value;
 }
 
-function wallSeconds(
+function lastSeenSeconds(
   startedAt: Date,
   endedAt: Date | null,
   now: Date,
   createdAt?: Date | null,
+  lastInterimAt?: Date | null,
 ): number {
   const start =
     createdAt && createdAt.getTime() > startedAt.getTime() ? createdAt : startedAt;
-  const end = endedAt ?? now;
+  const end = lastInterimAt ?? endedAt ?? now;
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
 }
 
@@ -112,18 +113,34 @@ function isDataCapBytes(totalBytes: number | null, planDataMb: number | null): b
 }
 
 function isInflated(session: SessionLike, now: Date): boolean {
-  const wall = wallSeconds(session.startedAt, session.stoppedAt, now, session.createdAt);
+  const lastSeen = lastSeenSeconds(
+    session.startedAt,
+    session.stoppedAt,
+    now,
+    session.createdAt,
+    session.lastInterimAt,
+  );
   const nas = session.sessionTimeSec ?? 0;
-  return nas > wall + 120 && nas > wall * 2;
+  return nas > 12 * 3600 && nas > lastSeen * 2;
 }
 
 function serializeSession(session: SessionLike, now: Date) {
-  const wall = wallSeconds(session.startedAt, session.stoppedAt, now, session.createdAt);
+  const wall = lastSeenSeconds(
+    session.startedAt,
+    session.stoppedAt,
+    now,
+    session.createdAt,
+    session.lastInterimAt,
+  );
   const billed = billedSessionSeconds(
     session.sessionTimeSec,
     session.startedAt,
     session.stoppedAt ?? now,
-    { createdAt: session.createdAt ?? null, stoppedAt: session.stoppedAt },
+    {
+      createdAt: session.createdAt ?? null,
+      stoppedAt: session.stoppedAt,
+      lastInterimAt: session.lastInterimAt,
+    },
   );
   return {
     id: session.id,
@@ -548,6 +565,7 @@ export async function diagnoseAccessToken(
         billedSessionSeconds(row.sessionTimeSec, row.startedAt, row.stoppedAt ?? now, {
           createdAt: row.createdAt ?? null,
           stoppedAt: row.stoppedAt,
+          lastInterimAt: row.lastInterimAt,
         }),
       0
     ),

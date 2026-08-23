@@ -72,18 +72,24 @@ export function planTimeQuotaSec(
 }
 
 /**
- * NAS Acct-Session-Time can be leftover hotspot host uptime or a copy of
- * Session-Timeout (e.g. 10800s on a 1-minute session). Trust wall clock when
- * NAS time is both >2 minutes beyond wall and more than 2× wall.
+ * @deprecated Kept for diagnose copy; billed time no longer GREATEST(nas, wall).
+ * Session-Timeout copies are discarded only when NAS time exceeds 12h and 2× last-seen.
  */
 export const ACCT_SESSION_TIME_SLACK_SEC = 120;
+
+/** NAS Acct-Session-Time above this that also dwarfs last RADIUS update is treated as Session-Timeout copy. */
+export const IMPLAUSIBLE_ACCT_SESSION_SEC = 12 * 3600;
+
+export type BilledSessionTimeOptions = {
+  createdAt?: Date | null;
+  stoppedAt?: Date | null;
+  lastInterimAt?: Date | null;
+};
 
 /**
  * MikroTik often copies Session-Timeout into Acct-Session-Time. Late Interim/Stop
  * INSERT then sets started_at = now − that value (e.g. 30 days ago on a 30-day
- * plan). Wall clock then equals NAS time, so the inflation guard never fires.
- * Always bill from insert time when created_at is later than started_at, including
- * already-stopped rows.
+ * plan). Always measure from insert time when created_at is later than started_at.
  */
 export function effectiveAccountingStart(
   startedAt: Date,
@@ -93,19 +99,32 @@ export function effectiveAccountingStart(
   return options.createdAt.getTime() > startedAt.getTime() ? options.createdAt : startedAt;
 }
 
+/**
+ * Bill RADIUS Acct-Session-Time as stored. Do not GREATEST with start→stop wall
+ * clock (cleanup used to stamp stopped_at = now and inflate remaining).
+ * Fallback to last-interim span only when NAS time is missing or looks like a
+ * Session-Timeout copy (>12h and more than 2× last RADIUS update).
+ */
 export function billedSessionSeconds(
   sessionTimeSec: number | null | undefined,
   startedAt: Date,
   endedAt: Date,
-  options?: { createdAt?: Date | null; stoppedAt?: Date | null },
+  options?: BilledSessionTimeOptions,
 ): number {
   const wallStart = effectiveAccountingStart(startedAt, options);
-  const wall = Math.max(0, Math.floor((endedAt.getTime() - wallStart.getTime()) / 1000));
+  const lastSeenAt = options?.lastInterimAt ?? options?.stoppedAt ?? endedAt;
+  const lastSeen = Math.max(
+    0,
+    Math.floor((lastSeenAt.getTime() - wallStart.getTime()) / 1000),
+  );
   const nas = sessionTimeSec ?? 0;
-  if (nas > wall + ACCT_SESSION_TIME_SLACK_SEC && nas > wall * 2) {
-    return wall;
+  if (nas > IMPLAUSIBLE_ACCT_SESSION_SEC && nas > lastSeen * 2) {
+    return lastSeen;
   }
-  return Math.max(nas, wall);
+  if (nas > 0) {
+    return nas;
+  }
+  return lastSeen;
 }
 
 /** True when wall-clock time since activation meets or exceeds the plan time allowance. */
@@ -199,6 +218,7 @@ export async function aggregateRadiusUsedSeconds(
       startedAt: true,
       stoppedAt: true,
       createdAt: true,
+      lastInterimAt: true,
     },
   });
 
@@ -210,6 +230,7 @@ export async function aggregateRadiusUsedSeconds(
     total += billedSessionSeconds(s.sessionTimeSec, s.startedAt, end, {
       createdAt: s.createdAt,
       stoppedAt: s.stoppedAt,
+      lastInterimAt: s.lastInterimAt,
     });
   }
   return total;

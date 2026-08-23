@@ -65,6 +65,9 @@ const loadConfig = async (): Promise<CredentialSyncConfig> => {
  * Close orphan START/INTERIM RADIUS sessions so remaining-time math stays accurate
  * and Simultaneous-Use slots free up after NAS power loss.
  *
+ * STOP is the last RADIUS update (last_interim_at), not now. Acct-Session-Time is
+ * left as the NAS sent it — do not overwrite with start→now wall clock.
+ *
  * Age is measured from GREATEST(started_at, created_at) so a delayed Accounting-Start
  * with a backdated started_at is not treated as already hours old.
  */
@@ -73,37 +76,8 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
     UPDATE wf_radius_session
     SET
       status = 'STOP',
-      stopped_at = COALESCE(stopped_at, CURRENT_TIMESTAMP),
+      stopped_at = COALESCE(last_interim_at, created_at, started_at),
       terminate_cause = COALESCE(NULLIF(terminate_cause, ''), 'Cleanup-Timeout'),
-      "sessionTimeSec" = CASE
-        WHEN COALESCE("sessionTimeSec", 0) > GREATEST(
-          0,
-          FLOOR(EXTRACT(EPOCH FROM (
-            CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
-          )))::integer
-        ) + 120
-        AND COALESCE("sessionTimeSec", 0) > GREATEST(
-          0,
-          FLOOR(EXTRACT(EPOCH FROM (
-            CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
-          )))::integer
-        ) * 2
-        THEN GREATEST(
-          0,
-          FLOOR(EXTRACT(EPOCH FROM (
-            CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
-          )))::integer
-        )
-        ELSE GREATEST(
-          COALESCE("sessionTimeSec", 0),
-          GREATEST(
-            0,
-            FLOOR(EXTRACT(EPOCH FROM (
-              CURRENT_TIMESTAMP - GREATEST(started_at, created_at)
-            )))::integer
-          )
-        )
-      END,
       updated_at = CURRENT_TIMESTAMP
     WHERE stopped_at IS NULL
       AND status IN ('START', 'INTERIM')
@@ -114,6 +88,98 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
       )
   `;
   return Number(result);
+}
+
+/**
+ * Repair rows whose displayed window or stored sessionTimeSec exceeds 12 hours
+ * because cleanup used to stamp stopped_at = now and GREATEST(nas, wall).
+ * STOP becomes last RADIUS update; sessionTimeSec stays when it looks like real
+ * NAS time (≤12h), otherwise last-interim − start.
+ */
+async function repairInflatedSessionWallClocks(): Promise<number> {
+  const hot = await prisma.$executeRaw`
+    UPDATE wf_radius_session rs
+    SET
+      stopped_at = COALESCE(rs.last_interim_at, rs.created_at, rs.started_at),
+      status = 'STOP'::"RadiusAcctStatus",
+      "sessionTimeSec" = CASE
+        WHEN COALESCE(rs."sessionTimeSec", 0) > 0
+          AND COALESCE(rs."sessionTimeSec", 0) <= 43200
+        THEN rs."sessionTimeSec"
+        ELSE GREATEST(
+          0,
+          FLOOR(EXTRACT(EPOCH FROM (
+            COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
+            - GREATEST(rs.started_at, rs.created_at)
+          )))::integer
+        )
+      END,
+      terminate_cause = COALESCE(NULLIF(rs.terminate_cause, ''), 'Last-Interim-Stop'),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE rs.stopped_at IS NOT NULL
+      AND (
+        (
+          EXTRACT(EPOCH FROM (
+            rs.stopped_at - GREATEST(rs.started_at, rs.created_at)
+          )) > 43200
+          AND (
+            rs.last_interim_at IS NULL
+            OR rs.stopped_at > rs.last_interim_at + INTERVAL '120 seconds'
+          )
+        )
+        OR (
+          COALESCE(rs."sessionTimeSec", 0) > 43200
+          AND COALESCE(rs."sessionTimeSec", 0) > GREATEST(
+            0,
+            FLOOR(EXTRACT(EPOCH FROM (
+              COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
+              - GREATEST(rs.started_at, rs.created_at)
+            )))::integer
+          ) * 2
+        )
+      )
+  `;
+
+  const archive = await prisma.$executeRaw`
+    UPDATE wf_radius_session_archive rs
+    SET
+      stopped_at = COALESCE(rs.last_interim_at, rs.started_at),
+      status = 'STOP'::"RadiusAcctStatus",
+      session_time_sec = CASE
+        WHEN COALESCE(rs.session_time_sec, 0) > 0
+          AND COALESCE(rs.session_time_sec, 0) <= 43200
+        THEN rs.session_time_sec
+        ELSE GREATEST(
+          0,
+          FLOOR(EXTRACT(EPOCH FROM (
+            COALESCE(rs.last_interim_at, rs.started_at)
+            - rs.started_at
+          )))::integer
+        )
+      END,
+      terminate_cause = COALESCE(NULLIF(rs.terminate_cause, ''), 'Last-Interim-Stop')
+    WHERE rs.stopped_at IS NOT NULL
+      AND (
+        (
+          EXTRACT(EPOCH FROM (rs.stopped_at - rs.started_at)) > 43200
+          AND (
+            rs.last_interim_at IS NULL
+            OR rs.stopped_at > rs.last_interim_at + INTERVAL '120 seconds'
+          )
+        )
+        OR (
+          COALESCE(rs.session_time_sec, 0) > 43200
+          AND COALESCE(rs.session_time_sec, 0) > GREATEST(
+            0,
+            FLOOR(EXTRACT(EPOCH FROM (
+              COALESCE(rs.last_interim_at, rs.started_at) - rs.started_at
+            )))::integer
+          ) * 2
+        )
+      )
+  `;
+
+  return Number(hot) + Number(archive);
 }
 
 /** Calendar window ended → EXPIRED (takes precedence over CONSUMED). */
@@ -160,10 +226,12 @@ async function syncRemainingAndConsume(): Promise<number> {
         SELECT
           COALESCE(SUM(
             CASE
-              WHEN COALESCE(rs."sessionTimeSec", 0) > w.wall + 120
-                AND COALESCE(rs."sessionTimeSec", 0) > w.wall * 2
-              THEN w.wall
-              ELSE GREATEST(COALESCE(rs."sessionTimeSec", 0), w.wall)
+              WHEN COALESCE(rs."sessionTimeSec", 0) > 43200
+                AND COALESCE(rs."sessionTimeSec", 0) > w.last_seen * 2
+              THEN w.last_seen
+              WHEN COALESCE(rs."sessionTimeSec", 0) > 0
+              THEN rs."sessionTimeSec"
+              ELSE w.last_seen
             END
           ), 0)::integer AS used_sec,
           COALESCE(SUM(
@@ -177,10 +245,10 @@ async function syncRemainingAndConsume(): Promise<number> {
           SELECT GREATEST(
             0,
             FLOOR(EXTRACT(EPOCH FROM (
-              COALESCE(rs.stopped_at, CURRENT_TIMESTAMP)
+              COALESCE(rs.last_interim_at, rs.stopped_at, CURRENT_TIMESTAMP)
               - GREATEST(rs.started_at, rs.created_at)
             )))::integer
-          ) AS wall
+          ) AS last_seen
         ) w
         WHERE (
           (c.username IS NOT NULL AND rs.user_name = c.username)
@@ -289,6 +357,7 @@ let running = false;
 
 export type CredentialSyncTickResult = {
   staleRadiusClosed: number;
+  inflatedWallRepaired: number;
   expired: number;
   remainingSynced: number;
 };
@@ -296,7 +365,7 @@ export type CredentialSyncTickResult = {
 export async function runCredentialSyncTick(): Promise<CredentialSyncTickResult> {
   if (running) {
     logger.warn('[credential-sync] Previous run still in progress; skipping');
-    return { staleRadiusClosed: 0, expired: 0, remainingSynced: 0 };
+    return { staleRadiusClosed: 0, inflatedWallRepaired: 0, expired: 0, remainingSynced: 0 };
   }
   running = true;
   const startedAt = Date.now();
@@ -305,18 +374,19 @@ export async function runCredentialSyncTick(): Promise<CredentialSyncTickResult>
     const cfg = await loadConfig();
     if (!cfg.enabled) {
       logger.info('[credential-sync] Disabled by AppSetting');
-      return { staleRadiusClosed: 0, expired: 0, remainingSynced: 0 };
+      return { staleRadiusClosed: 0, inflatedWallRepaired: 0, expired: 0, remainingSynced: 0 };
     }
 
     const staleRadiusClosed = await closeStaleRadiusSessions(cfg);
+    const inflatedWallRepaired = await repairInflatedSessionWallClocks();
     const expired = await markExpiredCredentials();
     const remainingSynced = await syncRemainingAndConsume();
 
     logger.info(
-      `[credential-sync] Tick done in ${Date.now() - startedAt}ms (staleRadius=${staleRadiusClosed}, expired=${expired}, remainingSynced=${remainingSynced})`,
+      `[credential-sync] Tick done in ${Date.now() - startedAt}ms (staleRadius=${staleRadiusClosed}, inflatedWall=${inflatedWallRepaired}, expired=${expired}, remainingSynced=${remainingSynced})`,
     );
 
-    return { staleRadiusClosed, expired, remainingSynced };
+    return { staleRadiusClosed, inflatedWallRepaired, expired, remainingSynced };
   } catch (err) {
     logger.error('[credential-sync] Tick failed', { err });
     throw err;

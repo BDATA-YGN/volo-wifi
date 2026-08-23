@@ -698,7 +698,14 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                       title: "NAS time",
                       dataIndex: "sessionTimeSec",
                       render: (value: number | null, row) =>
-                        formatSessionDuration(value, row.startedAt, row.stoppedAt, row.status),
+                        formatSessionDuration(
+                          value,
+                          row.startedAt,
+                          row.stoppedAt,
+                          row.status,
+                          row.createdAt,
+                          row.lastInterimAt
+                        ),
                     },
                     {
                       title: "Wall / billed",

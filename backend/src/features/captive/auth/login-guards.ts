@@ -9,7 +9,6 @@ import {
 import {
   aggregateRadiusUsedBytes,
   aggregateRadiusUsedSeconds,
-  billedSessionSeconds,
   isPlanActivationWindowExceeded,
   planDataQuotaBytes,
   planHasDataQuota,
@@ -176,7 +175,7 @@ async function endOpenRadiusSessionsForSameDevice(params: {
       callingStationId: true,
       startedAt: true,
       createdAt: true,
-      sessionTimeSec: true,
+      lastInterimAt: true,
     },
   });
 
@@ -188,19 +187,13 @@ async function endOpenRadiusSessionsForSameDevice(params: {
   const now = new Date();
   await Promise.all(
     matched.map((row) => {
-      const sessionTimeSec = billedSessionSeconds(
-        row.sessionTimeSec,
-        row.startedAt,
-        now,
-        { createdAt: row.createdAt, stoppedAt: null },
-      );
+      const stoppedAt = row.lastInterimAt ?? row.createdAt ?? row.startedAt;
       return prisma.radiusSession.update({
         where: { id: row.id },
         data: {
-          stoppedAt: now,
+          stoppedAt,
           status: RadiusAcctStatus.STOP,
           terminateCause: 'Portal-ReLogin',
-          sessionTimeSec,
           updatedAt: now,
         },
       });
