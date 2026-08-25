@@ -18,9 +18,13 @@ export function formatSessionDuration(
   startedAt: string,
   stoppedAt: string | null,
   status: RadiusAcctStatus,
-  lastInterimAt?: string | null
+  lastInterimAt?: string | null,
+  createdAt?: string | null
 ): string {
-  const start = new Date(startedAt).getTime();
+  const startMs = new Date(startedAt).getTime();
+  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+  const start =
+    Number.isFinite(createdMs) && createdMs > startMs ? createdMs : startMs;
   const lastSeen = lastInterimAt ? new Date(lastInterimAt).getTime() : NaN;
   const stop = stoppedAt != null ? new Date(stoppedAt).getTime() : NaN;
   const end = Number.isFinite(lastSeen)

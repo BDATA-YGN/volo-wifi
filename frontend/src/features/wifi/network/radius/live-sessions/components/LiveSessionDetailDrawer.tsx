@@ -144,7 +144,8 @@ const LiveSessionDetailDrawer: React.FC<Props> = ({
                   row.startedAt,
                   row.stoppedAt,
                   row.status,
-                  row.lastInterimAt
+                  row.lastInterimAt,
+                  row.createdAt
                 )}
               </Descriptions.Item>
               <Descriptions.Item label="Input / Output">

@@ -91,95 +91,65 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
 }
 
 /**
- * Repair rows whose displayed window or stored sessionTimeSec exceeds 12 hours
- * because cleanup used to stamp stopped_at = now and GREATEST(nas, wall).
- * STOP becomes last RADIUS update; sessionTimeSec stays when it looks like real
- * NAS time (≤12h), otherwise last-interim − start.
+ * STOP must be the last RADIUS update. Never invent sessionTimeSec (that
+ * column is Acct-Session-Time from the NAS only).
  */
 async function repairInflatedSessionWallClocks(): Promise<number> {
   const hot = await prisma.$executeRaw`
-    UPDATE wf_radius_session rs
+    UPDATE wf_radius_session
     SET
-      stopped_at = COALESCE(rs.last_interim_at, rs.created_at, rs.started_at),
+      stopped_at = COALESCE(last_interim_at, created_at, started_at),
       status = 'STOP'::"RadiusAcctStatus",
-      "sessionTimeSec" = CASE
-        WHEN COALESCE(rs."sessionTimeSec", 0) > 0
-          AND COALESCE(rs."sessionTimeSec", 0) <= 43200
-        THEN rs."sessionTimeSec"
-        ELSE GREATEST(
-          0,
-          FLOOR(EXTRACT(EPOCH FROM (
-            COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
-            - GREATEST(rs.started_at, rs.created_at)
-          )))::integer
-        )
-      END,
-      terminate_cause = COALESCE(NULLIF(rs.terminate_cause, ''), 'Last-Interim-Stop'),
       updated_at = CURRENT_TIMESTAMP
-    WHERE rs.stopped_at IS NOT NULL
-      AND (
-        (
-          EXTRACT(EPOCH FROM (
-            rs.stopped_at - GREATEST(rs.started_at, rs.created_at)
-          )) > 43200
-          AND (
-            rs.last_interim_at IS NULL
-            OR rs.stopped_at > rs.last_interim_at + INTERVAL '120 seconds'
-          )
-        )
-        OR (
-          COALESCE(rs."sessionTimeSec", 0) > 43200
-          AND COALESCE(rs."sessionTimeSec", 0) > GREATEST(
-            0,
-            FLOOR(EXTRACT(EPOCH FROM (
-              COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
-              - GREATEST(rs.started_at, rs.created_at)
-            )))::integer
-          ) * 2
-        )
-      )
+    WHERE stopped_at IS NOT NULL
+      AND last_interim_at IS NOT NULL
+      AND ABS(EXTRACT(EPOCH FROM (stopped_at - last_interim_at))) > 120
   `;
 
   const archive = await prisma.$executeRaw`
-    UPDATE wf_radius_session_archive rs
+    UPDATE wf_radius_session_archive
     SET
-      stopped_at = COALESCE(rs.last_interim_at, rs.started_at),
-      status = 'STOP'::"RadiusAcctStatus",
-      session_time_sec = CASE
-        WHEN COALESCE(rs.session_time_sec, 0) > 0
-          AND COALESCE(rs.session_time_sec, 0) <= 43200
-        THEN rs.session_time_sec
-        ELSE GREATEST(
-          0,
-          FLOOR(EXTRACT(EPOCH FROM (
-            COALESCE(rs.last_interim_at, rs.started_at)
-            - rs.started_at
-          )))::integer
-        )
-      END,
-      terminate_cause = COALESCE(NULLIF(rs.terminate_cause, ''), 'Last-Interim-Stop')
-    WHERE rs.stopped_at IS NOT NULL
-      AND (
-        (
-          EXTRACT(EPOCH FROM (rs.stopped_at - rs.started_at)) > 43200
-          AND (
-            rs.last_interim_at IS NULL
-            OR rs.stopped_at > rs.last_interim_at + INTERVAL '120 seconds'
-          )
-        )
-        OR (
-          COALESCE(rs.session_time_sec, 0) > 43200
-          AND COALESCE(rs.session_time_sec, 0) > GREATEST(
-            0,
-            FLOOR(EXTRACT(EPOCH FROM (
-              COALESCE(rs.last_interim_at, rs.started_at) - rs.started_at
-            )))::integer
-          ) * 2
-        )
-      )
+      stopped_at = COALESCE(last_interim_at, started_at),
+      status = 'STOP'::"RadiusAcctStatus"
+    WHERE stopped_at IS NOT NULL
+      AND last_interim_at IS NOT NULL
+      AND ABS(EXTRACT(EPOCH FROM (stopped_at - last_interim_at))) > 120
   `;
 
   return Number(hot) + Number(archive);
+}
+
+/**
+ * MikroTik reuses Acct-Session-Id across vouchers. Restore user_name to the
+ * bound credential and STOP at last RADIUS update. Do not invent sessionTimeSec.
+ */
+async function repairReboundStolenUserNames(): Promise<number> {
+  const hot = await prisma.$executeRaw`
+    UPDATE wf_radius_session rs
+    SET
+      user_name = COALESCE(c.token, c.username, rs.user_name),
+      stopped_at = COALESCE(rs.last_interim_at, rs.created_at, rs.started_at),
+      status = 'STOP'::"RadiusAcctStatus",
+      terminate_cause = COALESCE(NULLIF(rs.terminate_cause, ''), 'User-Name-Rebound'),
+      updated_at = CURRENT_TIMESTAMP
+    FROM wf_credential c
+    WHERE c.id = rs.credential_id
+      AND c.token IS NOT NULL
+      AND rs.user_name IS DISTINCT FROM c.token
+      AND (c.username IS NULL OR rs.user_name IS DISTINCT FROM c.username)
+  `;
+
+  const clamped = await prisma.$executeRaw`
+    UPDATE wf_radius_session rs
+    SET
+      started_at = GREATEST(rs.started_at, COALESCE(c.activated_at, c.sold_at, c.created_at)),
+      updated_at = CURRENT_TIMESTAMP
+    FROM wf_credential c
+    WHERE c.id = rs.credential_id
+      AND rs.started_at < COALESCE(c.activated_at, c.sold_at, c.created_at) - INTERVAL '120 seconds'
+  `;
+
+  return Number(hot) + Number(clamped);
 }
 
 /** Calendar window ended → EXPIRED (takes precedence over CONSUMED). */
@@ -358,6 +328,7 @@ let running = false;
 export type CredentialSyncTickResult = {
   staleRadiusClosed: number;
   inflatedWallRepaired: number;
+  reboundRepaired: number;
   expired: number;
   remainingSynced: number;
 };
@@ -365,7 +336,7 @@ export type CredentialSyncTickResult = {
 export async function runCredentialSyncTick(): Promise<CredentialSyncTickResult> {
   if (running) {
     logger.warn('[credential-sync] Previous run still in progress; skipping');
-    return { staleRadiusClosed: 0, inflatedWallRepaired: 0, expired: 0, remainingSynced: 0 };
+    return { staleRadiusClosed: 0, inflatedWallRepaired: 0, reboundRepaired: 0, expired: 0, remainingSynced: 0 };
   }
   running = true;
   const startedAt = Date.now();
@@ -374,19 +345,20 @@ export async function runCredentialSyncTick(): Promise<CredentialSyncTickResult>
     const cfg = await loadConfig();
     if (!cfg.enabled) {
       logger.info('[credential-sync] Disabled by AppSetting');
-      return { staleRadiusClosed: 0, inflatedWallRepaired: 0, expired: 0, remainingSynced: 0 };
+      return { staleRadiusClosed: 0, inflatedWallRepaired: 0, reboundRepaired: 0, expired: 0, remainingSynced: 0 };
     }
 
     const staleRadiusClosed = await closeStaleRadiusSessions(cfg);
     const inflatedWallRepaired = await repairInflatedSessionWallClocks();
+    const reboundRepaired = await repairReboundStolenUserNames();
     const expired = await markExpiredCredentials();
     const remainingSynced = await syncRemainingAndConsume();
 
     logger.info(
-      `[credential-sync] Tick done in ${Date.now() - startedAt}ms (staleRadius=${staleRadiusClosed}, inflatedWall=${inflatedWallRepaired}, expired=${expired}, remainingSynced=${remainingSynced})`,
+      `[credential-sync] Tick done in ${Date.now() - startedAt}ms (staleRadius=${staleRadiusClosed}, inflatedWall=${inflatedWallRepaired}, rebound=${reboundRepaired}, expired=${expired}, remainingSynced=${remainingSynced})`,
     );
 
-    return { staleRadiusClosed, inflatedWallRepaired, expired, remainingSynced };
+    return { staleRadiusClosed, inflatedWallRepaired, reboundRepaired, expired, remainingSynced };
   } catch (err) {
     logger.error('[credential-sync] Tick failed', { err });
     throw err;

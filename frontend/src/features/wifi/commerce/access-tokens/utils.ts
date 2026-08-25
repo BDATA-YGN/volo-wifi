@@ -36,6 +36,18 @@ export function formatBytes(value: string | number | null | undefined): string {
   return `${size < 10 && i > 0 ? size.toFixed(1) : Math.round(size)} ${units[i]}`;
 }
 
+export function accountingStartAt(
+  startedAt: string,
+  createdAt?: string | null
+): string {
+  const startMs = new Date(startedAt).getTime();
+  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+  if (Number.isFinite(createdMs) && createdMs > startMs) {
+    return new Date(createdMs).toISOString();
+  }
+  return startedAt;
+}
+
 export function billedDurationSeconds(
   sessionTimeSec: number | null | undefined,
   startedAt: string,
@@ -44,10 +56,7 @@ export function billedDurationSeconds(
   createdAt?: string | null,
   lastInterimAt?: string | null
 ): number {
-  const startMs = new Date(startedAt).getTime();
-  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
-  const start =
-    Number.isFinite(createdMs) && createdMs > startMs ? createdMs : startMs;
+  const start = new Date(accountingStartAt(startedAt, createdAt)).getTime();
   const lastSeenMs = lastInterimAt ? new Date(lastInterimAt).getTime() : NaN;
   const stopMs = stoppedAt != null ? new Date(stoppedAt).getTime() : NaN;
   const end = Number.isFinite(lastSeenMs)

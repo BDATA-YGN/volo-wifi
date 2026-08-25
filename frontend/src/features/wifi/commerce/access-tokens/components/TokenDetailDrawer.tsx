@@ -36,6 +36,7 @@ import {
   formatMoney,
   formatSessionDuration,
   formatStatusLabel,
+  accountingStartAt,
 } from "../utils";
 
 const { Text, Title, Paragraph } = Typography;
@@ -192,7 +193,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
       width: 160,
       render: (_, record) => (
         <div style={{ fontSize: 12 }}>
-          <div>{formatWifiDateTime(record.startedAt)}</div>
+          <div>{formatWifiDateTime(accountingStartAt(record.startedAt, record.createdAt))}</div>
           <Text type="secondary">
             → {record.stoppedAt
               ? formatWifiDateTime(record.lastInterimAt ?? record.stoppedAt)

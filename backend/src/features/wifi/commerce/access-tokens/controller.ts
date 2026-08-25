@@ -188,6 +188,8 @@ function takeEarlier(map: Map<string, Date>, id: string, at: Date | null | undef
 /**
  * Earliest login time from captive portal and/or RADIUS sessions (hot + archive).
  * Falls back to credential.activatedAt when session rows were purged.
+ * RADIUS started_at before the token was sold is leftover hotspot-host time
+ * (MikroTik reuses Acct-Session-Id) and must not become "first login".
  */
 async function loadFirstLoginAtMap(
   prisma: PrismaClient,
@@ -197,13 +199,17 @@ async function loadFirstLoginAtMap(
     token: string | null;
     username: string | null;
     activatedAt: Date | null;
+    soldAt?: Date | null;
   }>
 ): Promise<Map<string, Date>> {
   const map = new Map<string, Date>();
   if (credentials.length === 0) return map;
 
+  const floorByCredential = new Map<string, Date>();
   for (const c of credentials) {
     takeEarlier(map, c.id, c.activatedAt);
+    const floor = c.activatedAt ?? c.soldAt ?? null;
+    if (floor) floorByCredential.set(c.id, floor);
   }
 
   const userNameToCredentialId = new Map<string, string>();
@@ -246,12 +252,20 @@ async function loadFirstLoginAtMap(
   for (const row of radiusByUserHot) {
     if (!row.userName) continue;
     const credentialId = userNameToCredentialId.get(row.userName);
-    if (credentialId) takeEarlier(map, credentialId, row._min.startedAt);
+    if (!credentialId) continue;
+    const floor = floorByCredential.get(credentialId);
+    const started = row._min.startedAt;
+    if (started && floor && started.getTime() < floor.getTime()) continue;
+    takeEarlier(map, credentialId, started);
   }
   for (const row of radiusByUserArchive) {
     if (!row.userName) continue;
     const credentialId = userNameToCredentialId.get(row.userName);
-    if (credentialId) takeEarlier(map, credentialId, row._min.startedAt);
+    if (!credentialId) continue;
+    const floor = floorByCredential.get(credentialId);
+    const started = row._min.startedAt;
+    if (started && floor && started.getTime() < floor.getTime()) continue;
+    takeEarlier(map, credentialId, started);
   }
 
   return map;

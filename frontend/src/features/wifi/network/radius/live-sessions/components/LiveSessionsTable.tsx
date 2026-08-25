@@ -120,7 +120,8 @@ const LiveSessionsTable: React.FC<Props> = ({
             row.startedAt,
             row.stoppedAt,
             row.status,
-            row.lastInterimAt
+            row.lastInterimAt,
+            row.createdAt
           )}
         </Text>
       ),

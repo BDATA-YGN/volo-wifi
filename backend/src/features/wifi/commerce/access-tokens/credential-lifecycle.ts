@@ -1,4 +1,4 @@
-import { Prisma, RadiusAcctStatus, type Plan } from '@/generated/prisma/client';
+import { Prisma, type Plan } from '@/generated/prisma/client';
 import {
   billedSessionSeconds,
   planTimeQuotaSec,
@@ -107,27 +107,23 @@ async function softEndOpenRadiusSessions(
 ): Promise<{ endedRadiusSessions: number; clearedPortalSessions: number }> {
   const now = new Date();
   const userNameVariants = radiusUserNameVariants(credential);
-  const sessionOr: Prisma.RadiusSessionWhereInput[] = [];
-  if (userNameVariants.length > 0) {
-    sessionOr.push({ userName: { in: userNameVariants } });
-  }
 
-  const ended =
-    sessionOr.length > 0
-      ? await tx.radiusSession.updateMany({
-          where: {
-            OR: sessionOr,
-            status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
-            stoppedAt: null,
-          },
-          data: {
-            stoppedAt: now,
-            status: RadiusAcctStatus.STOP,
-            terminateCause,
-            updatedAt: now,
-          },
-        })
-      : { count: 0 };
+  const endedCount =
+    userNameVariants.length > 0
+      ? Number(
+          await tx.$executeRaw`
+            UPDATE wf_radius_session
+            SET
+              status = 'STOP'::"RadiusAcctStatus",
+              stopped_at = COALESCE(last_interim_at, created_at, started_at),
+              terminate_cause = ${terminateCause},
+              updated_at = CURRENT_TIMESTAMP
+            WHERE stopped_at IS NULL
+              AND status IN ('START'::"RadiusAcctStatus", 'INTERIM'::"RadiusAcctStatus")
+              AND user_name IN (${Prisma.join(userNameVariants)})
+          `,
+        )
+      : 0;
 
   const since = new Date(now.getTime() - PORTAL_LOGIN_SLOT_MS);
   const cleared =
@@ -141,7 +137,7 @@ async function softEndOpenRadiusSessions(
       : { count: 0 };
 
   return {
-    endedRadiusSessions: ended.count,
+    endedRadiusSessions: endedCount,
     clearedPortalSessions: cleared.count,
   };
 }

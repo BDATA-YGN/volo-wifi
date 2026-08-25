@@ -12,6 +12,7 @@ import {
   formatBytes,
   formatSessionDuration,
   formatStatusLabel,
+  accountingStartAt,
 } from "@/features/wifi/commerce/access-tokens/utils";
 import { formatWifiDateTime } from "@/features/wifi/shared/format";
 import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
@@ -183,7 +184,7 @@ function RadiusSessionCard({ session }: { session: RadiusSessionPreview }) {
       </p>
       <p className={styles.sessionLine}>
         <span className={styles.sessionKey}>From</span>
-        <span>{formatWifiDateTime(session.startedAt)}</span>
+        <span>{formatWifiDateTime(accountingStartAt(session.startedAt, session.createdAt))}</span>
       </p>
       <p className={styles.sessionLine}>
         <span className={styles.sessionKey}>To</span>
