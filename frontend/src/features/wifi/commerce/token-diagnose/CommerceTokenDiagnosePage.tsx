@@ -216,11 +216,11 @@ const CommerceTokenDiagnosePage: React.FC = () => {
         success: "Device slot released. Re-diagnosing…",
       },
       clearSessions: {
-        title: "Clear sessions for this token?",
+        title: "Fix Session times for this token?",
         content:
-          "Deletes captive portal logins and RADIUS sessions for this token from the token page. Remaining time is recomputed from what is left.",
-        okText: "Clear sessions",
-        success: "Sessions cleared. Re-diagnosing…",
+          "Corrects backdated login/logout times from RADIUS last update. Does not delete session rows. Remaining time is recomputed.",
+        okText: "Fix Session",
+        success: "Session times were corrected. Re-diagnosing…",
       },
       restoreActivated: {
         title: "Restore this token to Activated?",
@@ -420,7 +420,7 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                   <Space wrap>
                     {tokenActions?.canClearSessions ? (
                       <Button size="small" onClick={() => void handleTokenAction("clearSessions")}>
-                        Clear sessions
+                        Fix Session
                       </Button>
                     ) : null}
                     {tokenActions?.canRestoreActivated ? (
@@ -645,7 +645,7 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
                   {tokenActions?.canClearSessions ? (
                     <Button type="primary" onClick={() => void handleTokenAction("clearSessions")}>
-                      Clear sessions
+                      Fix Session
                     </Button>
                   ) : null}
                   {activeResult.token?.actions?.canAllowNewDevice ? (

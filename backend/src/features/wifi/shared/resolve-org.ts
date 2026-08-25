@@ -29,8 +29,8 @@ export function isConsoleOrgAdmin(user: AdminLike): boolean {
 }
 
 /**
- * Developer, platform Admin, or tenant ORG_ADMIN — destructive token session
- * actions (clear sessions, revert to sold / activated).
+ * Developer, platform Admin, or tenant ORG_ADMIN — token session
+ * actions (Fix Session, revert to sold / activated).
  */
 export function isSessionLifecycleAdmin(user: AdminLike): boolean {
   return isDeveloperAdmin(user) || isPlatformAdmin(user) || isConsoleOrgAdmin(user);

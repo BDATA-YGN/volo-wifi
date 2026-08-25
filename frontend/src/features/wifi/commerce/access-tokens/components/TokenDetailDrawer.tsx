@@ -7,6 +7,7 @@ import {
   Button,
   Descriptions,
   Drawer,
+  Popconfirm,
   Spin,
   Table,
   Tag,
@@ -49,6 +50,11 @@ type Props = {
   onClose: () => void;
   onRevoke: (record: AccessTokenRecord) => void;
   onApplyAction: (record: AccessTokenRecord, action: CredentialLifecycleAction) => void;
+  onDeleteSession: (
+    record: AccessTokenRecord,
+    sessionId: string,
+    source: "hot" | "archive" | "captive"
+  ) => Promise<void>;
   loadToken: (id: string) => Promise<AccessTokenDetail>;
 };
 
@@ -66,6 +72,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
   onClose,
   onRevoke,
   onApplyAction,
+  onDeleteSession,
   loadToken,
 }) => {
   const [token, setToken] = useState<AccessTokenDetail | null>(null);
@@ -102,6 +109,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
   const radiusSessionsTruncated = row?.radiusSessionsTruncated ?? false;
   const sessionsMeta = row?.sessionsMeta ?? null;
   const hasAnySessions = captiveSessions.length > 0 || radiusSessions.length > 0;
+  const canDeleteSessions = Boolean(actions?.canDeleteSessions);
 
   const captiveColumns: ColumnsType<CaptiveSessionPreview> = [
     {
@@ -138,6 +146,29 @@ const TokenDetailDrawer: React.FC<Props> = ({
       width: 130,
       render: (value: string) => formatWifiDateTime(value),
     },
+    ...(canDeleteSessions
+      ? [
+          {
+            title: "",
+            key: "delete",
+            width: 72,
+            render: (_: unknown, record: CaptiveSessionPreview) => (
+              <Popconfirm
+                title="Delete this session row?"
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+                onConfirm={() =>
+                  row ? onDeleteSession(row, record.id, "captive") : Promise.resolve()
+                }
+              >
+                <Button type="link" danger size="small">
+                  Delete
+                </Button>
+              </Popconfirm>
+            ),
+          },
+        ]
+      : []),
   ];
 
   const radiusColumns: ColumnsType<RadiusSessionPreview> = [
@@ -229,6 +260,29 @@ const TokenDetailDrawer: React.FC<Props> = ({
         </div>
       ),
     },
+    ...(canDeleteSessions
+      ? [
+          {
+            title: "",
+            key: "delete",
+            width: 72,
+            render: (_: unknown, record: RadiusSessionPreview) => (
+              <Popconfirm
+                title="Delete this session row?"
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+                onConfirm={() =>
+                  row ? onDeleteSession(row, record.id, record.source) : Promise.resolve()
+                }
+              >
+                <Button type="link" danger size="small">
+                  Delete
+                </Button>
+              </Popconfirm>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -248,7 +302,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
             ) : null}
             {actions.canClearSessions ? (
               <Button size="small" onClick={() => onApplyAction(row, "clearSessions")}>
-                Clear sessions
+                Fix Session
               </Button>
             ) : null}
             {actions.canRestoreActivated ? (
@@ -373,7 +427,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
                   pagination={false}
                   columns={radiusColumns}
                   dataSource={radiusSessions}
-                  scroll={{ x: 720 }}
+                  scroll={{ x: canDeleteSessions ? 800 : 720 }}
                   className="mb-2"
                 />
                 {radiusSessionsTruncated ? (

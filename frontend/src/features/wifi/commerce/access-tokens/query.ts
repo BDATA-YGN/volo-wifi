@@ -113,6 +113,29 @@ export const applyAction = async (
   }
 };
 
+export const deleteSession = async (
+  tokenId: string,
+  sessionId: string,
+  source: "hot" | "archive" | "captive",
+  params?: Pick<AccessTokensListParams, "orgId" | "resellerId">
+): Promise<CommonResponse> => {
+  try {
+    const res = await apiClient.delete(
+      `${COMMERCE_ACCESS_TOKENS_API.listOrDetails(tokenId)}/sessions/${sessionId}`,
+      {
+        params: {
+          source,
+          orgId: params?.orgId || undefined,
+          resellerId: params?.resellerId || undefined,
+        },
+      }
+    );
+    return res.data;
+  } catch (error) {
+    throw handleApiError(error);
+  }
+};
+
 export const revoke = async (
   id: string,
   params?: Pick<AccessTokensListParams, "orgId" | "resellerId">

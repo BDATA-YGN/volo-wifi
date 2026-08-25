@@ -287,18 +287,18 @@ const appSettingsData: AppSettingSeed[] = [
     description: "Closes stale RADIUS sessions and marks exhausted/expired access tokens CONSUMED or EXPIRED.",
   },
   {
-    key: "credential_sync_cron", value: "*/3 * * * *", defaultValue: "*/3 * * * *",
+    key: "credential_sync_cron", value: "*/15 * * * *", defaultValue: "*/15 * * * *",
     valueType: "STRING", controlType: "TEXT",
     category: "ops", sortOrder: 16, isPublic: false,
     labelEn: "Credential sync schedule (cron)", labelMy: "Credential sync cron",
-    description: "Default: every 3 minutes. Recomputes remaining time and terminal statuses.",
+    description: "Default: every 15 minutes. Recomputes remaining time and terminal statuses. Keep this shorter than stale interim, longer than NAS accounting interim.",
   },
   {
-    key: "credential_sync_stale_interim_minutes", value: "5", defaultValue: "5",
+    key: "credential_sync_stale_interim_minutes", value: "60", defaultValue: "60",
     valueType: "NUMBER", controlType: "NUMBER",
     category: "ops", sortOrder: 17, isPublic: false,
     labelEn: "Stale RADIUS interim (minutes)", labelMy: "Stale RADIUS interim (မိနစ်)",
-    description: "Open START/INTERIM RADIUS rows with no activity longer than this are closed as Cleanup-Timeout.",
+    description: "Open START/INTERIM RADIUS rows with no activity longer than this are closed as Cleanup-Timeout. Match NAS Idle-Timeout (3600s = 60 minutes) so a user can resume before the NAS stops the session.",
   },
   {
     key: "credential_sync_max_open_hours", value: "2", defaultValue: "2",

@@ -58,6 +58,7 @@ const CommerceAccessTokensPage: React.FC = () => {
     issueTokens,
     revokeToken,
     applyTokenAction,
+    deleteTokenSession,
   } = useCommerceAccessTokens();
 
   useEffect(() => {
@@ -136,7 +137,7 @@ const CommerceAccessTokensPage: React.FC = () => {
     pause: "Pause this token?",
     unlock: "Unlock this token for login?",
     allowNewDevice: "Allow a new device to use this token?",
-    clearSessions: "Clear session history for this token?",
+    clearSessions: "Fix Session times for this token?",
     restoreActivated: "Restore this consumed token to activated?",
     revertToSold: "Revert this token to sold status?",
   };
@@ -161,7 +162,7 @@ const CommerceAccessTokensPage: React.FC = () => {
             : action === "allowNewDevice"
               ? "Releases the current device slot (online session / recent portal login) so another phone or laptop can log in with this token. This does not add permanent multi-device capacity."
               : action === "clearSessions"
-                ? "Deletes captive portal logins and RADIUS sessions for this token from the token page. Remaining time is recomputed from what is left."
+                ? "Corrects backdated login/logout times from RADIUS last update. Does not delete session rows. Remaining time is recomputed."
                 : action === "restoreActivated"
                   ? "Clears leftover sessions and sets status back to Activated (or Expired if calendar expiry already passed)."
               : "The customer can log in again if the plan quota allows.",
@@ -173,7 +174,7 @@ const CommerceAccessTokensPage: React.FC = () => {
             : action === "allowNewDevice"
               ? "Allow new device"
               : action === "clearSessions"
-                ? "Clear sessions"
+                ? "Fix Session"
                 : action === "restoreActivated"
                   ? "Restore"
                   : "Revert",
@@ -184,13 +185,31 @@ const CommerceAccessTokensPage: React.FC = () => {
           message.success(
             action === "allowNewDevice"
               ? "Device binding cleared. Customer can log in from a new device now."
-              : "Token updated"
+              : action === "clearSessions"
+                ? "Session times were corrected"
+                : "Token updated"
           );
         } catch (err: unknown) {
           message.error(getApiErrorMessage(err, "Failed to update token"));
         }
       },
     });
+  };
+
+  const handleDeleteSession = async (
+    record: AccessTokenRecord,
+    sessionId: string,
+    source: "hot" | "archive" | "captive"
+  ) => {
+    try {
+      await deleteTokenSession(record.id, sessionId, source);
+      const updated = await loadToken(record.id);
+      setSelected(updated);
+      message.success("Session row deleted");
+    } catch (err: unknown) {
+      message.error(getApiErrorMessage(err, "Failed to delete session"));
+      throw err;
+    }
   };
 
   const handleRevoke = (record: AccessTokenRecord) => {
@@ -360,6 +379,7 @@ const CommerceAccessTokensPage: React.FC = () => {
         }}
         onRevoke={handleRevoke}
         onApplyAction={handleApplyAction}
+        onDeleteSession={handleDeleteSession}
         loadToken={loadToken}
       />
 

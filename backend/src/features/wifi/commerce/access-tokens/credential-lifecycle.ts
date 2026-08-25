@@ -80,6 +80,7 @@ async function loadCredentialForSessionOps(
       status: true,
       username: true,
       token: true,
+      soldAt: true,
       activatedAt: true,
       expiresAt: true,
       plan: {
@@ -228,45 +229,9 @@ async function refreshTimeRemainingAfterRepair(
 const SESSION_CLEARABLE = new Set(['ACTIVATED', 'PAUSED', 'CONSUMED']);
 
 /**
- * Operator Clear Sessions: remove this token's session history from the token
- * page (captive logins + RADIUS hot/archive), not only the last 3-minute hold.
- */
-async function purgeTokenSessionHistory(
-  tx: Prisma.TransactionClient,
-  params: {
-    orgId: string;
-    credential: { username: string | null; token: string | null };
-  },
-): Promise<{ endedRadiusSessions: number; clearedPortalSessions: number }> {
-  const userNameVariants = radiusUserNameVariants(params.credential);
-  if (userNameVariants.length === 0) {
-    return { endedRadiusSessions: 0, clearedPortalSessions: 0 };
-  }
-
-  const [hot, archive, portal] = await Promise.all([
-    tx.radiusSession.deleteMany({
-      where: { userName: { in: userNameVariants } },
-    }),
-    tx.radiusSessionArchive.deleteMany({
-      where: { userName: { in: userNameVariants } },
-    }),
-    tx.captivePortalSession.deleteMany({
-      where: {
-        orgId: params.orgId,
-        username: { in: userNameVariants },
-      },
-    }),
-  ]);
-
-  return {
-    endedRadiusSessions: hot.count + archive.count,
-    clearedPortalSessions: portal.count,
-  };
-}
-
-/**
- * Delete captive portal logins and RADIUS history for this token, then
- * recompute remaining time. CONSUMED tokens with leftover quota become ACTIVATED.
+ * Fix incorrect RADIUS timestamps for this token. Does not delete history
+ * and does not invent sessionTimeSec. STOP rows snap to last_interim_at;
+ * started_at cannot be before the token was sold/activated.
  */
 export async function clearAccessTokenSessions(
   tx: Prisma.TransactionClient,
@@ -276,17 +241,100 @@ export async function clearAccessTokenSessions(
 
   if (!SESSION_CLEARABLE.has(existing.status)) {
     throw Object.assign(
-      new Error(`Sessions cannot be cleared while the token is ${existing.status}.`),
+      new Error(`Sessions cannot be fixed while the token is ${existing.status}.`),
       { status: 409, code: 'CANNOT_CLEAR_SESSIONS' },
     );
   }
 
-  const result = await purgeTokenSessionHistory(tx, {
-    orgId: params.orgId,
-    credential: existing,
-  });
+  const names = radiusUserNameVariants(existing);
+  let radiusFixed = 0;
+  if (names.length > 0) {
+    const hot = await tx.$executeRaw`
+      UPDATE wf_radius_session rs
+      SET
+        started_at = GREATEST(
+          rs.started_at,
+          rs.created_at,
+          COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
+        ),
+        stopped_at = CASE
+          WHEN rs.status = 'STOP'::"RadiusAcctStatus" OR rs.stopped_at IS NOT NULL
+          THEN COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
+          ELSE rs.stopped_at
+        END,
+        updated_at = CURRENT_TIMESTAMP
+      FROM wf_credential c
+      WHERE c.id = ${existing.id}
+        AND rs.user_name IN (${Prisma.join(names)})
+    `;
+    const archive = await tx.$executeRaw`
+      UPDATE wf_radius_session_archive rs
+      SET
+        started_at = GREATEST(
+          rs.started_at,
+          COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
+        ),
+        stopped_at = COALESCE(rs.last_interim_at, rs.stopped_at, rs.started_at)
+      FROM wf_credential c
+      WHERE c.id = ${existing.id}
+        AND rs.user_name IN (${Prisma.join(names)})
+    `;
+    radiusFixed = Number(hot) + Number(archive);
+  }
+
   await refreshTimeRemainingAfterRepair(tx, existing);
-  return result;
+  return { endedRadiusSessions: radiusFixed, clearedPortalSessions: 0 };
+}
+
+export type TokenSessionSource = 'hot' | 'archive' | 'captive';
+
+/**
+ * Developer-only: delete one captive or RADIUS session row, then recompute remaining.
+ */
+export async function deleteAccessTokenSession(
+  tx: Prisma.TransactionClient,
+  params: {
+    orgId: string;
+    resellerId: string;
+    credentialId: string;
+    sessionId: string;
+    source: TokenSessionSource;
+  },
+): Promise<void> {
+  const existing = await loadCredentialForSessionOps(tx, params);
+  const names = radiusUserNameVariants(existing);
+  if (names.length === 0) {
+    throw Object.assign(new Error('Session not found.'), { status: 404, code: 'NOT_FOUND' });
+  }
+
+  if (params.source === 'captive') {
+    const deleted = await tx.captivePortalSession.deleteMany({
+      where: {
+        id: params.sessionId,
+        orgId: params.orgId,
+        username: { in: names },
+      },
+    });
+    if (deleted.count === 0) {
+      throw Object.assign(new Error('Session not found.'), { status: 404, code: 'NOT_FOUND' });
+    }
+  } else if (params.source === 'archive') {
+    const deleted = await tx.radiusSessionArchive.deleteMany({
+      where: { id: params.sessionId, userName: { in: names } },
+    });
+    if (deleted.count === 0) {
+      throw Object.assign(new Error('Session not found.'), { status: 404, code: 'NOT_FOUND' });
+    }
+  } else {
+    const deleted = await tx.radiusSession.deleteMany({
+      where: { id: params.sessionId, userName: { in: names } },
+    });
+    if (deleted.count === 0) {
+      throw Object.assign(new Error('Session not found.'), { status: 404, code: 'NOT_FOUND' });
+    }
+  }
+
+  await refreshTimeRemainingAfterRepair(tx, existing);
 }
 
 /**

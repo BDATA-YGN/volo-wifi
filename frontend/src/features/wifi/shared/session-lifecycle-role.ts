@@ -12,7 +12,7 @@ export function isSessionLifecycleAdminRole(roleName: string | null | undefined)
   return Boolean(role && SESSION_LIFECYCLE_ROLES.has(role));
 }
 
-/** Developer, Admin, or ORG_ADMIN — Clear sessions / Revert to sold or activated. */
+/** Developer, Admin, or ORG_ADMIN — Fix Session / Revert to sold or activated. */
 export function useCanManageTokenSessionLifecycle(): boolean {
   const { authData } = useAuthStore();
   return isSessionLifecycleAdminRole(authData?.role?.roleName);
@@ -21,6 +21,7 @@ export function useCanManageTokenSessionLifecycle(): boolean {
 export function gateSessionLifecycleActions<
   T extends {
     canClearSessions?: boolean;
+    canDeleteSessions?: boolean;
     canRestoreActivated?: boolean;
     canRevertToSold?: boolean;
   },

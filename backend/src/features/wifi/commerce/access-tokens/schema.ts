@@ -27,6 +27,12 @@ export const CommerceAccessTokensActionSchema = Joi.object({
     .required(),
 }).unknown(false);
 
+export const CommerceAccessTokensDeleteSessionQuerySchema = Joi.object({
+  source: Joi.string().valid('hot', 'archive', 'captive').required(),
+  orgId: Joi.string().uuid().optional(),
+  resellerId: Joi.string().uuid().optional(),
+}).unknown(true);
+
 export const CommerceAccessTokensListQuerySchema = Joi.object({
   orgId: Joi.string().uuid().optional(),
   resellerId: Joi.string().uuid().optional(),

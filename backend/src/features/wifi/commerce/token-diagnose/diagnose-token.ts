@@ -264,7 +264,7 @@ function buildVerdict(args: {
           summary:
             'This token is Consumed, but there is no captive login, RADIUS auth, or accounting. Status was likely flipped by the credential-sync job (for example a SINGLE_SESSION clock from activatedAt, or a delayed/inflated session that was later gone). Use Last updated to see when that happened.',
           actions: [
-            'Clear sessions if any leftover open RADIUS row still exists.',
+            'Fix Session if login/logout times look wrong.',
             'If the customer never used this token, Revert to sold (clears activatedAt so it will not be re-consumed).',
             'If they already started using it, Restore to activated.',
           ],
@@ -290,7 +290,7 @@ function buildVerdict(args: {
       severity: 'warning',
       title: 'Consumed but billed time is 0',
       detail:
-        'Status is Consumed even though billed accounting time is 0. Check Last updated, then Clear sessions and restore or revert status from this page.',
+        'Status is Consumed even though billed accounting time is 0. Check Last updated, then Fix Session if times are wrong, and restore or revert status from this page.',
     });
   }
 

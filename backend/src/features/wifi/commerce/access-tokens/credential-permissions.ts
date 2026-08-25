@@ -12,6 +12,7 @@ export type CredentialActions = {
   canUnlock: boolean;
   canAllowNewDevice: boolean;
   canClearSessions: boolean;
+  canDeleteSessions: boolean;
   canRestoreActivated: boolean;
   canRevertToSold: boolean;
   revokeBlockedReason?: string;
@@ -121,6 +122,7 @@ export function resolveCredentialActions(
     // Partner + org staff: free device slots for ACTIVATED tokens (does not raise maxDevices).
     canAllowNewDevice: ALLOW_NEW_DEVICE.has(status),
     canClearSessions: ctx.canManageSessionLifecycle && SESSION_CLEARABLE.has(status),
+    canDeleteSessions: ctx.isDeveloper,
     canRestoreActivated: ctx.canManageSessionLifecycle && RESTORABLE_CONSUMED.has(status),
     canRevertToSold: ctx.canManageSessionLifecycle && REVERTABLE.has(status),
     revokeBlockedReason,
@@ -158,7 +160,7 @@ export function assertCredentialActionAllowed(
           : action === 'restoreActivated'
             ? 'Restore to activated is only available to Developer, Admin, or ORG_ADMIN.'
           : action === 'clearSessions'
-            ? 'Clear sessions is only available to Developer, Admin, or ORG_ADMIN.'
+            ? 'Fix Session is only available to Developer, Admin, or ORG_ADMIN.'
           : action === 'allowNewDevice'
             ? 'Allow new device is only available for activated tokens.'
             : `Action "${action}" is not allowed for this token.`;

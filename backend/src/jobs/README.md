@@ -10,7 +10,7 @@ are ready (`initializeCronJobs()` → `startAllJobs()`).
 | Job | Default schedule | Purpose |
 |-----|------------------|---------|
 | `log-cleanup` | `0 3 * * *` daily | Purges expired audit and login logs |
-| `credential-sync` | `*/3 * * * *` every 3 min | Closes stale RADIUS sessions; marks tokens `CONSUMED` / `EXPIRED`; refreshes `timeRemainingSec` |
+| `credential-sync` | `*/15 * * * *` every 15 min | Closes stale RADIUS sessions (1h idle); marks tokens `CONSUMED` / `EXPIRED`; refreshes `timeRemainingSec` |
 | `reporting-aggregate` | `15 * * * *` hourly | Builds `rpt_daily_*` stat tables from operational data |
 | `reporting-aggregate` | `30 2 1 * *` monthly | Rolls daily → monthly → yearly sales stats |
 | `ops-archive` | `30 4 * * *` daily | Archives/purges operational tables (see below) |

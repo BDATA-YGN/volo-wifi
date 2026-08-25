@@ -23,6 +23,7 @@ export type CredentialActions = {
   canUnlock: boolean;
   canAllowNewDevice: boolean;
   canClearSessions: boolean;
+  canDeleteSessions: boolean;
   canRestoreActivated: boolean;
   canRevertToSold: boolean;
   revokeBlockedReason?: string;

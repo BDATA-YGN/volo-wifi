@@ -37,12 +37,13 @@ import {
 import {
   allowNewDeviceAccessToken,
   clearAccessTokenSessions,
+  deleteAccessTokenSession,
   pauseAccessToken,
   restoreConsumedAccessToken,
   revertAccessTokenToSold,
   unlockAccessToken,
 } from './credential-lifecycle';
-import { CommerceAccessTokensActionSchema, CommerceAccessTokensIssueSchema } from './schema';
+import { CommerceAccessTokensActionSchema, CommerceAccessTokensIssueSchema, CommerceAccessTokensDeleteSessionQuerySchema } from './schema';
 import { revokeAccessToken } from './revoke-access-token';
 import { generateUniqueAlphanumericToken } from '@/features/shared/credentials/voucher-token';
 import {
@@ -1517,7 +1518,7 @@ export class CommerceAccessTokensController {
           pause: 'paused',
           unlock: 'unlocked',
           allowNewDevice: 'ready for a new device',
-          clearSessions: 'sessions cleared',
+          clearSessions: 'sessions fixed',
           restoreActivated: 'restored to activated',
           revertToSold: 'reverted to sold',
         };
@@ -1527,7 +1528,7 @@ export class CommerceAccessTokensController {
             value.action === 'allowNewDevice'
               ? 'Device binding cleared. The customer can log in from a new device now.'
               : value.action === 'clearSessions'
-                ? 'RADIUS and captive portal session history for this token was deleted. Remaining time was recomputed.'
+                ? 'Session times were corrected from RADIUS last update. Remaining time was recomputed.'
               : value.action === 'restoreActivated'
                 ? 'Open sessions were cleared and the token was restored (activated, or expired if the calendar expiry already passed).'
               : `Access token ${actionLabels[value.action] ?? 'updated'}`,
@@ -1545,6 +1546,88 @@ export class CommerceAccessTokensController {
             ? String((err as { code: string }).code)
             : 'ACTION_FAILED';
         const message = err instanceof Error ? err.message : 'Failed to update access token.';
+        return responseError(res, status, { code, message });
+      }
+    }),
+  ];
+
+  public deleteSession = [
+    asyncController(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+      const adminId = req.userId!;
+      const tokenIdParam = req.params.id as string | string[];
+      const sessionIdParam = req.params.sessionId as string | string[];
+      const tokenId = Array.isArray(tokenIdParam) ? tokenIdParam[0] : tokenIdParam;
+      const sessionId = Array.isArray(sessionIdParam) ? sessionIdParam[0] : sessionIdParam;
+      const q = queryResellerParams(req.query);
+
+      const { error, value } = CommerceAccessTokensDeleteSessionQuerySchema.validate(req.query, {
+        abortEarly: false,
+        allowUnknown: true,
+      });
+      if (error) {
+        return responseError(res, 400, {
+          code: 'VALIDATION_ERROR',
+          message: error.details.map((d) => d.message).join(', '),
+        });
+      }
+
+      if (!isDeveloperAdmin(req.user!)) {
+        return responseError(res, 403, {
+          code: 'ACTION_NOT_ALLOWED',
+          message: 'Deleting a session row is only available to Developer.',
+        });
+      }
+
+      try {
+        const context = await resolveResellerContext(this.prisma, adminId, req.user, q);
+        if ('requiresOrgSelection' in context) {
+          return responseError(res, 400, {
+            code: 'RESELLER_REQUIRED',
+            message: 'Select an organization before deleting a session.',
+          });
+        }
+
+        let orgId: string;
+        let resellerId: string;
+        if ('requiresResellerSelection' in context) {
+          const credential = await this.prisma.credential.findFirst({
+            where: { id: tokenId, orgId: context.orgId, deletedAt: null },
+            select: { resellerId: true },
+          });
+          if (!credential?.resellerId) {
+            return responseError(res, 404, {
+              code: 'NOT_FOUND',
+              message: 'Access token not found.',
+            });
+          }
+          orgId = context.orgId;
+          resellerId = credential.resellerId;
+        } else {
+          orgId = context.orgId;
+          resellerId = context.resellerId;
+        }
+
+        await this.prisma.$transaction((tx) =>
+          deleteAccessTokenSession(tx, {
+            orgId,
+            resellerId,
+            credentialId: tokenId,
+            sessionId,
+            source: value.source,
+          }),
+        );
+
+        return responseSuccess(res, { message: 'Session row deleted.' });
+      } catch (err: unknown) {
+        const status =
+          err && typeof err === 'object' && 'status' in err
+            ? Number((err as { status: number }).status)
+            : 400;
+        const code =
+          err && typeof err === 'object' && 'code' in err
+            ? String((err as { code: string }).code)
+            : 'DELETE_FAILED';
+        const message = err instanceof Error ? err.message : 'Failed to delete session.';
         return responseError(res, status, { code, message });
       }
     }),

@@ -141,6 +141,14 @@ export function useCommerceAccessTokens() {
     [orgId, resellerId, refresh]
   );
 
+  const deleteTokenSession = useCallback(
+    async (tokenId: string, sessionId: string, source: "hot" | "archive" | "captive") => {
+      await Query.deleteSession(tokenId, sessionId, source, { orgId, resellerId });
+      refresh();
+    },
+    [orgId, resellerId, refresh]
+  );
+
   return {
     list,
     meta,
@@ -162,5 +170,6 @@ export function useCommerceAccessTokens() {
     issueTokens,
     revokeToken,
     applyTokenAction,
+    deleteTokenSession,
   };
 }

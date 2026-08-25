@@ -16,9 +16,9 @@ interface CredentialSyncConfig {
 
 const DEFAULTS: CredentialSyncConfig = {
   enabled: true,
-  /** Every 3 minutes — matches Captive Portal Implementation Spec §10. */
-  cron: '*/3 * * * *',
-  staleInterimMinutes: 5,
+  /** Every 15 minutes — Idle-Timeout on NAS is 3600s; do not close sooner. */
+  cron: '*/15 * * * *',
+  staleInterimMinutes: 60,
   maxOpenHours: 2,
 };
 
