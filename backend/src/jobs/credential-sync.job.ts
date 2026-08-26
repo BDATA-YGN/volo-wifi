@@ -176,9 +176,9 @@ async function markExpiredCredentials(): Promise<number> {
  * Recompute remaining time/data from RADIUS usage and mark CONSUMED when
  * remaining time ≤ 0, remaining data ≤ 0, or SINGLE_SESSION activation window exceeded.
  *
- * Open sessions bill from created_at when NAS started_at is backdated (delayed
- * accounting). CONSUMED tokens are restored only when BOTH time and data still
- * have leftover quota (so a data-cap disconnect cannot log in again on leftover time).
+ * Leftover hotspot-host rows (login→logout or NAS time > 24h) are not billed.
+ * Used seconds are also capped at elapsed-since-activation × maxDevices so
+ * overlapping rebound copies cannot consume a 30-day plan in a few days.
  */
 async function syncRemainingAndConsume(): Promise<number> {
   const result = await prisma.$executeRaw`
@@ -196,11 +196,26 @@ async function syncRemainingAndConsume(): Promise<number> {
         SELECT
           COALESCE(SUM(
             CASE
+              WHEN w.last_seen > 86400 AND COALESCE(rs."sessionTimeSec", 0) > 86400
+              THEN 0
+              WHEN COALESCE(rs."sessionTimeSec", 0) > 86400
+              THEN w.last_seen
+              WHEN w.last_seen > 86400 THEN
+                CASE
+                  WHEN COALESCE(rs."sessionTimeSec", 0) > 0
+                    AND COALESCE(rs."sessionTimeSec", 0) <= 86400
+                  THEN rs."sessionTimeSec"
+                  ELSE 0
+                END
+              WHEN w.last_seen = 0
+                AND COALESCE(rs."sessionTimeSec", 0) > 0
+                AND COALESCE(rs."sessionTimeSec", 0) <= 86400
+              THEN rs."sessionTimeSec"
               WHEN COALESCE(rs."sessionTimeSec", 0) > 43200
                 AND COALESCE(rs."sessionTimeSec", 0) > w.last_seen * 2
               THEN w.last_seen
               WHEN COALESCE(rs."sessionTimeSec", 0) > 0
-              THEN rs."sessionTimeSec"
+              THEN LEAST(rs."sessionTimeSec", w.last_seen)
               ELSE w.last_seen
             END
           ), 0)::integer AS used_sec,
@@ -257,7 +272,20 @@ async function syncRemainingAndConsume(): Promise<number> {
         SELECT
           CASE
             WHEN q.quota_sec IS NULL THEN NULL
-            ELSE GREATEST(0, q.quota_sec - COALESCE(used.used_sec, 0))
+            ELSE GREATEST(
+              0,
+              q.quota_sec - CASE
+                WHEN c.activated_at IS NULL THEN COALESCE(used.used_sec, 0)
+                ELSE LEAST(
+                  COALESCE(used.used_sec, 0),
+                  GREATEST(1, COALESCE(p.max_devices, 1)) *
+                    GREATEST(
+                      0,
+                      FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - c.activated_at)))::integer
+                    )
+                )
+              END
+            )
           END::integer AS remaining_sec,
           CASE
             WHEN q.quota_bytes IS NULL THEN NULL
@@ -268,7 +296,19 @@ async function syncRemainingAndConsume(): Promise<number> {
           END AS remaining_mb,
           CASE
             WHEN q.quota_sec IS NOT NULL
-              AND COALESCE(used.used_sec, 0) >= q.quota_sec THEN true
+              AND (
+                CASE
+                  WHEN c.activated_at IS NULL THEN COALESCE(used.used_sec, 0)
+                  ELSE LEAST(
+                    COALESCE(used.used_sec, 0),
+                    GREATEST(1, COALESCE(p.max_devices, 1)) *
+                      GREATEST(
+                        0,
+                        FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - c.activated_at)))::integer
+                      )
+                  )
+                END
+              ) >= q.quota_sec THEN true
             WHEN q.quota_bytes IS NOT NULL
               AND COALESCE(used.used_bytes, 0) >= q.quota_bytes THEN true
             WHEN p.time_usage_mode::text = 'SINGLE_SESSION'

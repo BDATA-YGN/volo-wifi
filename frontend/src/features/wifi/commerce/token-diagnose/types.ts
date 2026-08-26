@@ -98,6 +98,7 @@ export type DiagnoseResult = {
     nasIpAddress: string | null;
     nasIdentifier: string | null;
     startedAt: string;
+    createdAt?: string | null;
     lastInterimAt: string | null;
     stoppedAt: string | null;
     sessionTimeSec: number | null;

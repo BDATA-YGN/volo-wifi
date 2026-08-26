@@ -89,6 +89,7 @@ async function loadCredentialForSessionOps(
           timeAmount: true,
           timeUnit: true,
           timeUsageMode: true,
+          maxDevices: true,
         },
       },
     },
@@ -175,8 +176,9 @@ async function refreshTimeRemainingAfterRepair(
     status: string;
     username: string | null;
     token: string | null;
+    activatedAt?: Date | null;
     expiresAt: Date | null;
-    plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode'> | null;
+    plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode' | 'maxDevices'> | null;
   },
 ): Promise<void> {
   const plan = credential.plan;
@@ -211,6 +213,13 @@ async function refreshTimeRemainingAfterRepair(
         lastInterimAt: session.lastInterimAt,
       },
     );
+  }
+  if (credential.activatedAt) {
+    const elapsedSec = Math.max(
+      0,
+      Math.floor((now.getTime() - credential.activatedAt.getTime()) / 1000),
+    );
+    usedSec = Math.min(usedSec, Math.max(1, plan.maxDevices ?? 1) * elapsedSec);
   }
   const remainingSec = Math.max(0, quotaSec - usedSec);
   const expired = credential.expiresAt != null && credential.expiresAt.getTime() < now.getTime();

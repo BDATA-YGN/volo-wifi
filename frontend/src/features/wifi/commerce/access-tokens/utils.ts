@@ -48,8 +48,7 @@ export function accountingStartAt(
   return startedAt;
 }
 
-export function billedDurationSeconds(
-  sessionTimeSec: number | null | undefined,
+export function lastSeenDurationSeconds(
   startedAt: string,
   stoppedAt: string | null,
   status: string,
@@ -66,11 +65,46 @@ export function billedDurationSeconds(
       : status === "STOP"
         ? start
         : Date.now();
-  const lastSeen = Math.max(0, Math.floor((end - start) / 1000));
+  return Math.max(0, Math.floor((end - start) / 1000));
+}
+
+const LEFTOVER_HOST_SESSION_SEC = 24 * 3600;
+
+export function billedDurationSeconds(
+  sessionTimeSec: number | null | undefined,
+  startedAt: string,
+  stoppedAt: string | null,
+  status: string,
+  createdAt?: string | null,
+  lastInterimAt?: string | null
+): number {
+  const lastSeen = lastSeenDurationSeconds(
+    startedAt,
+    stoppedAt,
+    status,
+    createdAt,
+    lastInterimAt
+  );
   const nas = sessionTimeSec ?? 0;
+  if (lastSeen > LEFTOVER_HOST_SESSION_SEC && nas > LEFTOVER_HOST_SESSION_SEC) return 0;
+  if (nas > LEFTOVER_HOST_SESSION_SEC) return lastSeen;
+  if (lastSeen > LEFTOVER_HOST_SESSION_SEC) {
+    return nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC ? nas : 0;
+  }
+  if (lastSeen === 0 && nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC) return nas;
   if (nas > 12 * 3600 && nas > lastSeen * 2) return lastSeen;
-  if (nas > 0) return nas;
+  if (nas > 0) return Math.min(nas, lastSeen);
   return lastSeen;
+}
+
+export function formatClockSeconds(sec: number | null | undefined): string {
+  if (sec == null || !Number.isFinite(sec) || sec < 0) return "—";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
 }
 
 export function formatSessionDuration(
@@ -81,21 +115,17 @@ export function formatSessionDuration(
   createdAt?: string | null,
   lastInterimAt?: string | null
 ): string {
-  let sec = billedDurationSeconds(
-    sessionTimeSec,
+  let sec = lastSeenDurationSeconds(
     startedAt,
     stoppedAt,
     status,
     createdAt,
     lastInterimAt
   );
-
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  if (sec === 0 && (sessionTimeSec ?? 0) > 0 && (sessionTimeSec ?? 0) <= LEFTOVER_HOST_SESSION_SEC) {
+    sec = sessionTimeSec ?? 0;
+  }
+  return formatClockSeconds(sec);
 }
 
 export function resolvePlanPrice(

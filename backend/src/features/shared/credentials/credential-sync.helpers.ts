@@ -80,6 +80,13 @@ export const ACCT_SESSION_TIME_SLACK_SEC = 120;
 /** NAS Acct-Session-Time above this that also dwarfs last RADIUS update is treated as Session-Timeout copy. */
 export const IMPLAUSIBLE_ACCT_SESSION_SEC = 12 * 3600;
 
+/**
+ * Login→logout (or NAS time) longer than this is leftover hotspot-host / reused
+ * Acct-Session-Id, not a real billed session. Idle-Timeout is 1h; a healthy
+ * session does not stay one RADIUS row for more than a day.
+ */
+export const LEFTOVER_HOST_SESSION_SEC = 24 * 3600;
+
 export type BilledSessionTimeOptions = {
   createdAt?: Date | null;
   stoppedAt?: Date | null;
@@ -99,11 +106,28 @@ export function effectiveAccountingStart(
   return options.createdAt.getTime() > startedAt.getTime() ? options.createdAt : startedAt;
 }
 
+export function lastSeenSessionSeconds(
+  startedAt: Date,
+  endedAt: Date,
+  options?: BilledSessionTimeOptions,
+): number {
+  const wallStart = effectiveAccountingStart(startedAt, options);
+  const lastSeenAt = options?.lastInterimAt ?? options?.stoppedAt ?? endedAt;
+  return Math.max(0, Math.floor((lastSeenAt.getTime() - wallStart.getTime()) / 1000));
+}
+
+export function isLeftoverHostSession(
+  sessionTimeSec: number | null | undefined,
+  lastSeenSec: number,
+): boolean {
+  const nas = sessionTimeSec ?? 0;
+  return lastSeenSec > LEFTOVER_HOST_SESSION_SEC || nas > LEFTOVER_HOST_SESSION_SEC;
+}
+
 /**
- * Bill RADIUS Acct-Session-Time as stored. Do not GREATEST with start→stop wall
- * clock (cleanup used to stamp stopped_at = now and inflate remaining).
- * Fallback to last-interim span only when NAS time is missing or looks like a
- * Session-Timeout copy (>12h and more than 2× last RADIUS update).
+ * Bill last RADIUS update minus effective start. Do not trust Acct-Session-Time
+ * when it is leftover hotspot-host uptime (days) or a Session-Timeout copy.
+ * NAS time is only used when last-seen wall is 0 (timestamps were snapped).
  */
 export function billedSessionSeconds(
   sessionTimeSec: number | null | undefined,
@@ -111,18 +135,26 @@ export function billedSessionSeconds(
   endedAt: Date,
   options?: BilledSessionTimeOptions,
 ): number {
-  const wallStart = effectiveAccountingStart(startedAt, options);
-  const lastSeenAt = options?.lastInterimAt ?? options?.stoppedAt ?? endedAt;
-  const lastSeen = Math.max(
-    0,
-    Math.floor((lastSeenAt.getTime() - wallStart.getTime()) / 1000),
-  );
+  const lastSeen = lastSeenSessionSeconds(startedAt, endedAt, options);
   const nas = sessionTimeSec ?? 0;
+
+  if (lastSeen > LEFTOVER_HOST_SESSION_SEC && nas > LEFTOVER_HOST_SESSION_SEC) {
+    return 0;
+  }
+  if (nas > LEFTOVER_HOST_SESSION_SEC) {
+    return lastSeen;
+  }
+  if (lastSeen > LEFTOVER_HOST_SESSION_SEC) {
+    return nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC ? nas : 0;
+  }
+  if (lastSeen === 0 && nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC) {
+    return nas;
+  }
   if (nas > IMPLAUSIBLE_ACCT_SESSION_SEC && nas > lastSeen * 2) {
     return lastSeen;
   }
   if (nas > 0) {
-    return nas;
+    return Math.min(nas, lastSeen);
   }
   return lastSeen;
 }
@@ -283,7 +315,7 @@ export function radiusUsageSinceForPlan(
 /** Remaining plan seconds (quota − RADIUS used), or null when the plan has no time quota. */
 export async function computeCredentialTimeRemainingSec(
   credential: CredentialTimeUsageIdentity,
-  plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode'>,
+  plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode' | 'maxDevices'>,
 ): Promise<number | null> {
   if (!planHasTimeQuota(plan)) {
     return null;
@@ -292,10 +324,16 @@ export async function computeCredentialTimeRemainingSec(
   if (quotaSec == null || quotaSec <= 0) {
     return null;
   }
-  const usedSec = await aggregateRadiusUsedSeconds(credential, {
+  let usedSec = await aggregateRadiusUsedSeconds(credential, {
     since: radiusUsageSinceForPlan(credential, plan),
     includeActive: true,
   });
+  const floor = credential.activatedAt ?? credential.soldAt ?? null;
+  if (floor) {
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - floor.getTime()) / 1000));
+    const deviceCap = Math.max(1, plan.maxDevices ?? 1) * elapsedSec;
+    usedSec = Math.min(usedSec, deviceCap);
+  }
   return Math.max(0, quotaSec - usedSec);
 }
 

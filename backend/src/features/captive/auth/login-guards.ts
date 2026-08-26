@@ -98,7 +98,7 @@ export async function assertRadiusTimeQuotaAllowsLogin(
     activatedAt: Date | null;
     soldAt: Date | null;
   },
-  plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode'>,
+  plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode' | 'maxDevices'>,
 ): Promise<{ usedSec: number; quotaSec: number } | null> {
   if (!planHasTimeQuota(plan)) {
     return null;
@@ -109,10 +109,17 @@ export async function assertRadiusTimeQuotaAllowsLogin(
     return null;
   }
 
-  const usedSec = await aggregateRadiusUsedSeconds(credential, {
+  let usedSec = await aggregateRadiusUsedSeconds(credential, {
     since: radiusUsageSinceForPlan(credential, plan),
     includeActive: true,
   });
+  if (credential.activatedAt) {
+    const elapsedSec = Math.max(
+      0,
+      Math.floor((Date.now() - credential.activatedAt.getTime()) / 1000),
+    );
+    usedSec = Math.min(usedSec, Math.max(1, plan.maxDevices ?? 1) * elapsedSec);
+  }
 
   return { usedSec, quotaSec };
 }

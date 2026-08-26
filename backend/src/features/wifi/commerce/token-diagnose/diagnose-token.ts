@@ -2,6 +2,9 @@ import type { PrismaClient } from '@/generated/prisma/client';
 import {
   billedSessionSeconds,
   captivePortalSessionUsageWhere,
+  computeCredentialTimeRemainingSec,
+  IMPLAUSIBLE_ACCT_SESSION_SEC,
+  isLeftoverHostSession,
   planTimeQuotaSec,
   radiusSessionUsageWhere,
   radiusUserNameVariants,
@@ -121,7 +124,10 @@ function isInflated(session: SessionLike, now: Date): boolean {
     session.lastInterimAt,
   );
   const nas = session.sessionTimeSec ?? 0;
-  return nas > 12 * 3600 && nas > lastSeen * 2;
+  return (
+    isLeftoverHostSession(nas, lastSeen) ||
+    (nas > IMPLAUSIBLE_ACCT_SESSION_SEC && nas > lastSeen * 2)
+  );
 }
 
 function serializeSession(session: SessionLike, now: Date) {
@@ -152,6 +158,7 @@ function serializeSession(session: SessionLike, now: Date) {
     nasIpAddress: session.nasIpAddress,
     nasIdentifier: session.nasIdentifier,
     startedAt: session.startedAt.toISOString(),
+    createdAt: iso(session.createdAt),
     lastInterimAt: iso(session.lastInterimAt),
     stoppedAt: iso(session.stoppedAt),
     sessionTimeSec: session.sessionTimeSec,
@@ -181,6 +188,7 @@ function buildVerdict(args: {
   rejectCount: number;
   radiusCount: number;
   billedSeconds: number;
+  liveRemainingSec: number | null;
   online: boolean;
   dataCap: boolean;
   inflated: boolean;
@@ -294,6 +302,20 @@ function buildVerdict(args: {
     });
   }
 
+  if (
+    args.status === 'CONSUMED' &&
+    args.liveRemainingSec != null &&
+    args.liveRemainingSec > 0
+  ) {
+    extra.push({
+      code: 'INFLATED_SESSION_TIME',
+      severity: 'warning',
+      title: 'Consumed from leftover RADIUS time',
+      detail:
+        `Plan time is still left (${Math.floor(args.liveRemainingSec / 3600)}h ${Math.floor((args.liveRemainingSec % 3600) / 60)}m). Remaining hit 0 because leftover hotspot-host sessions were billed as days of use. Credential-sync will restore Activated when remaining is recomputed.`,
+    });
+  }
+
   if (args.dataCap) {
     extra.push({
       code: 'DATA_CAP_DISCONNECT',
@@ -308,9 +330,9 @@ function buildVerdict(args: {
     extra.push({
       code: 'INFLATED_SESSION_TIME',
       severity: 'warning',
-      title: 'NAS over-reported session time',
+      title: 'Leftover RADIUS time was billed',
       detail:
-        'Acct-Session-Time is far larger than login→logout clock time (leftover hotspot host uptime or Session-Timeout copied into STOP). Billing should use wall clock, not the NAS value.',
+        'One or more RADIUS rows span more than 24 hours (leftover hotspot host or reused Acct-Session-Id). Those rows are excluded from remaining time.',
     });
   }
 
@@ -356,10 +378,10 @@ function buildVerdict(args: {
         severity: 'warning',
         title: 'Billed time looks inflated',
         summary:
-          'The NAS reported full plan duration on a session that lasted only a short time. This is usually caused by leftover hotspot host/cookie uptime being reused for billing.',
+          'RADIUS rows include leftover hotspot-host uptime (often many days on one Acct-Session-Id). That time is not billed. Remaining is recomputed from real sessions only.',
         actions: [
           'On the router, remove `/ip hotspot host` and `/ip hotspot cookie` for this MAC after a voucher change.',
-          'If the token was marked Consumed, revert to sold (developer) or issue a replacement.',
+          'If status is still Consumed, use Restore to activated or wait for credential-sync.',
         ],
       },
       extra,
@@ -442,6 +464,8 @@ export async function diagnoseAccessToken(
           quotaType: true,
           timeAmount: true,
           timeUnit: true,
+          timeUsageMode: true,
+          maxDevices: true,
           dataMb: true,
         },
       },
@@ -462,6 +486,7 @@ export async function diagnoseAccessToken(
       rejectCount: 0,
       radiusCount: 0,
       billedSeconds: 0,
+      liveRemainingSec: null,
       online: false,
       dataCap: false,
       inflated: false,
@@ -490,20 +515,42 @@ export async function diagnoseAccessToken(
     ],
   };
 
-  const [captiveRows, authRows, hotSessions, archiveSessions] = await Promise.all([
+  const authWhere =
+    userNames.length > 0
+      ? {
+          OR: userNames.map((username) => ({
+            username: { equals: username, mode: 'insensitive' as const },
+          })),
+        }
+      : null;
+
+  const [
+    captiveRows,
+    captiveTotal,
+    authRows,
+    acceptTotal,
+    rejectTotal,
+    hotSessions,
+    hotTotal,
+    archiveSessions,
+    archiveTotal,
+    firstCaptiveRow,
+    firstAcceptRow,
+    firstRadiusRow,
+    liveRemainingSec,
+  ] = await Promise.all([
     prisma.captivePortalSession.findMany({
       where: captivePortalSessionUsageWhere(input.orgId, credential),
       select: { id: true, username: true, ip: true, mac: true, createdAt: true },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: CAPTIVE_PREVIEW_LIMIT,
     }),
-    userNames.length > 0
+    prisma.captivePortalSession.count({
+      where: captivePortalSessionUsageWhere(input.orgId, credential),
+    }),
+    authWhere
       ? prisma.radpostauth.findMany({
-          where: {
-            OR: userNames.map((username) => ({
-              username: { equals: username, mode: 'insensitive' as const },
-            })),
-          },
+          where: authWhere,
           select: {
             id: true,
             username: true,
@@ -512,63 +559,121 @@ export async function diagnoseAccessToken(
             calledStationId: true,
             authdate: true,
           },
-          orderBy: { authdate: 'asc' },
+          orderBy: { authdate: 'desc' },
           take: AUTH_PREVIEW_LIMIT,
         })
       : Promise.resolve([]),
+    authWhere
+      ? prisma.radpostauth.count({
+          where: { AND: [authWhere, { reply: { contains: 'Accept', mode: 'insensitive' } }] },
+        })
+      : Promise.resolve(0),
+    authWhere
+      ? prisma.radpostauth.count({
+          where: { AND: [authWhere, { reply: { contains: 'Reject', mode: 'insensitive' } }] },
+        })
+      : Promise.resolve(0),
     prisma.radiusSession.findMany({
       where: sessionWhere,
-      orderBy: { startedAt: 'asc' },
+      orderBy: { startedAt: 'desc' },
       take: RADIUS_PREVIEW_LIMIT,
     }),
+    prisma.radiusSession.count({ where: sessionWhere }),
     prisma.radiusSessionArchive.findMany({
       where: sessionWhere,
-      orderBy: { startedAt: 'asc' },
+      orderBy: { startedAt: 'desc' },
       take: RADIUS_PREVIEW_LIMIT,
     }),
+    prisma.radiusSessionArchive.count({ where: sessionWhere }),
+    prisma.captivePortalSession.findFirst({
+      where: captivePortalSessionUsageWhere(input.orgId, credential),
+      select: { createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    authWhere
+      ? prisma.radpostauth.findFirst({
+          where: { AND: [authWhere, { reply: { contains: 'Accept', mode: 'insensitive' } }] },
+          select: { authdate: true },
+          orderBy: { authdate: 'asc' },
+        })
+      : Promise.resolve(null),
+    prisma.radiusSession.findFirst({
+      where: sessionWhere,
+      select: { startedAt: true },
+      orderBy: { startedAt: 'asc' },
+    }),
+    computeCredentialTimeRemainingSec(credential, credential.plan),
   ]);
 
   const sessions: SessionLike[] = [
     ...hotSessions.map((row) => ({ ...row, archived: false })),
     ...archiveSessions.map((row) => ({ ...row, archived: true })),
-  ].sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
+  ]
+    .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+    .slice(0, RADIUS_PREVIEW_LIMIT);
 
-  const acceptCount = authRows.filter((row) => authOutcome(row.reply) === 'ACCEPT').length;
-  const rejectCount = authRows.filter((row) => authOutcome(row.reply) === 'REJECT').length;
+  const acceptCount = acceptTotal;
+  const rejectCount = rejectTotal;
   const online = sessions.some((row) => row.stoppedAt == null && row.status !== 'STOP');
   const dataCap = sessions.some((row) =>
     isDataCapBytes(asNumber(row.totalBytes), credential.plan.dataMb)
   );
-  const inflated = sessions.some((row) => isInflated(row, now));
+  const inflated =
+    sessions.some((row) => isInflated(row, now)) ||
+    (credential.timeRemainingSec === 0 && liveRemainingSec != null && liveRemainingSec > 0);
 
-  const firstCaptive = captiveRows[0]?.createdAt ?? null;
-  const firstAccept = authRows.find((row) => authOutcome(row.reply) === 'ACCEPT')?.authdate ?? null;
+  const firstCaptive = firstCaptiveRow?.createdAt ?? null;
+  const firstAccept = firstAcceptRow?.authdate ?? null;
   const firstAuthAt = firstCaptive ?? firstAccept;
-  const firstRadiusAt = sessions[0]?.startedAt ?? null;
+  const firstRadiusAt = firstRadiusRow?.startedAt ?? null;
   const firstSessionMissing = Boolean(
     firstAuthAt &&
       firstRadiusAt &&
       firstRadiusAt.getTime() - firstAuthAt.getTime() > 60_000 &&
-      (captiveRows.length > 1 || acceptCount > 1)
+      (captiveTotal > 1 || acceptCount > 1)
   );
+
+  const billedSeconds = sessions.reduce(
+    (sum, row) =>
+      sum +
+      billedSessionSeconds(row.sessionTimeSec, row.startedAt, row.stoppedAt ?? now, {
+        createdAt: row.createdAt ?? null,
+        stoppedAt: row.stoppedAt,
+        lastInterimAt: row.lastInterimAt,
+      }),
+    0
+  );
+
+  // Persist live remaining so leftover-host billing restores Consumed tokens
+  // without waiting for the credential-sync cron.
+  if (
+    liveRemainingSec != null &&
+    (liveRemainingSec !== credential.timeRemainingSec ||
+      (credential.status === 'CONSUMED' && liveRemainingSec > 0))
+  ) {
+    const expired =
+      credential.expiresAt != null && credential.expiresAt.getTime() < now.getTime();
+    const restore = credential.status === 'CONSUMED' && liveRemainingSec > 0 && !expired;
+    await prisma.credential.update({
+      where: { id: credential.id },
+      data: {
+        timeRemainingSec: liveRemainingSec,
+        ...(restore ? { status: 'ACTIVATED' } : {}),
+      },
+    });
+    if (restore) credential.status = 'ACTIVATED';
+    credential.timeRemainingSec = liveRemainingSec;
+  }
 
   const { verdict, extra } = buildVerdict({
     found: true,
     status: credential.status,
-    captiveCount: captiveRows.length,
+    captiveCount: captiveTotal,
     acceptCount,
     rejectCount,
-    radiusCount: sessions.length,
-    billedSeconds: sessions.reduce(
-      (sum, row) =>
-        sum +
-        billedSessionSeconds(row.sessionTimeSec, row.startedAt, row.stoppedAt ?? now, {
-          createdAt: row.createdAt ?? null,
-          stoppedAt: row.stoppedAt,
-          lastInterimAt: row.lastInterimAt,
-        }),
-      0
-    ),
+    radiusCount: hotTotal + archiveTotal,
+    billedSeconds,
+    liveRemainingSec,
     online,
     dataCap,
     inflated,
@@ -576,12 +681,12 @@ export async function diagnoseAccessToken(
   });
 
   const findings: DiagnoseFinding[] = [...extra];
-  if (captiveRows.length >= 8 && acceptCount >= 8 && sessions.length === 0) {
+  if (captiveTotal >= 8 && acceptCount >= 8 && hotTotal === 0) {
     findings.push({
       code: 'RAPID_RETRIES',
       severity: 'warning',
       title: 'Repeated captive retries',
-      detail: `${captiveRows.length} portal logins and ${acceptCount} Access-Accepts with no accounting. The phone kept failing to join /ip hotspot active.`,
+      detail: `${captiveTotal} portal logins and ${acceptCount} Access-Accepts with no accounting. The phone kept failing to join /ip hotspot active.`,
     });
   }
 
@@ -703,11 +808,11 @@ export async function diagnoseAccessToken(
     verdict,
     findings,
     counts: {
-      captive: captiveRows.length,
+      captive: captiveTotal,
       accept: acceptCount,
       reject: rejectCount,
-      radiusSessions: hotSessions.length,
-      archiveSessions: archiveSessions.length,
+      radiusSessions: hotTotal,
+      archiveSessions: archiveTotal,
     },
     token: {
       id: credential.id,
@@ -720,7 +825,7 @@ export async function diagnoseAccessToken(
       revokedAt: iso(credential.revokedAt),
       createdAt: credential.createdAt.toISOString(),
       updatedAt: credential.updatedAt.toISOString(),
-      timeRemainingSec: credential.timeRemainingSec,
+      timeRemainingSec: liveRemainingSec ?? credential.timeRemainingSec,
       dataRemainingMb: credential.dataRemainingMb,
       planQuotaSec: quotaSec,
       planDataMb: credential.plan.dataMb,

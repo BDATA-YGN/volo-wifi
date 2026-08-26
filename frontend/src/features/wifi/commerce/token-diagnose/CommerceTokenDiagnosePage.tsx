@@ -29,7 +29,7 @@ import {
   useCanManageTokenSessionLifecycle,
 } from "@/features/wifi/shared/session-lifecycle-role";
 import { VoucherCodeText } from "@/features/wifi/shared/components/VoucherCodeText";
-import { formatBytes, formatSessionDuration, formatStatusLabel } from "@/features/wifi/commerce/access-tokens/utils";
+import { formatBytes, formatClockSeconds, formatStatusLabel, accountingStartAt } from "@/features/wifi/commerce/access-tokens/utils";
 import { STATUS_COLOR } from "@/features/wifi/commerce/access-tokens/constant";
 import { SEVERITY_ALERT } from "./constant";
 import { useCommerceTokenDiagnose } from "./useCommerceTokenDiagnose";
@@ -556,6 +556,14 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                     },
                   ]}
                 />
+                {activeResult.counts.captive > activeResult.captiveLogins.length ? (
+                  <Alert
+                    type="info"
+                    showIcon
+                    className="mt-2"
+                    message={`Showing latest ${activeResult.captiveLogins.length} of ${activeResult.counts.captive} captive logins`}
+                  />
+                ) : null}
               </Card>
             ) : null}
 
@@ -609,9 +617,9 @@ const CommerceTokenDiagnosePage: React.FC = () => {
             {likelyShortTimeMismatch || inflatedSessions.length > 0 ? (
               <Card title="Inflated billing analysis" className="mb-4" size="small">
                 <p style={{ marginTop: 0, marginBottom: 12 }}>
-                  Detected {inflatedSessions.length} RADIUS session(s) where <b>wall time</b> is much
-                  smaller than <b>billed time</b>. This usually indicates leftover hotspot host/cookie
-                  or session-time copied into STOP.
+                  Detected {inflatedSessions.length} RADIUS session(s) whose NAS time or
+                  login→logout span is leftover hotspot-host uptime (often many days). Those
+                  rows are not billed.
                 </p>
 
                 <Table
@@ -702,7 +710,8 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                     {
                       title: "Started",
                       dataIndex: "startedAt",
-                      render: (value: string) => formatWifiDateTimeWithSeconds(value),
+                      render: (value: string, row) =>
+                        formatWifiDateTimeWithSeconds(accountingStartAt(value, row.createdAt)),
                     },
                     {
                       title: "Last RADIUS update",
@@ -715,15 +724,7 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                     {
                       title: "NAS time",
                       dataIndex: "sessionTimeSec",
-                      render: (value: number | null, row) =>
-                        formatSessionDuration(
-                          value,
-                          row.startedAt,
-                          row.stoppedAt,
-                          row.status,
-                          row.createdAt,
-                          row.lastInterimAt
-                        ),
+                      render: (value: number | null) => formatClockSeconds(value),
                     },
                     {
                       title: "Wall / billed",
@@ -741,11 +742,30 @@ const CommerceTokenDiagnosePage: React.FC = () => {
                     {
                       title: "Flag",
                       dataIndex: "inflated",
-                      render: (inflated: boolean) =>
-                        inflated ? <Tag color="orange">Inflated time</Tag> : "—",
+                      render: (inflated: boolean, row) =>
+                        inflated ? (
+                          <Tag color="orange">
+                            {(row.wallSeconds > 86400 || (row.sessionTimeSec ?? 0) > 86400)
+                              ? "Leftover host"
+                              : "Inflated time"}
+                          </Tag>
+                        ) : (
+                          "—"
+                        ),
                     },
                   ]}
                 />
+                {activeResult.counts.radiusSessions + activeResult.counts.archiveSessions >
+                activeResult.radiusSessions.length ? (
+                  <Alert
+                    type="info"
+                    showIcon
+                    className="mt-2"
+                    message={`Showing latest ${activeResult.radiusSessions.length} of ${
+                      activeResult.counts.radiusSessions + activeResult.counts.archiveSessions
+                    } RADIUS sessions`}
+                  />
+                ) : null}
               </Card>
             ) : null}
 
