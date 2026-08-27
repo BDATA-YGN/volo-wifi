@@ -90,6 +90,26 @@ async function closeStaleRadiusSessions(cfg: CredentialSyncConfig): Promise<numb
   return Number(result);
 }
 
+async function repairDelayedStopTimestamps(): Promise<number> {
+  const hot = await prisma.$executeRaw`
+    UPDATE wf_radius_session
+    SET
+      last_interim_at = GREATEST(started_at, created_at)
+        + ("sessionTimeSec" * INTERVAL '1 second'),
+      stopped_at = GREATEST(started_at, created_at)
+        + ("sessionTimeSec" * INTERVAL '1 second'),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE status = 'STOP'::"RadiusAcctStatus"
+      AND COALESCE("sessionTimeSec", 0) > 0
+      AND COALESCE("sessionTimeSec", 0) <= 43200
+      AND EXTRACT(EPOCH FROM (
+        COALESCE(last_interim_at, stopped_at, CURRENT_TIMESTAMP)
+        - GREATEST(started_at, created_at)
+      )) > "sessionTimeSec" * 2
+  `;
+  return Number(hot);
+}
+
 /**
  * STOP must be the last RADIUS update. Never invent sessionTimeSec (that
  * column is Acct-Session-Time from the NAS only).
@@ -389,13 +409,14 @@ export async function runCredentialSyncTick(): Promise<CredentialSyncTickResult>
     }
 
     const staleRadiusClosed = await closeStaleRadiusSessions(cfg);
+    const delayedStopRepaired = await repairDelayedStopTimestamps();
     const inflatedWallRepaired = await repairInflatedSessionWallClocks();
     const reboundRepaired = await repairReboundStolenUserNames();
     const expired = await markExpiredCredentials();
     const remainingSynced = await syncRemainingAndConsume();
 
     logger.info(
-      `[credential-sync] Tick done in ${Date.now() - startedAt}ms (staleRadius=${staleRadiusClosed}, inflatedWall=${inflatedWallRepaired}, rebound=${reboundRepaired}, expired=${expired}, remainingSynced=${remainingSynced})`,
+      `[credential-sync] Tick done in ${Date.now() - startedAt}ms (staleRadius=${staleRadiusClosed}, delayedStop=${delayedStopRepaired}, inflatedWall=${inflatedWallRepaired}, rebound=${reboundRepaired}, expired=${expired}, remainingSynced=${remainingSynced})`,
     );
 
     return { staleRadiusClosed, inflatedWallRepaired, reboundRepaired, expired, remainingSynced };

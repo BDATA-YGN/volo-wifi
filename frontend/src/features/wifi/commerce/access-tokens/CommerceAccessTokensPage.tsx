@@ -180,8 +180,9 @@ const CommerceAccessTokensPage: React.FC = () => {
                   : "Revert",
       onOk: async () => {
         try {
-          const updated = await applyTokenAction(record.id, action);
-          setSelected(updated);
+          await applyTokenAction(record.id, action);
+          const detail = await loadToken(record.id);
+          setSelected(detail);
           message.success(
             action === "allowNewDevice"
               ? "Device binding cleared. Customer can log in from a new device now."

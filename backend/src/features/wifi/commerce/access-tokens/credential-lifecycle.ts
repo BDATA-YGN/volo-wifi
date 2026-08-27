@@ -261,18 +261,41 @@ export async function clearAccessTokenSessions(
     const hot = await tx.$executeRaw`
       UPDATE wf_radius_session rs
       SET
-        started_at = GREATEST(
-          rs.started_at,
-          rs.created_at,
-          COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
-        ),
+        started_at = v.start_at,
+        last_interim_at = v.last_at,
         stopped_at = CASE
           WHEN rs.status = 'STOP'::"RadiusAcctStatus" OR rs.stopped_at IS NOT NULL
-          THEN COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
+          THEN v.last_at
           ELSE rs.stopped_at
         END,
         updated_at = CURRENT_TIMESTAMP
-      FROM wf_credential c
+      FROM wf_credential c,
+      LATERAL (
+        SELECT
+          GREATEST(
+            rs.started_at,
+            rs.created_at,
+            COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
+          ) AS start_at,
+          CASE
+            WHEN COALESCE(rs."sessionTimeSec", 0) > 0
+              AND COALESCE(rs."sessionTimeSec", 0) <= 43200
+              AND EXTRACT(EPOCH FROM (
+                COALESCE(rs.last_interim_at, rs.stopped_at, CURRENT_TIMESTAMP)
+                - GREATEST(
+                    rs.started_at,
+                    rs.created_at,
+                    COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
+                  )
+              )) > rs."sessionTimeSec" * 2
+            THEN GREATEST(
+                rs.started_at,
+                rs.created_at,
+                COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
+              ) + (rs."sessionTimeSec" * INTERVAL '1 second')
+            ELSE COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
+          END AS last_at
+      ) v
       WHERE c.id = ${existing.id}
         AND rs.user_name IN (${Prisma.join(names)})
     `;

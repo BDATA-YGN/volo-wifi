@@ -84,7 +84,7 @@ const TokenDetailDrawer: React.FC<Props> = ({
       return;
     }
 
-    if (fallback?.id === tokenId) {
+    if (fallback?.id === tokenId && "radiusSessions" in fallback) {
       setToken(fallback as AccessTokenDetail);
     }
 
