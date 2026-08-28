@@ -115,12 +115,41 @@ export function handleApiError(error: unknown, fallback = "Request failed"): nev
   throw createApiRequestError(error, fallback);
 }
 
+/** Serializable failure for `"use server"` actions — do not throw, or production shows React #441. */
+export function toActionFailure(
+  error: unknown,
+  fallback = "Request failed"
+): {
+  message: string;
+  data: null;
+  meta: { ok: false; status: number; errorCode?: string };
+} {
+  const parsed = parseApiError(error, fallback);
+  return {
+    message: parsed.message,
+    data: null,
+    meta: {
+      ok: false,
+      status: parsed.code,
+      ...(parsed.errorCode ? { errorCode: parsed.errorCode } : {}),
+    },
+  };
+}
+
+function isMinifiedReactDigest(message: string): boolean {
+  return /Minified React error #441/i.test(message) || /error occurred in the Server Components render/i.test(message);
+}
+
 /** User-facing message for toast / alert — never returns raw `{ code, message }` objects. */
 export function getApiErrorMessage(error: unknown, fallback = "Request failed"): string {
-  if (error instanceof ApiRequestError) return error.message;
+  if (error instanceof ApiRequestError && error.message.trim() && !isMinifiedReactDigest(error.message)) {
+    return error.message.trim();
+  }
   if (error instanceof Error && error.message.trim()) {
     const msg = error.message.trim();
-    if (!msg.startsWith("Request failed with status code")) return msg;
+    if (!msg.startsWith("Request failed with status code") && !isMinifiedReactDigest(msg)) return msg;
   }
-  return parseApiError(error, fallback).message;
+  const parsed = parseApiError(error, fallback).message;
+  if (parsed && !isMinifiedReactDigest(parsed)) return parsed;
+  return fallback;
 }

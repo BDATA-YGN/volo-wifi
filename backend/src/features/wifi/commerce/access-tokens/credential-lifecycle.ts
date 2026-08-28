@@ -269,47 +269,72 @@ export async function clearAccessTokenSessions(
           ELSE rs.stopped_at
         END,
         updated_at = CURRENT_TIMESTAMP
-      FROM wf_credential c,
-      LATERAL (
+      FROM (
         SELECT
+          s.id,
           GREATEST(
-            rs.started_at,
-            rs.created_at,
-            COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
+            s.started_at,
+            s.created_at,
+            COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
           ) AS start_at,
           CASE
-            WHEN COALESCE(rs."sessionTimeSec", 0) > 0
-              AND COALESCE(rs."sessionTimeSec", 0) <= 43200
+            WHEN COALESCE(s."sessionTimeSec", 0) > 0
+              AND COALESCE(s."sessionTimeSec", 0) <= 43200
               AND EXTRACT(EPOCH FROM (
-                COALESCE(rs.last_interim_at, rs.stopped_at, CURRENT_TIMESTAMP)
+                COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
                 - GREATEST(
-                    rs.started_at,
-                    rs.created_at,
-                    COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
+                    s.started_at,
+                    s.created_at,
+                    COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
                   )
-              )) > rs."sessionTimeSec" * 2
+              )) > s."sessionTimeSec" * 2
             THEN GREATEST(
-                rs.started_at,
-                rs.created_at,
-                COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
-              ) + (rs."sessionTimeSec" * INTERVAL '1 second')
-            ELSE COALESCE(rs.last_interim_at, rs.created_at, rs.started_at)
+                s.started_at,
+                s.created_at,
+                COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+              ) + (s."sessionTimeSec" * INTERVAL '1 second')
+            ELSE COALESCE(s.last_interim_at, s.created_at, s.started_at)
           END AS last_at
+        FROM wf_radius_session s
+        INNER JOIN wf_credential c ON c.id = ${existing.id}
+        WHERE s.user_name IN (${Prisma.join(names)})
       ) v
-      WHERE c.id = ${existing.id}
-        AND rs.user_name IN (${Prisma.join(names)})
+      WHERE rs.id = v.id
     `;
     const archive = await tx.$executeRaw`
       UPDATE wf_radius_session_archive rs
       SET
-        started_at = GREATEST(
-          rs.started_at,
-          COALESCE(c.activated_at, c.sold_at, c.created_at, rs.started_at)
-        ),
-        stopped_at = COALESCE(rs.last_interim_at, rs.stopped_at, rs.started_at)
-      FROM wf_credential c
-      WHERE c.id = ${existing.id}
-        AND rs.user_name IN (${Prisma.join(names)})
+        started_at = v.start_at,
+        last_interim_at = v.last_at,
+        stopped_at = v.last_at
+      FROM (
+        SELECT
+          s.id,
+          GREATEST(
+            s.started_at,
+            COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+          ) AS start_at,
+          CASE
+            WHEN COALESCE(s.session_time_sec, 0) > 0
+              AND COALESCE(s.session_time_sec, 0) <= 43200
+              AND EXTRACT(EPOCH FROM (
+                COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
+                - GREATEST(
+                    s.started_at,
+                    COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+                  )
+              )) > s.session_time_sec * 2
+            THEN GREATEST(
+                s.started_at,
+                COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+              ) + (s.session_time_sec * INTERVAL '1 second')
+            ELSE COALESCE(s.last_interim_at, s.stopped_at, s.started_at)
+          END AS last_at
+        FROM wf_radius_session_archive s
+        INNER JOIN wf_credential c ON c.id = ${existing.id}
+        WHERE s.user_name IN (${Prisma.join(names)})
+      ) v
+      WHERE rs.id = v.id
     `;
     radiusFixed = Number(hot) + Number(archive);
   }

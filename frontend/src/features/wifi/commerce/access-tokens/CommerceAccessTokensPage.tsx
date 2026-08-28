@@ -191,7 +191,9 @@ const CommerceAccessTokensPage: React.FC = () => {
                 : "Token updated"
           );
         } catch (err: unknown) {
-          message.error(getApiErrorMessage(err, "Failed to update token"));
+          const msg = getApiErrorMessage(err, "Failed to update token");
+          message.error(msg);
+          throw new Error(msg);
         }
       },
     });

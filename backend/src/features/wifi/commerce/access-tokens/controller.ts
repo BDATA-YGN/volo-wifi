@@ -1537,14 +1537,22 @@ export class CommerceAccessTokensController {
             : null,
         });
       } catch (err: unknown) {
-        const status =
+        const assignedStatus =
           err && typeof err === 'object' && 'status' in err
-            ? Number((err as { status: number }).status)
-            : 400;
-        const code =
+            ? Number((err as { status: unknown }).status)
+            : NaN;
+        const status =
+          Number.isInteger(assignedStatus) && assignedStatus >= 400 && assignedStatus < 600
+            ? assignedStatus
+            : 500;
+        const prismaCode =
           err && typeof err === 'object' && 'code' in err
-            ? String((err as { code: string }).code)
-            : 'ACTION_FAILED';
+            ? String((err as { code: unknown }).code)
+            : '';
+        const code =
+          prismaCode.startsWith('P')
+            ? 'ACTION_FAILED'
+            : prismaCode || 'ACTION_FAILED';
         const message = err instanceof Error ? err.message : 'Failed to update access token.';
         return responseError(res, status, { code, message });
       }

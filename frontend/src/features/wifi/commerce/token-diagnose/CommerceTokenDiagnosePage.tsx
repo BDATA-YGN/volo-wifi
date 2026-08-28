@@ -245,19 +245,24 @@ const CommerceTokenDiagnosePage: React.FC = () => {
       okText: selected.okText,
       onOk: async () => {
         try {
-          await applyDiagnoseTokenAction({
+          const res = await applyDiagnoseTokenAction({
             tokenId: activeResult.token.id,
             action,
             orgId: activeMeta.orgId,
             resellerId: activeMeta.resellerId ?? undefined,
           });
+          if (res?.meta?.ok === false) {
+            throw new Error(res.message?.trim() || "Failed to update token");
+          }
           message.success(selected.success);
           if (activeCode) {
             runDiagnose(activeCode);
           }
           await refresh();
         } catch (err) {
-          message.error(getApiErrorMessage(err, "Failed to update token"));
+          const msg = getApiErrorMessage(err, "Failed to update token");
+          message.error(msg);
+          throw new Error(msg);
         }
       },
     });

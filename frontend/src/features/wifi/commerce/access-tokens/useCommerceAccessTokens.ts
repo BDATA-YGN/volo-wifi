@@ -135,6 +135,9 @@ export function useCommerceAccessTokens() {
   const applyTokenAction = useCallback(
     async (id: string, action: CredentialLifecycleAction) => {
       const res = await Query.applyAction(id, action, { orgId, resellerId });
+      if (res.meta?.ok === false) {
+        throw new Error(res.message?.trim() || "Failed to update token");
+      }
       refresh();
       return res.data;
     },

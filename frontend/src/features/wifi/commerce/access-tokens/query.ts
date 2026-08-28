@@ -1,7 +1,7 @@
 "use server";
 
 import { apiClient } from "@/lib/restapi/apiClient";
-import { handleApiError } from "@/common/exceptions/handleApiError";
+import { handleApiError, toActionFailure } from "@/common/exceptions/handleApiError";
 import type { CommonListResponse, CommonResponse } from "@/common/interface/interface";
 import { COMMERCE_ACCESS_TOKENS_API } from "./constant";
 import type {
@@ -95,7 +95,7 @@ export const applyAction = async (
   id: string,
   action: CredentialLifecycleAction,
   params?: Pick<AccessTokensListParams, "orgId" | "resellerId">
-): Promise<CommonResponse & { data: AccessTokenRecord }> => {
+): Promise<CommonResponse & { data: AccessTokenRecord | null }> => {
   try {
     const res = await apiClient.post(
       COMMERCE_ACCESS_TOKENS_API.action(id),
@@ -109,7 +109,9 @@ export const applyAction = async (
     );
     return res.data;
   } catch (error) {
-    throw handleApiError(error);
+    // Return instead of throw so production Next.js does not replace the API
+    // message with minified React error #441 (Server Components digest).
+    return toActionFailure(error, "Failed to update token");
   }
 };
 

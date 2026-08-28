@@ -1,7 +1,7 @@
 "use server";
 
 import { apiClient } from "@/lib/restapi/apiClient";
-import { handleApiError } from "@/common/exceptions/handleApiError";
+import { handleApiError, toActionFailure } from "@/common/exceptions/handleApiError";
 import type { CommonResponse } from "@/common/interface/interface";
 import { COMMERCE_TOKEN_DIAGNOSE_API } from "./constant";
 import type { DiagnoseFormOptions, DiagnoseResult } from "./types";
@@ -67,6 +67,6 @@ export const applyDiagnoseTokenAction = async (params: {
     );
     return res.data ?? null;
   } catch (error) {
-    throw handleApiError(error);
+    return toActionFailure(error, "Failed to update token");
   }
 };
