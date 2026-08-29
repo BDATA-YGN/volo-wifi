@@ -162,7 +162,7 @@ const CommerceAccessTokensPage: React.FC = () => {
             : action === "allowNewDevice"
               ? "Releases the current device slot (online session / recent portal login) so another phone or laptop can log in with this token. This does not add permanent multi-device capacity."
               : action === "clearSessions"
-                ? "Corrects backdated login/logout times from RADIUS last update. Does not delete session rows. Remaining time is recomputed."
+                ? "Finds leftover hotspot-host sessions (NAS or login→logout longer than 24h), corrects their times, and recomputes remaining. Consumed is restored to Activated when time is left. Does not delete session rows."
                 : action === "restoreActivated"
                   ? "Clears leftover sessions and sets status back to Activated (or Expired if calendar expiry already passed)."
               : "The customer can log in again if the plan quota allows.",

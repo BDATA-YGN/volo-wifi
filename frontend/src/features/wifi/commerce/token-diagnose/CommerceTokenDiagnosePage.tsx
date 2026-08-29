@@ -218,7 +218,7 @@ const CommerceTokenDiagnosePage: React.FC = () => {
       clearSessions: {
         title: "Fix Session times for this token?",
         content:
-          "Corrects backdated login/logout times from RADIUS last update. Does not delete session rows. Remaining time is recomputed.",
+          "Finds leftover hotspot-host sessions (NAS or login→logout longer than 24h), corrects their times, and recomputes remaining. Consumed is restored to Activated when time is left. Does not delete session rows.",
         okText: "Fix Session",
         success: "Session times were corrected. Re-diagnosing…",
       },

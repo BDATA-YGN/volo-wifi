@@ -1,6 +1,8 @@
 import { Prisma, type Plan } from '@/generated/prisma/client';
 import {
   billedSessionSeconds,
+  IMPLAUSIBLE_ACCT_SESSION_SEC,
+  LEFTOVER_HOST_SESSION_SEC,
   planTimeQuotaSec,
   planHasTimeQuota,
   radiusSessionUsageWhere,
@@ -238,9 +240,11 @@ async function refreshTimeRemainingAfterRepair(
 const SESSION_CLEARABLE = new Set(['ACTIVATED', 'PAUSED', 'CONSUMED']);
 
 /**
- * Fix incorrect RADIUS timestamps for this token. Does not delete history
- * and does not invent sessionTimeSec. STOP rows snap to last_interim_at;
- * started_at cannot be before the token was sold/activated.
+ * Fix incorrect RADIUS timestamps and leftover hotspot-host rows.
+ * Does not delete history. Leftover NAS (>24h MikroTik host uptime) is
+ * cleared rather than billed; delayed Stop still snaps to last RADIUS
+ * update / start + Acct-Session-Time when NAS is plausible. Remaining time
+ * is recomputed and Consumed is restored to Activated when time is left.
  */
 export async function clearAccessTokenSessions(
   tx: Prisma.TransactionClient,
@@ -256,6 +260,8 @@ export async function clearAccessTokenSessions(
   }
 
   const names = radiusUserNameVariants(existing);
+  const leftoverSec = LEFTOVER_HOST_SESSION_SEC;
+  const delayedNasCap = IMPLAUSIBLE_ACCT_SESSION_SEC;
   let radiusFixed = 0;
   if (names.length > 0) {
     const hot = await tx.$executeRaw`
@@ -264,40 +270,79 @@ export async function clearAccessTokenSessions(
         started_at = v.start_at,
         last_interim_at = v.last_at,
         stopped_at = CASE
-          WHEN rs.status = 'STOP'::"RadiusAcctStatus" OR rs.stopped_at IS NOT NULL
+          WHEN v.leftover
+            OR rs.status = 'STOP'::"RadiusAcctStatus"
+            OR rs.stopped_at IS NOT NULL
           THEN v.last_at
           ELSE rs.stopped_at
         END,
+        status = CASE
+          WHEN v.leftover THEN 'STOP'::"RadiusAcctStatus"
+          ELSE rs.status
+        END,
+        "sessionTimeSec" = v.nas_sec,
         updated_at = CURRENT_TIMESTAMP
       FROM (
         SELECT
-          s.id,
-          GREATEST(
+          x.id,
+          CASE
+            WHEN x.leftover_nas OR (x.leftover_wall AND x.nas = 0)
+            THEN x.anchor
+            ELSE x.base_start
+          END AS start_at,
+          CASE
+            WHEN x.leftover_nas OR (x.leftover_wall AND x.nas = 0)
+            THEN x.anchor
+            WHEN x.nas > 0
+              AND x.nas <= ${leftoverSec}
+              AND (x.leftover_wall OR (x.nas <= ${delayedNasCap} AND x.wall_sec > x.nas * 2))
+            THEN x.base_start + (x.nas * INTERVAL '1 second')
+            ELSE COALESCE(x.last_interim_at, x.created_at, x.started_at)
+          END AS last_at,
+          CASE WHEN x.leftover_nas THEN 0 ELSE x.session_time_sec END AS nas_sec,
+          (x.leftover_nas OR (x.leftover_wall AND x.nas = 0)) AS leftover
+        FROM (
+          SELECT
+            s.id,
             s.started_at,
             s.created_at,
-            COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
-          ) AS start_at,
-          CASE
-            WHEN COALESCE(s."sessionTimeSec", 0) > 0
-              AND COALESCE(s."sessionTimeSec", 0) <= 43200
-              AND EXTRACT(EPOCH FROM (
-                COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
-                - GREATEST(
-                    s.started_at,
-                    s.created_at,
-                    COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
-                  )
-              )) > s."sessionTimeSec" * 2
-            THEN GREATEST(
+            s.last_interim_at,
+            s."sessionTimeSec" AS session_time_sec,
+            COALESCE(s."sessionTimeSec", 0) AS nas,
+            GREATEST(
+              s.started_at,
+              s.created_at,
+              COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+            ) AS base_start,
+            EXTRACT(EPOCH FROM (
+              COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
+              - GREATEST(
+                  s.started_at,
+                  s.created_at,
+                  COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+                )
+            )) AS wall_sec,
+            GREATEST(
+              GREATEST(
                 s.started_at,
                 s.created_at,
                 COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
-              ) + (s."sessionTimeSec" * INTERVAL '1 second')
-            ELSE COALESCE(s.last_interim_at, s.created_at, s.started_at)
-          END AS last_at
-        FROM wf_radius_session s
-        INNER JOIN wf_credential c ON c.id = ${existing.id}
-        WHERE s.user_name IN (${Prisma.join(names)})
+              ),
+              COALESCE(s.last_interim_at, s.stopped_at, s.created_at, s.started_at)
+            ) AS anchor,
+            COALESCE(s."sessionTimeSec", 0) > ${leftoverSec} AS leftover_nas,
+            EXTRACT(EPOCH FROM (
+              COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
+              - GREATEST(
+                  s.started_at,
+                  s.created_at,
+                  COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+                )
+            )) > ${leftoverSec} AS leftover_wall
+          FROM wf_radius_session s
+          INNER JOIN wf_credential c ON c.id = ${existing.id}
+          WHERE s.user_name IN (${Prisma.join(names)})
+        ) x
       ) v
       WHERE rs.id = v.id
     `;
@@ -306,33 +351,69 @@ export async function clearAccessTokenSessions(
       SET
         started_at = v.start_at,
         last_interim_at = v.last_at,
-        stopped_at = v.last_at
+        stopped_at = v.last_at,
+        status = CASE
+          WHEN v.leftover THEN 'STOP'::"RadiusAcctStatus"
+          ELSE rs.status
+        END,
+        session_time_sec = v.nas_sec
       FROM (
         SELECT
-          s.id,
-          GREATEST(
-            s.started_at,
-            COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
-          ) AS start_at,
+          x.id,
           CASE
-            WHEN COALESCE(s.session_time_sec, 0) > 0
-              AND COALESCE(s.session_time_sec, 0) <= 43200
-              AND EXTRACT(EPOCH FROM (
-                COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
-                - GREATEST(
-                    s.started_at,
-                    COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
-                  )
-              )) > s.session_time_sec * 2
-            THEN GREATEST(
+            WHEN x.leftover_nas OR (x.leftover_wall AND x.nas = 0)
+            THEN x.anchor
+            ELSE x.base_start
+          END AS start_at,
+          CASE
+            WHEN x.leftover_nas OR (x.leftover_wall AND x.nas = 0)
+            THEN x.anchor
+            WHEN x.nas > 0
+              AND x.nas <= ${leftoverSec}
+              AND (x.leftover_wall OR (x.nas <= ${delayedNasCap} AND x.wall_sec > x.nas * 2))
+            THEN x.base_start + (x.nas * INTERVAL '1 second')
+            ELSE COALESCE(x.last_interim_at, x.stopped_at, x.started_at)
+          END AS last_at,
+          CASE WHEN x.leftover_nas THEN 0 ELSE x.session_time_sec END AS nas_sec,
+          (x.leftover_nas OR (x.leftover_wall AND x.nas = 0)) AS leftover
+        FROM (
+          SELECT
+            s.id,
+            s.started_at,
+            s.last_interim_at,
+            s.stopped_at,
+            s.session_time_sec,
+            COALESCE(s.session_time_sec, 0) AS nas,
+            GREATEST(
+              s.started_at,
+              COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+            ) AS base_start,
+            EXTRACT(EPOCH FROM (
+              COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
+              - GREATEST(
+                  s.started_at,
+                  COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+                )
+            )) AS wall_sec,
+            GREATEST(
+              GREATEST(
                 s.started_at,
                 COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
-              ) + (s.session_time_sec * INTERVAL '1 second')
-            ELSE COALESCE(s.last_interim_at, s.stopped_at, s.started_at)
-          END AS last_at
-        FROM wf_radius_session_archive s
-        INNER JOIN wf_credential c ON c.id = ${existing.id}
-        WHERE s.user_name IN (${Prisma.join(names)})
+              ),
+              COALESCE(s.last_interim_at, s.stopped_at, s.started_at)
+            ) AS anchor,
+            COALESCE(s.session_time_sec, 0) > ${leftoverSec} AS leftover_nas,
+            EXTRACT(EPOCH FROM (
+              COALESCE(s.last_interim_at, s.stopped_at, CURRENT_TIMESTAMP)
+              - GREATEST(
+                  s.started_at,
+                  COALESCE(c.activated_at, c.sold_at, c.created_at, s.started_at)
+                )
+            )) > ${leftoverSec} AS leftover_wall
+          FROM wf_radius_session_archive s
+          INNER JOIN wf_credential c ON c.id = ${existing.id}
+          WHERE s.user_name IN (${Prisma.join(names)})
+        ) x
       ) v
       WHERE rs.id = v.id
     `;
