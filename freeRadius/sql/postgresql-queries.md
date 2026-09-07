@@ -464,7 +464,7 @@ WHERE acct_session_id = '8123456789'
 
 ### 10b. INSERT … ON CONFLICT
 
-See `queries.conf` → `accounting.type.start` second `query`.
+See `queries.conf` → `accounting.type.start` last `query`. INSERT is skipped when a STOP'd row already holds `(acct_session_id, nas_ip_address)` (leftover host reuse after Cleanup-Timeout).
 
 ```sql
 SELECT c.id, c.org_id, c.station_id, c.token, c.username, c.status
@@ -483,9 +483,10 @@ Same `wf_radius_session` keys: `(acct_session_id, nas_ip_address)`. Full SQL in 
 Guards (leftover hotspot host / reused Acct-Session-Id):
 
 - Start/Interim/Stop **never UPDATE a row that already has `stopped_at`**.
-- On Start, a STOP'd row with the same `(acct_session_id, nas_ip_address)` is renamed (`:closed:<uuid>`) so a new session can INSERT.
-- `Acct-Session-Time` **> 86400 (24h) and > 2× last-seen wall** is treated as a leftover-host / Session-Timeout copy and is **not stored**.
-- A Stop/Interim **INSERT is skipped** when that leftover test fails (no new 15-day row on a 3-hour voucher).
+- Start/Interim/Stop **never INSERT** a second row when that `(acct_session_id, nas_ip)` is already STOP'd. Do **not** rename closed rows on Start — leftover MikroTik hosts keep sending Start after Cleanup-Timeout; renaming reopened them and duplicated leftover rows.
+- `rebound-orphan` still renames when **User-Name** differs (new voucher vs leftover host).
+- On UPDATE, `Acct-Session-Time` **> 86400 (24h) and > 2× last-seen wall** is treated as leftover-host / Session-Timeout copy and is **not stored**.
+- A Stop/Interim **INSERT is skipped** when `Acct-Session-Time` **> 86400** (leftover-host uptime; the 2× wall test is only valid on UPDATE of an existing row).
 - Authorize remaining-time SQL bills leftover NAS+wall (>24h both) as **0**, matching `billedSessionSeconds()`.
 
 Preview:
