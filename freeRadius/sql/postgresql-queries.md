@@ -478,7 +478,17 @@ LIMIT 1;
 
 ## 11–12. Interim-Update / Stop
 
-Same `wf_radius_session` keys: `(acct_session_id, nas_ip_address)`. Full SQL in `queries.conf`. Preview:
+Same `wf_radius_session` keys: `(acct_session_id, nas_ip_address)`. Full SQL in `queries.conf`.
+
+Guards (leftover hotspot host / reused Acct-Session-Id):
+
+- Start/Interim/Stop **never UPDATE a row that already has `stopped_at`**.
+- On Start, a STOP'd row with the same `(acct_session_id, nas_ip_address)` is renamed (`:closed:<uuid>`) so a new session can INSERT.
+- `Acct-Session-Time` **> 86400 (24h) and > 2× last-seen wall** is treated as a leftover-host / Session-Timeout copy and is **not stored**.
+- A Stop/Interim **INSERT is skipped** when that leftover test fails (no new 15-day row on a 3-hour voucher).
+- Authorize remaining-time SQL bills leftover NAS+wall (>24h both) as **0**, matching `billedSessionSeconds()`.
+
+Preview:
 
 ```sql
 SELECT id, status, started_at, last_interim_at, stopped_at,

@@ -150,6 +150,18 @@ FROM (
 	LEFT JOIN LATERAL (
 		SELECT COALESCE(SUM(
 			CASE
+				WHEN w.last_seen > 86400
+					AND COALESCE(rs."sessionTimeSec", 0) > 86400
+				THEN 0
+				WHEN COALESCE(rs."sessionTimeSec", 0) > 86400
+				THEN w.last_seen
+				WHEN w.last_seen > 86400 THEN
+					CASE
+						WHEN COALESCE(rs."sessionTimeSec", 0) > 0
+							AND COALESCE(rs."sessionTimeSec", 0) <= 86400
+						THEN rs."sessionTimeSec"
+						ELSE 0
+					END
 				WHEN COALESCE(rs."sessionTimeSec", 0) > 43200
 					AND COALESCE(rs."sessionTimeSec", 0) > w.last_seen * 2
 				THEN w.last_seen
