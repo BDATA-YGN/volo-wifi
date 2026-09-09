@@ -1,5 +1,6 @@
 import type { CredentialStatus, PrismaClient } from '@/generated/prisma/client';
 import { logger } from '@/logging/logger';
+import { endOpenRadiusSessionsForUser } from '@/features/shared/credentials/credential-sync.helpers';
 
 const TERMINAL_STATUSES: CredentialStatus[] = ['EXPIRED', 'CONSUMED', 'REVOKED'];
 
@@ -19,6 +20,8 @@ function terminalAt(row: {
 /**
  * Archives credentials in a terminal state after grace period.
  * Skips credentials with active RADIUS sessions (START / INTERIM).
+ * Closes leftover open sessions from a previous life of the same voucher code
+ * so the code can be reissued without Simultaneous-Use collisions.
  */
 export async function archiveCredentials(
   prisma: PrismaClient,
@@ -53,6 +56,13 @@ export async function archiveCredentials(
         select: { id: true },
       });
       if (activeSession) continue;
+
+      await endOpenRadiusSessionsForUser(
+        prisma,
+        { username: row.username, token: row.token },
+        'Archive-Credential-Reuse',
+        { createdBefore: row.createdAt, portalSince: null },
+      );
 
       const exists = await prisma.credentialArchive.findUnique({
         where: { sourceId: row.id },

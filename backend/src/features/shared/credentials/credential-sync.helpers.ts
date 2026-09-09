@@ -2,6 +2,7 @@ import PrismaDBConnection from '@/prisma/prisma-client';
 import {
   Plan,
   PlanTimeUsageMode,
+  Prisma,
   UnitTime,
 } from '@/generated/prisma/client';
 
@@ -11,6 +12,7 @@ export type CredentialTimeUsageIdentity = {
   id: string;
   username: string | null;
   token: string | null;
+  createdAt?: Date | null;
   singleSessionResellerUnlockAt?: Date | null;
   activatedAt?: Date | null;
   soldAt?: Date | null;
@@ -211,22 +213,78 @@ export function radiusSessionMatchWhere(
  * Sessions billed to this token/username (RADIUS User-Name).
  * Do not match on credential_id — leftover rows can keep an old FK after
  * User-Name changes, which makes deleted sessions reappear on the token.
+ * When createdAt is set, ignore rows from a previous life of the same code
+ * (credential was deleted/archived and the voucher string was issued again).
  */
 export function radiusSessionUsageWhere(credential: {
   username: string | null;
   token: string | null;
-}): { userName: { in: string[] } } {
-  return radiusSessionMatchWhere(radiusUserNameVariants(credential));
+  createdAt?: Date | null;
+}): { userName: { in: string[] }; createdAt?: { gte: Date } } {
+  const where = radiusSessionMatchWhere(radiusUserNameVariants(credential));
+  if (!credential.createdAt) return where;
+  return { ...where, createdAt: { gte: credential.createdAt } };
 }
 
 /** Captive portal rows for this token/username (`wf_captive_portal_session.username`). */
 export function captivePortalSessionUsageWhere(
   orgId: string,
-  credential: { username: string | null; token: string | null },
-): { orgId: string; username: { in: string[] } } {
+  credential: { username: string | null; token: string | null; createdAt?: Date | null },
+): { orgId: string; username: { in: string[] }; createdAt?: { gte: Date } } {
   return {
     orgId,
     username: radiusSessionMatchWhere(radiusUserNameVariants(credential)).userName,
+    ...(credential.createdAt ? { createdAt: { gte: credential.createdAt } } : {}),
+  };
+}
+
+type RadiusSessionTx = Pick<Prisma.TransactionClient, '$executeRaw' | 'captivePortalSession'>;
+
+/**
+ * Soft-end open RADIUS rows for this username/token.
+ * `createdBefore` closes only leftover sessions from a previous voucher instance.
+ */
+export async function endOpenRadiusSessionsForUser(
+  tx: RadiusSessionTx,
+  credential: { username: string | null; token: string | null },
+  terminateCause: string,
+  options?: { createdBefore?: Date; portalSince?: Date | null },
+): Promise<{ endedRadiusSessions: number; clearedPortalSessions: number }> {
+  const userNameVariants = radiusUserNameVariants(credential);
+  if (userNameVariants.length === 0) {
+    return { endedRadiusSessions: 0, clearedPortalSessions: 0 };
+  }
+
+  const createdBefore = options?.createdBefore ?? null;
+  const endedCount = Number(
+    await tx.$executeRaw`
+      UPDATE wf_radius_session
+      SET
+        status = 'STOP'::"RadiusAcctStatus",
+        stopped_at = COALESCE(last_interim_at, created_at, started_at),
+        terminate_cause = ${terminateCause},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE stopped_at IS NULL
+        AND status IN ('START'::"RadiusAcctStatus", 'INTERIM'::"RadiusAcctStatus")
+        AND user_name IN (${Prisma.join(userNameVariants)})
+        AND (${createdBefore}::timestamptz IS NULL OR created_at < ${createdBefore})
+    `,
+  );
+
+  const portalSince = options?.portalSince;
+  const cleared =
+    portalSince === null
+      ? { count: 0 }
+      : await tx.captivePortalSession.deleteMany({
+          where: {
+            username: { in: userNameVariants },
+            ...(portalSince ? { createdAt: { gte: portalSince } } : {}),
+          },
+        });
+
+  return {
+    endedRadiusSessions: endedCount,
+    clearedPortalSessions: cleared.count,
   };
 }
 
@@ -236,7 +294,7 @@ export function captivePortalSessionUsageWhere(
  * @param since If set, only sessions that started on or after this time (single-session cycle).
  */
 export async function aggregateRadiusUsedSeconds(
-  credential: { id: string; username: string | null; token: string | null },
+  credential: { id: string; username: string | null; token: string | null; createdAt?: Date | null },
   options: { since?: Date | null; includeActive?: boolean } = {},
 ): Promise<number> {
   const { since = null, includeActive = true } = options;
@@ -269,7 +327,7 @@ export async function aggregateRadiusUsedSeconds(
 }
 
 export async function aggregateRadiusUsedBytes(
-  credential: { id: string; username: string | null; token: string | null },
+  credential: { id: string; username: string | null; token: string | null; createdAt?: Date | null },
   options: { since?: Date | null; includeActive?: boolean } = {},
 ): Promise<bigint> {
   const { since = null, includeActive = true } = options;

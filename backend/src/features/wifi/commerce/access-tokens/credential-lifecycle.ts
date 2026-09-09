@@ -7,6 +7,7 @@ import {
   planHasTimeQuota,
   radiusSessionUsageWhere,
   radiusUserNameVariants,
+  endOpenRadiusSessionsForUser,
 } from '@/features/shared/credentials/credential-sync.helpers';
 
 const PAUSABLE = new Set(['ACTIVATED']);
@@ -85,6 +86,7 @@ async function loadCredentialForSessionOps(
       soldAt: true,
       activatedAt: true,
       expiresAt: true,
+      createdAt: true,
       plan: {
         select: {
           quotaType: true,
@@ -107,43 +109,12 @@ async function loadCredentialForSessionOps(
 async function softEndOpenRadiusSessions(
   tx: Prisma.TransactionClient,
   credential: { id: string; username: string | null; token: string | null },
-  terminateCause: string
+  terminateCause: string,
 ): Promise<{ endedRadiusSessions: number; clearedPortalSessions: number }> {
-  const now = new Date();
-  const userNameVariants = radiusUserNameVariants(credential);
-
-  const endedCount =
-    userNameVariants.length > 0
-      ? Number(
-          await tx.$executeRaw`
-            UPDATE wf_radius_session
-            SET
-              status = 'STOP'::"RadiusAcctStatus",
-              stopped_at = COALESCE(last_interim_at, created_at, started_at),
-              terminate_cause = ${terminateCause},
-              updated_at = CURRENT_TIMESTAMP
-            WHERE stopped_at IS NULL
-              AND status IN ('START'::"RadiusAcctStatus", 'INTERIM'::"RadiusAcctStatus")
-              AND user_name IN (${Prisma.join(userNameVariants)})
-          `,
-        )
-      : 0;
-
-  const since = new Date(now.getTime() - PORTAL_LOGIN_SLOT_MS);
-  const cleared =
-    userNameVariants.length > 0
-      ? await tx.captivePortalSession.deleteMany({
-          where: {
-            username: { in: userNameVariants },
-            createdAt: { gte: since },
-          },
-        })
-      : { count: 0 };
-
-  return {
-    endedRadiusSessions: endedCount,
-    clearedPortalSessions: cleared.count,
-  };
+  const since = new Date(Date.now() - PORTAL_LOGIN_SLOT_MS);
+  return endOpenRadiusSessionsForUser(tx, credential, terminateCause, {
+    portalSince: since,
+  });
 }
 
 /**

@@ -212,9 +212,10 @@ async function endOpenRadiusSessionsForSameDevice(params: {
 
 async function collectOccupiedDeviceKeys(params: {
   userNameVariants: string[];
+  credentialCreatedAt?: Date | null;
   nowMs?: number;
 }): Promise<Set<string>> {
-  const { userNameVariants, nowMs = Date.now() } = params;
+  const { userNameVariants, credentialCreatedAt, nowMs = Date.now() } = params;
   const occupied = new Set<string>();
 
   if (userNameVariants.length === 0) {
@@ -226,6 +227,7 @@ async function collectOccupiedDeviceKeys(params: {
       userName: { in: userNameVariants },
       status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
       stoppedAt: null,
+      ...(credentialCreatedAt ? { createdAt: { gte: credentialCreatedAt } } : {}),
     },
     select: {
       acctSessionId: true,
@@ -306,6 +308,7 @@ export async function runCaptiveLoginGuards(
 
   const occupied = await collectOccupiedDeviceKeys({
     userNameVariants,
+    credentialCreatedAt: credential.createdAt,
   });
 
   const maxDevices =

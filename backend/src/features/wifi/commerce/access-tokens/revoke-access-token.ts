@@ -5,6 +5,7 @@ import {
   partnerRevocableStatuses,
 } from './credential-permissions';
 import { restoreVoucherBatchSlot } from './voucher-inventory';
+import { endOpenRadiusSessionsForUser } from '@/features/shared/credentials/credential-sync.helpers';
 
 function appendNote(existing: string | null | undefined, line: string): string {
   const base = existing?.trim();
@@ -35,7 +36,7 @@ export async function revokeAccessToken(
 
   const existing = await tx.credential.findFirst({
     where: { id: credentialId, orgId, resellerId, deletedAt: null },
-    select: { id: true, status: true, token: true, voucherBatchId: true, soldAt: true },
+    select: { id: true, status: true, token: true, username: true, voucherBatchId: true, soldAt: true },
   });
 
   if (!existing) {
@@ -65,6 +66,8 @@ export async function revokeAccessToken(
     where: { id: existing.id },
     data: { status: 'REVOKED', revokedAt: now },
   });
+
+  await endOpenRadiusSessionsForUser(tx, existing, 'Operator-Revoke');
 
   await restoreVoucherBatchSlot(tx, existing.voucherBatchId);
 

@@ -259,6 +259,7 @@ async function syncRemainingAndConsume(): Promise<number> {
           (c.username IS NOT NULL AND rs.user_name = c.username)
           OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
         )
+        AND rs.created_at >= c.created_at
         AND (
           p.time_usage_mode::text IS DISTINCT FROM 'SINGLE_SESSION'
           OR rs.started_at >= COALESCE(

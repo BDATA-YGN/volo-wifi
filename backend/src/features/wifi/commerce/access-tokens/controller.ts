@@ -374,6 +374,7 @@ async function loadTokenSessionHistory(
     token: string | null;
     status: string;
     activatedAt: Date | null;
+    createdAt: Date;
   }
 ) {
   const userNameVariants = radiusUserNameVariants(credential);
@@ -909,6 +910,7 @@ export class CommerceAccessTokensController {
             token: row.token,
             status: row.status,
             activatedAt: row.activatedAt,
+            createdAt: row.createdAt,
           });
           const firstLoginMap = await loadFirstLoginAtMap(this.prisma, orgId, [row]);
 
