@@ -215,6 +215,9 @@ export function radiusSessionMatchWhere(
  * User-Name changes, which makes deleted sessions reappear on the token.
  * When createdAt is set, ignore rows from a previous life of the same code
  * (credential was deleted/archived and the voucher string was issued again).
+ *
+ * Hot table: filter by session created_at (row insert time).
+ * Archive has no created_at — use radiusSessionArchiveUsageWhere (startedAt).
  */
 export function radiusSessionUsageWhere(credential: {
   username: string | null;
@@ -224,6 +227,17 @@ export function radiusSessionUsageWhere(credential: {
   const where = radiusSessionMatchWhere(radiusUserNameVariants(credential));
   if (!credential.createdAt) return where;
   return { ...where, createdAt: { gte: credential.createdAt } };
+}
+
+/** Archive rows have no created_at; bound this credential's life with startedAt. */
+export function radiusSessionArchiveUsageWhere(credential: {
+  username: string | null;
+  token: string | null;
+  createdAt?: Date | null;
+}): { userName: { in: string[] }; startedAt?: { gte: Date } } {
+  const where = radiusSessionMatchWhere(radiusUserNameVariants(credential));
+  if (!credential.createdAt) return where;
+  return { ...where, startedAt: { gte: credential.createdAt } };
 }
 
 /** Captive portal rows for this token/username (`wf_captive_portal_session.username`). */

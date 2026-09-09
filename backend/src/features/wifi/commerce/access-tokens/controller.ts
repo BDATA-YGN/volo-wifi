@@ -54,6 +54,7 @@ import {
 } from './voucher-inventory';
 import {
   radiusSessionUsageWhere,
+  radiusSessionArchiveUsageWhere,
   radiusUserNameVariants,
   captivePortalSessionUsageWhere,
 } from '@/features/shared/credentials/credential-sync.helpers';
@@ -384,6 +385,12 @@ async function loadTokenSessionHistory(
       { OR: [{ orgId }, { orgId: null }] },
     ],
   };
+  const radiusArchiveWhere = {
+    AND: [
+      radiusSessionArchiveUsageWhere(credential),
+      { OR: [{ orgId }, { orgId: null }] },
+    ],
+  };
 
   const [
     captiveSessions,
@@ -423,7 +430,7 @@ async function loadTokenSessionHistory(
       : Promise.resolve(0),
     userNameVariants.length > 0
       ? prisma.radiusSessionArchive.findMany({
-          where: radiusWhere,
+          where: radiusArchiveWhere,
           select: {
             id: true,
             status: true,
@@ -446,7 +453,7 @@ async function loadTokenSessionHistory(
         })
       : Promise.resolve([]),
     userNameVariants.length > 0
-      ? prisma.radiusSessionArchive.count({ where: radiusWhere })
+      ? prisma.radiusSessionArchive.count({ where: radiusArchiveWhere })
       : Promise.resolve(0),
     loadOpsArchiveSettings(prisma).catch(() => OPS_ARCHIVE_DEFAULTS),
   ]);

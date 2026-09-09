@@ -7,6 +7,7 @@ import {
   isLeftoverHostSession,
   planTimeQuotaSec,
   radiusSessionUsageWhere,
+  radiusSessionArchiveUsageWhere,
   radiusUserNameVariants,
 } from '@/features/shared/credentials/credential-sync.helpers';
 import { normalizeMacKey } from '@/utils/mac-address';
@@ -514,6 +515,12 @@ export async function diagnoseAccessToken(
       { OR: [{ orgId: input.orgId }, { orgId: null }] },
     ],
   };
+  const archiveWhere = {
+    AND: [
+      radiusSessionArchiveUsageWhere(credential),
+      { OR: [{ orgId: input.orgId }, { orgId: null }] },
+    ],
+  };
 
   const authWhere =
     userNames.length > 0
@@ -580,11 +587,11 @@ export async function diagnoseAccessToken(
     }),
     prisma.radiusSession.count({ where: sessionWhere }),
     prisma.radiusSessionArchive.findMany({
-      where: sessionWhere,
+      where: archiveWhere,
       orderBy: { startedAt: 'desc' },
       take: RADIUS_PREVIEW_LIMIT,
     }),
-    prisma.radiusSessionArchive.count({ where: sessionWhere }),
+    prisma.radiusSessionArchive.count({ where: archiveWhere }),
     prisma.captivePortalSession.findFirst({
       where: captivePortalSessionUsageWhere(input.orgId, credential),
       select: { createdAt: true },
