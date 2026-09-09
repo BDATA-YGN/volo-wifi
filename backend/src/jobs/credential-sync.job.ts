@@ -216,59 +216,64 @@ async function syncRemainingAndConsume(): Promise<number> {
         SELECT
           COALESCE(SUM(
             CASE
-              WHEN w.last_seen > 86400 AND COALESCE(rs."sessionTimeSec", 0) > 86400
+              WHEN billed.last_seen > 86400 AND COALESCE(billed."sessionTimeSec", 0) > 86400
               THEN 0
-              WHEN COALESCE(rs."sessionTimeSec", 0) > 86400
-              THEN w.last_seen
-              WHEN w.last_seen > 86400 THEN
+              WHEN COALESCE(billed."sessionTimeSec", 0) > 86400
+              THEN billed.last_seen
+              WHEN billed.last_seen > 86400 THEN
                 CASE
-                  WHEN COALESCE(rs."sessionTimeSec", 0) > 0
-                    AND COALESCE(rs."sessionTimeSec", 0) <= 86400
-                  THEN rs."sessionTimeSec"
+                  WHEN COALESCE(billed."sessionTimeSec", 0) > 0
+                    AND COALESCE(billed."sessionTimeSec", 0) <= 86400
+                  THEN billed."sessionTimeSec"
                   ELSE 0
                 END
-              WHEN w.last_seen = 0
-                AND COALESCE(rs."sessionTimeSec", 0) > 0
-                AND COALESCE(rs."sessionTimeSec", 0) <= 86400
-              THEN rs."sessionTimeSec"
-              WHEN COALESCE(rs."sessionTimeSec", 0) > 43200
-                AND COALESCE(rs."sessionTimeSec", 0) > w.last_seen * 2
-              THEN w.last_seen
-              WHEN COALESCE(rs."sessionTimeSec", 0) > 0
-              THEN LEAST(rs."sessionTimeSec", w.last_seen)
-              ELSE w.last_seen
+              WHEN billed.last_seen = 0
+                AND COALESCE(billed."sessionTimeSec", 0) > 0
+                AND COALESCE(billed."sessionTimeSec", 0) <= 86400
+              THEN billed."sessionTimeSec"
+              WHEN COALESCE(billed."sessionTimeSec", 0) > 43200
+                AND COALESCE(billed."sessionTimeSec", 0) > billed.last_seen * 2
+              THEN billed.last_seen
+              WHEN COALESCE(billed."sessionTimeSec", 0) > 0
+              THEN LEAST(billed."sessionTimeSec", billed.last_seen)
+              ELSE billed.last_seen
             END
           ), 0)::integer AS used_sec,
           COALESCE(SUM(
             CASE
-              WHEN COALESCE(rs."totalBytes", 0) > 0 THEN rs."totalBytes"
-              ELSE COALESCE(rs."inputBytes", 0) + COALESCE(rs."outputBytes", 0)
+              WHEN COALESCE(billed."totalBytes", 0) > 0 THEN billed."totalBytes"
+              ELSE COALESCE(billed."inputBytes", 0) + COALESCE(billed."outputBytes", 0)
             END
           ), 0)::bigint AS used_bytes
-        FROM wf_radius_session rs
-        CROSS JOIN LATERAL (
-          SELECT GREATEST(
-            0,
-            FLOOR(EXTRACT(EPOCH FROM (
-              COALESCE(rs.last_interim_at, rs.stopped_at, CURRENT_TIMESTAMP)
-              - GREATEST(rs.started_at, rs.created_at)
-            )))::integer
-          ) AS last_seen
-        ) w
-        WHERE (
-          (c.username IS NOT NULL AND rs.user_name = c.username)
-          OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
-        )
-        AND rs.created_at >= c.created_at
-        AND (
-          p.time_usage_mode::text IS DISTINCT FROM 'SINGLE_SESSION'
-          OR rs.started_at >= COALESCE(
-            c.single_session_reseller_unlock_at,
-            c.activated_at,
-            c.sold_at,
-            '-infinity'::timestamptz
+        FROM (
+          SELECT
+            rs."sessionTimeSec",
+            rs."totalBytes",
+            rs."inputBytes",
+            rs."outputBytes",
+            GREATEST(
+              0,
+              FLOOR(EXTRACT(EPOCH FROM (
+                COALESCE(rs.last_interim_at, rs.stopped_at, CURRENT_TIMESTAMP)
+                - GREATEST(rs.started_at, rs.created_at)
+              )))::integer
+            ) AS last_seen
+          FROM wf_radius_session rs
+          WHERE (
+            (c.username IS NOT NULL AND rs.user_name = c.username)
+            OR (c.token IS NOT NULL AND (rs.user_name = c.token OR rs.user_name = UPPER(c.token)))
           )
-        )
+          AND rs.created_at >= c.created_at
+          AND (
+            p.time_usage_mode::text IS DISTINCT FROM 'SINGLE_SESSION'
+            OR rs.started_at >= COALESCE(
+              c.single_session_reseller_unlock_at,
+              c.activated_at,
+              c.sold_at,
+              '-infinity'::timestamptz
+            )
+          )
+        ) billed
       ) used ON true
       CROSS JOIN LATERAL (
         SELECT
