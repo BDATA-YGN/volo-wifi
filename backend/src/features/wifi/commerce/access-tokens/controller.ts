@@ -1588,13 +1588,6 @@ export class CommerceAccessTokensController {
         });
       }
 
-      if (!isDeveloperAdmin(req.user!)) {
-        return responseError(res, 403, {
-          code: 'ACTION_NOT_ALLOWED',
-          message: 'Deleting a session row is only available to Developer.',
-        });
-      }
-
       try {
         const context = await resolveResellerContext(this.prisma, adminId, req.user, q);
         if ('requiresOrgSelection' in context) {
@@ -1606,6 +1599,7 @@ export class CommerceAccessTokensController {
 
         let orgId: string;
         let resellerId: string;
+        let mode: 'partner' | 'preview';
         if ('requiresResellerSelection' in context) {
           const credential = await this.prisma.credential.findFirst({
             where: { id: tokenId, orgId: context.orgId, deletedAt: null },
@@ -1619,9 +1613,24 @@ export class CommerceAccessTokensController {
           }
           orgId = context.orgId;
           resellerId = credential.resellerId;
+          mode = 'preview';
         } else {
           orgId = context.orgId;
           resellerId = context.resellerId;
+          mode = context.mode;
+        }
+
+        const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
+          adminId,
+          orgId,
+          user: req.user!,
+          mode,
+        });
+        if (!permissionCtx.isDeveloper && !permissionCtx.isOrgAdmin) {
+          return responseError(res, 403, {
+            code: 'ACTION_NOT_ALLOWED',
+            message: 'Deleting a session row is only available to Developer or ORG_ADMIN.',
+          });
         }
 
         await this.prisma.$transaction((tx) =>

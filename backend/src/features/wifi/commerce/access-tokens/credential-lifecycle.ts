@@ -1,6 +1,8 @@
 import { Prisma, type Plan } from '@/generated/prisma/client';
 import {
   billedSessionSeconds,
+  GHOST_NAS_MIN_SEC,
+  GHOST_SESSION_WALL_SEC,
   IMPLAUSIBLE_ACCT_SESSION_SEC,
   LEFTOVER_HOST_SESSION_SEC,
   planTimeQuotaSec,
@@ -233,6 +235,8 @@ export async function clearAccessTokenSessions(
   const names = radiusUserNameVariants(existing);
   const leftoverSec = LEFTOVER_HOST_SESSION_SEC;
   const delayedNasCap = IMPLAUSIBLE_ACCT_SESSION_SEC;
+  const ghostWall = GHOST_SESSION_WALL_SEC;
+  const ghostNasMin = GHOST_NAS_MIN_SEC;
   let radiusFixed = 0;
   if (names.length > 0) {
     const hot = await tx.$executeRaw`
@@ -270,7 +274,12 @@ export async function clearAccessTokenSessions(
             THEN x.base_start + (x.nas * INTERVAL '1 second')
             ELSE COALESCE(x.last_interim_at, x.created_at, x.started_at)
           END AS last_at,
-          CASE WHEN x.leftover_nas THEN 0 ELSE x.session_time_sec END AS nas_sec,
+          CASE
+            WHEN x.leftover_nas
+              OR (x.nas > ${ghostNasMin} AND x.wall_sec < ${ghostWall} AND x.nas > x.wall_sec * 2)
+            THEN 0
+            ELSE x.session_time_sec
+          END AS nas_sec,
           (x.leftover_nas OR (x.leftover_wall AND x.nas = 0)) AS leftover
         FROM (
           SELECT
@@ -345,7 +354,12 @@ export async function clearAccessTokenSessions(
             THEN x.base_start + (x.nas * INTERVAL '1 second')
             ELSE COALESCE(x.last_interim_at, x.stopped_at, x.started_at)
           END AS last_at,
-          CASE WHEN x.leftover_nas THEN 0 ELSE x.session_time_sec END AS nas_sec,
+          CASE
+            WHEN x.leftover_nas
+              OR (x.nas > ${ghostNasMin} AND x.wall_sec < ${ghostWall} AND x.nas > x.wall_sec * 2)
+            THEN 0
+            ELSE x.session_time_sec
+          END AS nas_sec,
           (x.leftover_nas OR (x.leftover_wall AND x.nas = 0)) AS leftover
         FROM (
           SELECT

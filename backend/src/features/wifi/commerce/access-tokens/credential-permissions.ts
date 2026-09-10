@@ -1,5 +1,6 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import {
+  isConsoleOrgAdmin,
   isDeveloperAdmin,
   isSessionLifecycleAdmin,
   type AdminLike,
@@ -30,6 +31,8 @@ const REVERTABLE = new Set(['ACTIVATED', 'PAUSED', 'CONSUMED']);
 export type CredentialPermissionContext = {
   mode: 'partner' | 'preview';
   isDeveloper: boolean;
+  /** Console ORG_ADMIN / ORG_OWNER, org owner, or org member with ORG_ADMIN. */
+  isOrgAdmin: boolean;
   /** Developer, platform Admin, or tenant ORG_ADMIN. */
   canManageSessionLifecycle: boolean;
 };
@@ -70,18 +73,15 @@ export async function resolveCredentialPermissionContext(
   },
 ): Promise<CredentialPermissionContext> {
   const isDeveloper = isDeveloperAdmin(params.user);
-  let canManageSessionLifecycle = isSessionLifecycleAdmin(params.user);
-  if (!canManageSessionLifecycle) {
-    canManageSessionLifecycle = await hasOrgAdminMembership(
-      prisma,
-      params.adminId,
-      params.orgId,
-    );
+  let isOrgAdmin = isConsoleOrgAdmin(params.user);
+  if (!isOrgAdmin) {
+    isOrgAdmin = await hasOrgAdminMembership(prisma, params.adminId, params.orgId);
   }
   return {
     mode: params.mode,
     isDeveloper,
-    canManageSessionLifecycle,
+    isOrgAdmin,
+    canManageSessionLifecycle: isSessionLifecycleAdmin(params.user) || isOrgAdmin,
   };
 }
 
@@ -122,7 +122,7 @@ export function resolveCredentialActions(
     // Partner + org staff: free device slots for ACTIVATED tokens (does not raise maxDevices).
     canAllowNewDevice: ALLOW_NEW_DEVICE.has(status),
     canClearSessions: ctx.canManageSessionLifecycle && SESSION_CLEARABLE.has(status),
-    canDeleteSessions: ctx.isDeveloper,
+    canDeleteSessions: ctx.isDeveloper || ctx.isOrgAdmin,
     canRestoreActivated: ctx.canManageSessionLifecycle && RESTORABLE_CONSUMED.has(status),
     canRevertToSold: ctx.canManageSessionLifecycle && REVERTABLE.has(status),
     revokeBlockedReason,

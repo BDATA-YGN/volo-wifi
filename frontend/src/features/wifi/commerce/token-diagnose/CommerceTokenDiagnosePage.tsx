@@ -622,9 +622,9 @@ const CommerceTokenDiagnosePage: React.FC = () => {
             {likelyShortTimeMismatch || inflatedSessions.length > 0 ? (
               <Card title="Inflated billing analysis" className="mb-4" size="small">
                 <p style={{ marginTop: 0, marginBottom: 12 }}>
-                  Detected {inflatedSessions.length} RADIUS session(s) whose NAS time or
-                  login→logout span is leftover hotspot-host uptime (often many days). Those
-                  rows are not billed.
+                  Detected {inflatedSessions.length} RADIUS session(s) whose NAS time is
+                  leftover hotspot-host uptime (often many days, or a Session-Timeout copy
+                  a few seconds after Access-Accept). Those rows are not billed.
                 </p>
 
                 <Table

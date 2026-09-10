@@ -12,7 +12,10 @@ export function isSessionLifecycleAdminRole(roleName: string | null | undefined)
   return Boolean(role && SESSION_LIFECYCLE_ROLES.has(role));
 }
 
-/** Developer, Admin, or ORG_ADMIN — Fix Session / Revert to sold or activated. */
+/** Developer, Admin, or ORG_ADMIN — Fix Session / Revert to sold or activated.
+ * Session-row Delete is not gated here; the API sets canDeleteSessions for
+ * Developer and ORG_ADMIN only.
+ */
 export function useCanManageTokenSessionLifecycle(): boolean {
   const { authData } = useAuthStore();
   return isSessionLifecycleAdminRole(authData?.role?.roleName);

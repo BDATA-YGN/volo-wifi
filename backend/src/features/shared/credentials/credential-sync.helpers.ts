@@ -75,7 +75,8 @@ export function planTimeQuotaSec(
 
 /**
  * @deprecated Kept for diagnose copy; billed time no longer GREATEST(nas, wall).
- * Session-Timeout copies are discarded only when NAS time exceeds 12h and 2× last-seen.
+ * Session-Timeout copies are discarded when NAS time exceeds 12h and 2× last-seen,
+ * or when a ghost copy lands on a near-zero wall row (Accept then Stop in seconds).
  */
 export const ACCT_SESSION_TIME_SLACK_SEC = 120;
 
@@ -88,6 +89,22 @@ export const IMPLAUSIBLE_ACCT_SESSION_SEC = 12 * 3600;
  * session does not stay one RADIUS row for more than a day.
  */
 export const LEFTOVER_HOST_SESSION_SEC = 24 * 3600;
+
+/**
+ * MikroTik leftover hosts often Accept then Stop in a few seconds with
+ * Acct-Session-Time copied from leftover host uptime / previous Session-Timeout
+ * (e.g. 1h14m on a 6-second row). Not 24h, so the leftover-host cap misses it.
+ */
+export const GHOST_SESSION_WALL_SEC = 120;
+export const GHOST_NAS_MIN_SEC = 60;
+
+export function isGhostSessionTimeoutCopy(nasSec: number, lastSeenSec: number): boolean {
+  return (
+    lastSeenSec < GHOST_SESSION_WALL_SEC &&
+    nasSec > GHOST_NAS_MIN_SEC &&
+    nasSec > lastSeenSec * 2
+  );
+}
 
 export type BilledSessionTimeOptions = {
   createdAt?: Date | null;
@@ -123,13 +140,17 @@ export function isLeftoverHostSession(
   lastSeenSec: number,
 ): boolean {
   const nas = sessionTimeSec ?? 0;
-  return lastSeenSec > LEFTOVER_HOST_SESSION_SEC || nas > LEFTOVER_HOST_SESSION_SEC;
+  return (
+    lastSeenSec > LEFTOVER_HOST_SESSION_SEC ||
+    nas > LEFTOVER_HOST_SESSION_SEC ||
+    isGhostSessionTimeoutCopy(nas, lastSeenSec)
+  );
 }
 
 /**
  * Bill last RADIUS update minus effective start. Do not trust Acct-Session-Time
- * when it is leftover hotspot-host uptime (days) or a Session-Timeout copy.
- * NAS time is only used when last-seen wall is 0 (timestamps were snapped).
+ * when it is leftover hotspot-host uptime (days) or a Session-Timeout copy
+ * on a near-zero wall row (Accept then Stop in seconds).
  */
 export function billedSessionSeconds(
   sessionTimeSec: number | null | undefined,
@@ -149,8 +170,8 @@ export function billedSessionSeconds(
   if (lastSeen > LEFTOVER_HOST_SESSION_SEC) {
     return nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC ? nas : 0;
   }
-  if (lastSeen === 0 && nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC) {
-    return nas;
+  if (isGhostSessionTimeoutCopy(nas, lastSeen)) {
+    return lastSeen;
   }
   if (nas > IMPLAUSIBLE_ACCT_SESSION_SEC && nas > lastSeen * 2) {
     return lastSeen;

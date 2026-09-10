@@ -227,11 +227,11 @@ async function syncRemainingAndConsume(): Promise<number> {
                   THEN billed."sessionTimeSec"
                   ELSE 0
                 END
-              WHEN billed.last_seen = 0
-                AND COALESCE(billed."sessionTimeSec", 0) > 0
-                AND COALESCE(billed."sessionTimeSec", 0) <= 86400
-              THEN billed."sessionTimeSec"
               WHEN COALESCE(billed."sessionTimeSec", 0) > 43200
+                AND COALESCE(billed."sessionTimeSec", 0) > billed.last_seen * 2
+              THEN billed.last_seen
+              WHEN billed.last_seen < 120
+                AND COALESCE(billed."sessionTimeSec", 0) > 60
                 AND COALESCE(billed."sessionTimeSec", 0) > billed.last_seen * 2
               THEN billed.last_seen
               WHEN COALESCE(billed."sessionTimeSec", 0) > 0

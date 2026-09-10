@@ -485,9 +485,9 @@ Guards (leftover hotspot host / reused Acct-Session-Id):
 - Start/Interim/Stop **never UPDATE a row that already has `stopped_at`**.
 - Start/Interim/Stop **never INSERT** a second row when that `(acct_session_id, nas_ip)` is already STOP'd. Do **not** rename closed rows on Start — leftover MikroTik hosts keep sending Start after Cleanup-Timeout; renaming reopened them and duplicated leftover rows.
 - `rebound-orphan` still renames when **User-Name** differs (new voucher vs leftover host).
-- On UPDATE, `Acct-Session-Time` **> 86400 (24h) and > 2× last-seen wall** is treated as leftover-host / Session-Timeout copy and is **not stored**.
-- A Stop/Interim **INSERT is skipped** when `Acct-Session-Time` **> 86400** (leftover-host uptime; the 2× wall test is only valid on UPDATE of an existing row).
-- Authorize remaining-time SQL bills leftover NAS+wall (>24h both) as **0**, matching `billedSessionSeconds()`.
+- On UPDATE, `Acct-Session-Time` **> 86400 (24h) and > 2× last-seen wall** is treated as leftover-host / Session-Timeout copy and is **not stored**. Same for **ghost copies**: NAS time **> 60s** on a wall clock **< 120s** that is also **> 2× last-seen** (Accept then Stop in a few seconds with leftover host uptime, often ~1h).
+- A Stop/Interim **INSERT is skipped** when `Acct-Session-Time` **> 86400** (leftover-host uptime; the 2× wall test is only valid on UPDATE of an existing row). Ghost NAS time on a Stop INSERT is stored as **NULL**.
+- Authorize remaining-time SQL bills leftover NAS+wall (>24h both) as **0**, and ghost Session-Timeout copies as last-seen wall, matching `billedSessionSeconds()`.
 
 Preview:
 

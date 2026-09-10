@@ -69,6 +69,12 @@ export function lastSeenDurationSeconds(
 }
 
 const LEFTOVER_HOST_SESSION_SEC = 24 * 3600;
+const GHOST_SESSION_WALL_SEC = 120;
+const GHOST_NAS_MIN_SEC = 60;
+
+function isGhostSessionTimeoutCopy(nas: number, lastSeen: number): boolean {
+  return lastSeen < GHOST_SESSION_WALL_SEC && nas > GHOST_NAS_MIN_SEC && nas > lastSeen * 2;
+}
 
 export function billedDurationSeconds(
   sessionTimeSec: number | null | undefined,
@@ -91,7 +97,7 @@ export function billedDurationSeconds(
   if (lastSeen > LEFTOVER_HOST_SESSION_SEC) {
     return nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC ? nas : 0;
   }
-  if (lastSeen === 0 && nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC) return nas;
+  if (isGhostSessionTimeoutCopy(nas, lastSeen)) return lastSeen;
   if (nas > 12 * 3600 && nas > lastSeen * 2) return lastSeen;
   if (nas > 0) return Math.min(nas, lastSeen);
   return lastSeen;
@@ -122,8 +128,9 @@ export function formatSessionDuration(
     createdAt,
     lastInterimAt
   );
-  if (sec === 0 && (sessionTimeSec ?? 0) > 0 && (sessionTimeSec ?? 0) <= LEFTOVER_HOST_SESSION_SEC) {
-    sec = sessionTimeSec ?? 0;
+  const nas = sessionTimeSec ?? 0;
+  if (sec === 0 && nas > 0 && nas <= LEFTOVER_HOST_SESSION_SEC && !isGhostSessionTimeoutCopy(nas, sec)) {
+    sec = nas;
   }
   return formatClockSeconds(sec);
 }

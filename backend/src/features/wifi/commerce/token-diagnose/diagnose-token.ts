@@ -313,7 +313,7 @@ function buildVerdict(args: {
       severity: 'warning',
       title: 'Consumed from leftover RADIUS time',
       detail:
-        `Plan time is still left (${Math.floor(args.liveRemainingSec / 3600)}h ${Math.floor((args.liveRemainingSec % 3600) / 60)}m). Remaining hit 0 because leftover hotspot-host sessions were billed as days of use. Credential-sync will restore Activated when remaining is recomputed.`,
+        `Plan time is still left (${Math.floor(args.liveRemainingSec / 3600)}h ${Math.floor((args.liveRemainingSec % 3600) / 60)}m). Remaining hit 0 because leftover hotspot-host time or a Session-Timeout copy was billed. Credential-sync will restore Activated when remaining is recomputed.`,
     });
   }
 
@@ -333,7 +333,7 @@ function buildVerdict(args: {
       severity: 'warning',
       title: 'Leftover RADIUS time was billed',
       detail:
-        'One or more RADIUS rows span more than 24 hours (leftover hotspot host or reused Acct-Session-Id). Those rows are excluded from remaining time.',
+        'One or more RADIUS rows look like leftover hotspot-host uptime: either more than 24 hours, or a Session-Timeout copy a few seconds after Access-Accept. Those NAS seconds are excluded from remaining time.',
     });
   }
 
@@ -379,9 +379,9 @@ function buildVerdict(args: {
         severity: 'warning',
         title: 'Billed time looks inflated',
         summary:
-          'RADIUS rows include leftover hotspot-host uptime (often many days on one Acct-Session-Id). That time is not billed. Remaining is recomputed from real sessions only.',
+          'RADIUS reported more session time than the wall clock (leftover hotspot-host uptime, or a Session-Timeout copy a few seconds after Access-Accept). That NAS time is not billed. Remaining is recomputed from real sessions only.',
         actions: [
-          'On the router, remove `/ip hotspot host` and `/ip hotspot cookie` for this MAC after a voucher change.',
+          'On the router, remove `/ip hotspot host` and `/ip hotspot cookie` for this MAC, then retry login.',
           'If status is still Consumed, use Restore to activated or wait for credential-sync.',
         ],
       },

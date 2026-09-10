@@ -23,6 +23,7 @@ export type CredentialActions = {
   canUnlock: boolean;
   canAllowNewDevice: boolean;
   canClearSessions: boolean;
+  /** Developer or tenant ORG_ADMIN only — delete RADIUS / captive session rows. */
   canDeleteSessions: boolean;
   canRestoreActivated: boolean;
   canRevertToSold: boolean;
