@@ -55,8 +55,13 @@ export async function syncServerCookies(
   const parsedCookies = setCookie.parse(splitCookies);
   const applied: string[] = [];
 
+  const MENUS_COOKIE_MAX_BYTES = 3500;
+
   parsedCookies.forEach((c: any) => {
     if (!allowedNames.has(c.name)) return;
+    if (typeof c.value === "string" && Buffer.byteLength(c.value) > MENUS_COOKIE_MAX_BYTES) {
+      return;
+    }
     cookieStore.set(c.name, c.value, {
       httpOnly: c.httpOnly ?? true,
       secure: process.env.NODE_ENV === 'production',

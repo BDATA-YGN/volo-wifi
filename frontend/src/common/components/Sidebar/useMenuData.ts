@@ -54,12 +54,18 @@ export function useMenuData() {
       try {
         const userData = await fetchMe();
         if (userData?.menus) setMenus(userData.menus);
-        await fetchMenuGroups();
       } catch (error) {
-        console.error("ERROR on menu initial load:", error);
+        console.error("ERROR on session initial load:", error);
         await signOut().finally(() => {
           message.error("Session expired. Please sign in again.");
         });
+        return;
+      }
+
+      try {
+        await fetchMenuGroups();
+      } catch {
+        console.log("Failed to fetch menu groups");
       }
     };
 

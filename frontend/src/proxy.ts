@@ -144,6 +144,13 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // Valid session but no RBAC cookie yet (login just issued tokens, or the
+  // menus cookie was skipped because it exceeded browser/proxy size limits).
+  // Let the dashboard load; `/auth/me` + RouteGuard enforce access on the client.
+  if (!userAccess) {
+    return nextWithClientIp(request);
+  }
+
   if (!isRouteAccessible(pathname, userAccess)) {
     const unauthorizedUrl = new URL(REDIRECT_URLS.unauthorized, request.url);
     return NextResponse.redirect(unauthorizedUrl);

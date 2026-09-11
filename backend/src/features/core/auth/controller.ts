@@ -178,7 +178,9 @@ export class Controller {
 
       // Super admin and Developer role get all role-setting rows (Next.js `menus` cookie + route gate).
       if (user.isSuper === true || isDeveloperAdmin(user)) {
-        const fetchAllMenus = await this.mngRoleSettingsService.baseModel().findMany();
+        const fetchAllMenus = await this.mngRoleSettingsService.baseModel().findMany({
+          where: { deletedAt: null },
+        });
         fetchRoles = fetchAllMenus.map((menu: any) => {
           return {
             id: menu.id,
@@ -191,11 +193,20 @@ export class Controller {
           };
         });
       } else {
-        fetchRoles = await this.mapRoleSettingsService.findWithCustomKey(
+        // To-one `include.where` is invalid in Prisma 7 and 500s `/auth/me` for
+        // ORG_ADMIN / other tenant roles — which the dashboard treats as session expiry.
+        const mapped = await this.mapRoleSettingsService.findWithCustomKey(
           'roleId',
           user.roleId,
-          { mngRoleSettings: { where: { deletedAt: null, level: "app" } } },
+          { mngRoleSettings: true },
           true,
+        );
+        fetchRoles = (mapped ?? []).filter(
+          (row: MapRoleSettings & { mngRoleSettings: MngRoleSettings | null }):
+            row is MapRoleSettings & { mngRoleSettings: MngRoleSettings } =>
+            row.mngRoleSettings != null
+            && row.mngRoleSettings.deletedAt == null
+            && (row.mngRoleSettings.level == null || row.mngRoleSettings.level === 'app'),
         );
       }
 
@@ -225,11 +236,20 @@ export class Controller {
         })),
       };
       const permissions = extraRolesAndMenus(resp.mapRoleSettings);
-      const jsonString = JSON.stringify(permissions);
-      const compressed = lzString.compressToEncodedURIComponent(jsonString);
+      // Proxy only needs path keys (`/wifi/...`). Keep the cookie small so Developer /
+      // ORG_ADMIN logins are not killed by 4KB cookie / header limits after `/auth/me`.
+      const proxyPermissions: Record<string, { visibility: boolean; access: boolean }> = {};
+      for (const [key, value] of Object.entries(permissions)) {
+        if (key.startsWith('/')) proxyPermissions[key] = value;
+      }
+      const compressed = lzString.compressToEncodedURIComponent(JSON.stringify(proxyPermissions));
       const { refreshMs: menusCookieMaxAge } = await this.jwtService.getSessionCookieMaxAges();
+      const MENUS_COOKIE_MAX_BYTES = 3500;
       // Partner app does not use console menu RBAC cookies.
-      if (resolveConsoleAuthProfile(req) === 'admin') {
+      if (
+        resolveConsoleAuthProfile(req) === 'admin'
+        && Buffer.byteLength(compressed) <= MENUS_COOKIE_MAX_BYTES
+      ) {
         res.cookie('menus', compressed, { ...cookieOptions, maxAge: menusCookieMaxAge });
       }
       responseSuccess(res, { message: 'success', data: resp });
