@@ -27,6 +27,7 @@ import {
   isProvisionMemberRoleCode,
   normalizeMemberRoleCode,
   PROVISION_ROLE_OPTIONS,
+  roleUsesSiteAllowList,
 } from "../constant";
 import {
   getPasswordStrengthChecklist,
@@ -205,7 +206,7 @@ const MemberFormDrawer: React.FC<Props> = ({
     const payload: MemberCreateFormValues = {
       ...rest,
       isPrimary: canBePrimary ? Boolean(rest.isPrimary) : false,
-      stationIds: rest.roleCode === "STATION_OPS" ? rest.stationIds ?? [] : [],
+      stationIds: roleUsesSiteAllowList(rest.roleCode) ? rest.stationIds ?? [] : [],
       ...(nextPassword && nextPassword.trim() ? { password: nextPassword.trim() } : {}),
     };
     if (editing) {
@@ -402,7 +403,7 @@ const MemberFormDrawer: React.FC<Props> = ({
             </Text>
           ) : null}
 
-          {roleCode === "STATION_OPS" ? (
+          {roleUsesSiteAllowList(roleCode) ? (
             <Form.Item
               name="stationIds"
               label="Site allow-list"
@@ -410,7 +411,11 @@ const MemberFormDrawer: React.FC<Props> = ({
             >
               <SitesTransfer dataSource={siteTransferData} />
             </Form.Item>
-          ) : null}
+          ) : (
+            <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 8 }}>
+              Admin always has organization-wide access. Site allow-list is not used for this role.
+            </Text>
+          )}
         </Form>
       ) : null}
     </Drawer>

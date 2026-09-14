@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
+import {
+  filterBySiteAllowList,
+  sessionStationAllowList,
+  singleMembershipOrgId,
+} from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   CoverageAnalyticsData,
@@ -29,6 +34,7 @@ export function useAnalyticsReconciliationCoverage() {
   const [formOptions, setFormOptions] = useState<CoverageFormOptions>(emptyFormOptions);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<CoverageDetail | null>(null);
+  const formOptionsSeq = useRef(0);
 
   const params: CoverageAnalyticsParams = {
     orgId,
@@ -38,26 +44,52 @@ export function useAnalyticsReconciliationCoverage() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
+    ready: Boolean(orgId),
     refreshDeps: [orgId, stationId, resellerId, eligibility],
   });
 
   const analytics = (data?.data ?? null) as CoverageAnalyticsData | null;
   const meta = (data?.meta ?? {}) as CoverageAnalyticsMeta;
 
+  const applyOrgFormOptions = useCallback((opts: CoverageFormOptions, scopedOrgId: string) => {
+    setFormOptions({
+      memberships: opts.memberships ?? [],
+      stations: filterBySiteAllowList(opts.stations ?? [], sessionStationAllowList(scopedOrgId)),
+      resellers: opts.resellers ?? [],
+      canSwitchOrg: opts.canSwitchOrg,
+      requiresOrgSelection: opts.requiresOrgSelection,
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as CoverageFormOptions;
-    setFormOptions({
-      ...emptyFormOptions,
-      ...opts,
-      stations: opts.stations ?? [],
-      resellers: opts.resellers ?? [],
-    });
-    if (!targetOrgId && opts.memberships.length === 1 && !opts.canSwitchOrg) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as CoverageFormOptions;
+      const scopedOpts = scoped.data as CoverageFormOptions;
+      applyOrgFormOptions(scopedOpts, onlyOrgId);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+        canSwitchOrg: opts.canSwitchOrg,
+        requiresOrgSelection: opts.requiresOrgSelection,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts, targetOrgId);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

@@ -103,6 +103,7 @@ export type ApprovalDetail = {
   nextAction: string;
   periodStart: string;
   periodEnd: string;
+  stationId: string;
   resellerCode: string;
   resellerName: string;
   stationCode: string;
@@ -132,6 +133,7 @@ type ApprovalFilters = {
   stationId?: string;
   resellerId?: string;
   status?: string;
+  allowedStationIds?: string[] | null;
 };
 
 const settlementContextSelect = {
@@ -229,7 +231,11 @@ function buildWhere(
     orgId,
     deletedAt: null,
     periodStart: { gte: periodFrom, lte: periodTo },
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
+    ...(filters?.stationId
+      ? { stationId: filters.stationId }
+      : filters?.allowedStationIds
+        ? { stationId: { in: filters.allowedStationIds } }
+        : {}),
     ...(filters?.resellerId ? { resellerId: filters.resellerId } : {}),
     ...(filters?.status
       ? { status: filters.status as Prisma.EnumRptFinSettlementStatusFilter['equals'] }
@@ -529,6 +535,7 @@ export async function loadApprovalDetail(
     nextAction: nextActionForStatus(row.status),
     periodStart: row.periodStart.toISOString(),
     periodEnd: row.periodEnd.toISOString(),
+    stationId: row.stationId,
     resellerCode: row.reseller.code,
     resellerName: row.reseller.name,
     stationCode: row.station.code,

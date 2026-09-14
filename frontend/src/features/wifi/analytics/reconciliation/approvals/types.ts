@@ -121,6 +121,7 @@ export type ApprovalDetail = {
   nextAction: string;
   periodStart: string;
   periodEnd: string;
+  stationId: string;
   resellerCode: string;
   resellerName: string;
   stationCode: string;

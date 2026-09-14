@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
+import {
+  filterBySiteAllowList,
+  sessionStationAllowList,
+  singleMembershipOrgId,
+} from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   DeviceType,
@@ -23,6 +28,7 @@ export function useAnalyticsNasInventory() {
   const [isRadiusClient, setIsRadiusClient] = useState<boolean | undefined>(undefined);
   const [unassignedOnly, setUnassignedOnly] = useState(false);
   const [formOptions, setFormOptions] = useState<NasInventoryFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const params: NasInventoryParams = {
     orgId,
@@ -33,21 +39,48 @@ export function useAnalyticsNasInventory() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadInventory(params), {
+    ready: Boolean(orgId),
     refreshDeps: [orgId, stationId, deviceType, isRadiusClient, unassignedOnly],
   });
 
   const inventory = (data?.data ?? null) as NasInventoryData | null;
   const meta = (data?.meta ?? {}) as NasInventoryMeta;
 
+  const applyOrgFormOptions = useCallback((opts: NasInventoryFormOptions, scopedOrgId: string) => {
+    setFormOptions({
+      ...opts,
+      memberships: opts.memberships ?? [],
+      stations: filterBySiteAllowList(opts.stations ?? [], sessionStationAllowList(scopedOrgId)),
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as NasInventoryFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as NasInventoryFormOptions;
+      const scopedOpts = scoped.data as NasInventoryFormOptions;
+      applyOrgFormOptions(scopedOpts, onlyOrgId);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts, targetOrgId);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

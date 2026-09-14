@@ -68,6 +68,7 @@ export type CredentialAnalyticsPayload = {
 type CredentialFilters = {
   planId?: string;
   type?: string;
+  stationIds?: string[];
 };
 
 type BucketCountRow = { bucket: string; count: number };
@@ -167,6 +168,7 @@ function baseCredentialWhere(orgId: string, filters?: CredentialFilters): Prisma
     deletedAt: null,
     ...(filters?.planId ? { planId: filters.planId } : {}),
     ...(filters?.type ? { type: filters.type as 'VOUCHER_TOKEN' | 'USER_PASSWORD' } : {}),
+    ...(filters?.stationIds ? { stationId: { in: filters.stationIds } } : {}),
   };
 }
 
@@ -176,6 +178,11 @@ function planFilterSql(filters?: CredentialFilters): Prisma.Sql {
 
 function typeFilterSql(filters?: CredentialFilters): Prisma.Sql {
   return filters?.type ? Prisma.sql`AND type::text = ${filters.type}` : Prisma.empty;
+}
+
+function stationFilterSql(filters?: CredentialFilters): Prisma.Sql {
+  if (!filters?.stationIds?.length) return Prisma.empty;
+  return Prisma.sql`AND station_id IN (${Prisma.join(filters.stationIds)})`;
 }
 
 /** Literal timezone so Prisma does not bind it as a UUID/date parameter. */
@@ -203,6 +210,7 @@ async function countByAppBucket(
 ): Promise<Map<string, number>> {
   const planSql = planFilterSql(filters);
   const typeSql = typeFilterSql(filters);
+  const stationSql = stationFilterSql(filters);
   const col = Prisma.raw(column);
   const bucketSql = bucketSelectSql(column, grain);
   const rows = await prisma.$queryRaw<BucketCountRow[]>`
@@ -212,6 +220,7 @@ async function countByAppBucket(
       AND deleted_at IS NULL
       ${planSql}
       ${typeSql}
+      ${stationSql}
       AND ${col} >= ${periodFrom}
       AND ${col} <= ${periodTo}
     GROUP BY 1
@@ -234,6 +243,7 @@ async function countArchivedByAppBucket(
     WHERE org_id = ${orgId}
       ${planFilterSql(filters)}
       ${typeFilterSql(filters)}
+      ${stationFilterSql(filters)}
       AND archived_at >= ${periodFrom}
       AND archived_at <= ${periodTo}
     GROUP BY 1
@@ -257,6 +267,7 @@ async function countStationPlanByColumn(
       AND deleted_at IS NULL
       ${planFilterSql(filters)}
       ${typeFilterSql(filters)}
+      ${stationFilterSql(filters)}
       AND ${col} IS NOT NULL
       AND ${col} >= ${periodFrom}
       AND ${col} <= ${periodTo}
@@ -278,6 +289,7 @@ async function countConsumedByStationPlan(
       AND deleted_at IS NULL
       ${planFilterSql(filters)}
       ${typeFilterSql(filters)}
+      ${stationFilterSql(filters)}
       AND status::text = 'CONSUMED'
       AND updated_at >= ${periodFrom}
       AND updated_at <= ${periodTo}
@@ -298,6 +310,7 @@ async function countArchivedByStationPlan(
     WHERE org_id = ${orgId}
       ${planFilterSql(filters)}
       ${typeFilterSql(filters)}
+      ${stationFilterSql(filters)}
       AND archived_at >= ${periodFrom}
       AND archived_at <= ${periodTo}
     GROUP BY 1, 2

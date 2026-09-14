@@ -175,7 +175,7 @@ Price resolution order: `OrgLicenseStationSizePrice` (tenant override) → `Stat
 
 | Concern | Parent screen | Route context | Models |
 |---------|---------------|---------------|--------|
-| Site allow-list on member | Access Control | `/wifi/tenant/access-control` | `OrgMemberStation` |
+| Site allow-list on member | Access Control | `/wifi/tenant/access-control` | `OrgMemberStation` — all provisioned roles except Admin (`ORG_ADMIN`) |
 | Partner ↔ site mapping | Partner Directory | `/wifi/commerce/partners` | `ResellerStation` |
 | Partner plan catalog | Partner Directory | `/wifi/commerce/partners` | `ResellerPlanEntitlement` |
 | Plan price row | Retail Pricing | `/wifi/catalog/retail-pricing` | `PlanPrice` |

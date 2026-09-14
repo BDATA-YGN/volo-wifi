@@ -111,9 +111,28 @@ export function previousPeriod(periodFrom: Date, periodTo: Date): { from: Date; 
   return previousAppPeriod(periodFrom, periodTo);
 }
 
+function orgStationScopeWhere(
+  orgIds: string[],
+  stationScopeByOrg?: Map<string, string[]>
+):
+  | { orgId: { in: string[] } }
+  | { OR: Array<{ orgId: string | { in: string[] }; stationId?: { in: string[] } }> } {
+  if (!stationScopeByOrg?.size) return { orgId: { in: orgIds } };
+
+  const unscoped = orgIds.filter((id) => !stationScopeByOrg.has(id));
+  const or: Array<{ orgId: string | { in: string[] }; stationId?: { in: string[] } }> = [];
+  if (unscoped.length) or.push({ orgId: { in: unscoped } });
+  for (const orgId of orgIds) {
+    const stationIds = stationScopeByOrg.get(orgId);
+    if (stationIds) or.push({ orgId, stationId: { in: stationIds } });
+  }
+  return { OR: or };
+}
+
 async function loadOrgMeta(
   prisma: PrismaClient,
-  orgIds: string[]
+  orgIds: string[],
+  stationScopeByOrg?: Map<string, string[]>
 ): Promise<Map<string, { code: string; name: string; isActive: boolean; currency: string; partnerCount: number; stationCount: number }>> {
   if (orgIds.length === 0) return new Map();
 
@@ -143,7 +162,7 @@ async function loadOrgMeta(
         isActive: o.isActive,
         currency: o.currency,
         partnerCount: o._count.resellers,
-        stationCount: o._count.stations,
+        stationCount: stationScopeByOrg?.get(o.id)?.length ?? o._count.stations,
       },
     ])
   );
@@ -153,7 +172,8 @@ async function aggregateFromDailyStats(
   prisma: PrismaClient,
   orgIds: string[],
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationScopeByOrg?: Map<string, string[]>
 ): Promise<TenantAnalyticsPayload | null> {
   if (orgIds.length === 0) {
     return {
@@ -165,10 +185,11 @@ async function aggregateFromDailyStats(
     };
   }
 
+  const stationWhere = orgStationScopeWhere(orgIds, stationScopeByOrg);
   const [salesRows, usageRows, orgMeta] = await Promise.all([
     prisma.dailySalesStat.findMany({
       where: {
-        orgId: { in: orgIds },
+        ...stationWhere,
         deletedAt: null,
         date: { gte: periodFrom, lte: periodTo },
       },
@@ -184,7 +205,7 @@ async function aggregateFromDailyStats(
     }),
     prisma.dailyRadiusUsageStat.findMany({
       where: {
-        orgId: { in: orgIds },
+        ...stationWhere,
         deletedAt: null,
         date: { gte: periodFrom, lte: periodTo },
       },
@@ -195,7 +216,7 @@ async function aggregateFromDailyStats(
         totalBytes: true,
       },
     }),
-    loadOrgMeta(prisma, orgIds),
+    loadOrgMeta(prisma, orgIds, stationScopeByOrg),
   ]);
 
   if (salesRows.length === 0 && usageRows.length === 0) {
@@ -333,14 +354,15 @@ async function aggregateFromLiveOrders(
   prisma: PrismaClient,
   orgIds: string[],
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationScopeByOrg?: Map<string, string[]>
 ): Promise<TenantAnalyticsPayload> {
   const [orders, orgMeta] = await Promise.all([
     orgIds.length === 0
       ? Promise.resolve([])
       : prisma.saleOrder.findMany({
           where: {
-            orgId: { in: orgIds },
+            ...orgStationScopeWhere(orgIds, stationScopeByOrg),
             status: 'PAID',
             soldAt: { gte: periodFrom, lte: periodTo },
           },
@@ -351,7 +373,7 @@ async function aggregateFromLiveOrders(
             items: { select: { qty: true } },
           },
         }),
-    loadOrgMeta(prisma, orgIds),
+    loadOrgMeta(prisma, orgIds, stationScopeByOrg),
   ]);
 
   const tenantMap = new Map<string, { ordersCount: number; itemsCount: number; revenue: number }>();
@@ -427,17 +449,31 @@ export async function buildTenantAnalytics(
   prisma: PrismaClient,
   orgIds: string[],
   periodFrom: Date,
-  periodTo: Date
+  periodTo: Date,
+  stationScopeByOrg?: Map<string, string[]>
 ): Promise<TenantAnalyticsPayload> {
-  const aggregated = await aggregateFromDailyStats(prisma, orgIds, periodFrom, periodTo);
+  const aggregated = await aggregateFromDailyStats(
+    prisma,
+    orgIds,
+    periodFrom,
+    periodTo,
+    stationScopeByOrg
+  );
   const current =
-    aggregated ?? (await aggregateFromLiveOrders(prisma, orgIds, periodFrom, periodTo));
+    aggregated ??
+    (await aggregateFromLiveOrders(prisma, orgIds, periodFrom, periodTo, stationScopeByOrg));
 
   const prev = previousPeriod(periodFrom, periodTo);
-  const prevAggregated = await aggregateFromDailyStats(prisma, orgIds, prev.from, prev.to);
+  const prevAggregated = await aggregateFromDailyStats(
+    prisma,
+    orgIds,
+    prev.from,
+    prev.to,
+    stationScopeByOrg
+  );
   const previousSummary =
     prevAggregated?.summary ??
-    (await aggregateFromLiveOrders(prisma, orgIds, prev.from, prev.to)).summary;
+    (await aggregateFromLiveOrders(prisma, orgIds, prev.from, prev.to, stationScopeByOrg)).summary;
 
   return {
     ...current,

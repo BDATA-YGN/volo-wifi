@@ -10,6 +10,7 @@ import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
+import { resolveAllowedStationIds } from '@/features/wifi/shared/resolve-station-scope';
 import { DEFAULT_PRESET, PERIOD_PRESETS, type PeriodPreset } from './constants';
 import { AnalyticsAccessTokensQuerySchema } from './schema';
 import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
@@ -141,12 +142,19 @@ export class AnalyticsAccessTokensController {
       }
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgIdParam,
+        req.user!
+      );
+
       const analytics = await buildCredentialAnalytics(
         this.prisma,
         orgIdParam,
         periodFrom,
         periodTo,
-        { planId, type }
+        { planId, type, stationIds: allowedStationIds ?? undefined }
       );
 
       const org = await this.prisma.org.findUnique({

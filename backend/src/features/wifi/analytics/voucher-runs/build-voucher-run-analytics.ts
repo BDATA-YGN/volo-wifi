@@ -106,6 +106,7 @@ type CredentialRow = {
 type VoucherFilters = {
   planId?: string;
   stationId?: string;
+  stationIds?: string[];
   batchId?: string;
 };
 
@@ -210,7 +211,11 @@ async function loadBatches(
       resellerId: null,
       createdAt: { gte: periodFrom, lte: periodTo },
       ...(filters?.planId ? { planId: filters.planId } : {}),
-      ...(filters?.stationId ? { stationId: filters.stationId } : {}),
+      ...(filters?.stationId
+        ? { stationId: filters.stationId }
+        : filters?.stationIds
+          ? { stationId: { in: filters.stationIds } }
+          : {}),
       ...(filters?.batchId ? { id: filters.batchId } : {}),
     },
     select: {

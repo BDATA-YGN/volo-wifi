@@ -2,7 +2,11 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
-import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
+import {
+  filterBySiteAllowList,
+  sessionStationAllowList,
+  singleMembershipOrgId,
+} from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PartnerAnalyticsData,
@@ -61,6 +65,27 @@ export function useAnalyticsPartners(options?: {
     const opts = res.data as PartnersFormOptions;
     if (seq !== formOptionsSeq.current) return opts;
 
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as PartnersFormOptions;
+      const scopedOpts = scoped.data as PartnersFormOptions;
+      setFormOptions({
+        memberships: scopedOpts.memberships ?? [],
+        resellers: scopedOpts.resellers ?? [],
+        stations: filterBySiteAllowList(
+          scopedOpts.stations ?? [],
+          sessionStationAllowList(onlyOrgId)
+        ),
+        stationSizes: scopedOpts.stationSizes ?? [],
+        currency: scopedOpts.currency ?? "MMK",
+        canSwitchOrg: scopedOpts.canSwitchOrg,
+        requiresOrgSelection: scopedOpts.requiresOrgSelection,
+      });
+      return scopedOpts;
+    }
+
     setFormOptions((prev) => {
       if (!targetOrgId) {
         return {
@@ -84,14 +109,6 @@ export function useAnalyticsPartners(options?: {
         requiresOrgSelection: opts.requiresOrgSelection,
       };
     });
-    if (
-      !targetOrgId &&
-      !opts.canSwitchOrg &&
-      !opts.requiresOrgSelection &&
-      (opts.memberships?.length ?? 0) === 1
-    ) {
-      setOrgId(opts.memberships[0].id);
-    }
     return opts;
   }, []);
 

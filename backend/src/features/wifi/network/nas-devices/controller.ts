@@ -14,6 +14,12 @@ import {
   toNetworkOrgMeta,
 } from '@/features/wifi/network/shared/resolve-network-org';
 import {
+  isStationInAllowList,
+  resolveAllowedStationIds,
+  stationFkScope,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
+import {
   NetworkNasDevicesCreateSchema,
   NetworkNasDevicesUpdateSchema,
 } from './schema';
@@ -141,7 +147,8 @@ function buildWhere(
 async function validateStationBelongsToOrg(
   prisma: PrismaClient,
   orgId: string,
-  stationId: string | null | undefined
+  stationId: string | null | undefined,
+  allowedStationIds: string[] | null = null
 ): Promise<string | null> {
   if (!stationId) return 'WiFi site is required.';
 
@@ -150,7 +157,7 @@ async function validateStationBelongsToOrg(
     select: { id: true },
   });
 
-  if (!station) {
+  if (!station || !isStationInAllowList(station.id, allowedStationIds)) {
     return 'Selected site does not belong to this tenant or does not exist.';
   }
 
@@ -260,11 +267,17 @@ export class NetworkNasDevicesController {
       }
 
       const { orgId } = scope;
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
 
       if (req.query.formOptions === 'true') {
         const [stations, vendorRows, radiusProfiles] = await Promise.all([
           this.prisma.wifiStation.findMany({
-            where: { orgId, deletedAt: null },
+            where: { orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
             select: stationSelect,
             orderBy: { name: 'asc' },
           }),
@@ -299,12 +312,14 @@ export class NetworkNasDevicesController {
       }
 
       if (!isUndefinedOrUndefinedString(req.params?.id)) {
+        const idParam = req.params.id;
+        const id = Array.isArray(idParam) ? idParam[0] : idParam;
         const row = await this.prisma.stationDevice.findFirst({
-          where: { id: req.params.id, deletedAt: null, orgId },
+          where: { id, deletedAt: null, orgId },
           select: deviceListSelect,
         });
 
-        if (!row) {
+        if (!row || !isStationInAllowList(row.stationId, allowedStationIds)) {
           return responseError(res, 404, {
             code: 'NOT_FOUND',
             message: 'NAS device not found.',
@@ -319,7 +334,24 @@ export class NetworkNasDevicesController {
       }
 
       const where = buildWhere(req.query, orgId);
-      const orgScopeWhere = { deletedAt: null, orgId };
+      if (allowedStationIds) {
+        const requestedStationId =
+          typeof req.query.stationId === 'string' ? req.query.stationId.trim() : '';
+        if (req.query.unassigned === 'true') {
+          where.stationId = { in: [] };
+        } else if (requestedStationId) {
+          where.stationId = {
+            in: allowedStationIds.includes(requestedStationId) ? [requestedStationId] : [],
+          };
+        } else {
+          Object.assign(where, stationFkScope(allowedStationIds));
+        }
+      }
+      const orgScopeWhere: Prisma.StationDeviceWhereInput = {
+        deletedAt: null,
+        orgId,
+        ...stationFkScope(allowedStationIds),
+      };
       const { page, limit, skip, take } = parsePagination(req.query);
 
       const [rows, total, typeGroups, radiusCount, unassignedCount] = await Promise.all([
@@ -401,6 +433,12 @@ export class NetworkNasDevicesController {
         });
       }
       const stationId = (value.stationId as string | null | undefined) || null;
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
 
       if (isUpdate) {
         const existing = await this.prisma.stationDevice.findFirst({
@@ -408,6 +446,7 @@ export class NetworkNasDevicesController {
           select: {
             id: true,
             orgId: true,
+            stationId: true,
             isRadiusClient: true,
             radiusProfileId: true,
             radiusSecret: true,
@@ -416,7 +455,7 @@ export class NetworkNasDevicesController {
           },
         });
 
-        if (!existing) {
+        if (!existing || !isStationInAllowList(existing.stationId, allowedStationIds)) {
           return responseError(res, 404, {
             code: 'NOT_FOUND',
             message: 'NAS device not found.',
@@ -427,7 +466,8 @@ export class NetworkNasDevicesController {
         const stationError = await validateStationBelongsToOrg(
           this.prisma,
           targetOrgId,
-          stationId
+          stationId,
+          allowedStationIds
         );
         if (stationError) {
           return responseError(res, 400, { code: 'INVALID_STATION', message: stationError });
@@ -507,7 +547,12 @@ export class NetworkNasDevicesController {
         });
       }
 
-      const stationError = await validateStationBelongsToOrg(this.prisma, orgId!, stationId);
+      const stationError = await validateStationBelongsToOrg(
+        this.prisma,
+        orgId!,
+        stationId,
+        allowedStationIds
+      );
       if (stationError) {
         return responseError(res, 400, { code: 'INVALID_STATION', message: stationError });
       }
@@ -568,13 +613,20 @@ export class NetworkNasDevicesController {
         });
       }
 
-      const id = req.params.id;
+      const idParam = req.params.id;
+      const id = Array.isArray(idParam) ? idParam[0] : idParam;
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        scope.orgId,
+        req.user!
+      );
       const existing = await this.prisma.stationDevice.findFirst({
         where: { id, deletedAt: null, orgId: scope.orgId },
-        select: { id: true },
+        select: { id: true, stationId: true },
       });
 
-      if (!existing) {
+      if (!existing || !isStationInAllowList(existing.stationId, allowedStationIds)) {
         return responseError(res, 404, {
           code: 'NOT_FOUND',
           message: 'NAS device not found.',

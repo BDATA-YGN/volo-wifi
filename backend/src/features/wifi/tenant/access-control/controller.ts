@@ -19,7 +19,7 @@ import {
   loadOrgMembershipOptions,
   resolveOrgIdForAdmin,
 } from '@/features/wifi/shared/resolve-org';
-import { PROVISION_MEMBER_ROLE_CODES, LOCKED_MEMBER_ROLE_CODES, isLockedMemberRoleCode, normalizeMemberRoleCode, pickConsoleRoleName } from './constants';
+import { PROVISION_MEMBER_ROLE_CODES, LOCKED_MEMBER_ROLE_CODES, isLockedMemberRoleCode, memberRolesIncludeOrgAdmin, pickConsoleRoleName, stationIdsForMemberRoles } from './constants';
 import {
   TenantAccessControlCreateSchema,
   TenantAccessControlUpdateSchema,
@@ -511,22 +511,21 @@ export class TenantAccessControlController {
           return responseError(res, 400, { code: 'OWNER_REQUIRED', message: ownerCheck });
         }
 
-        if (value.stationIds) {
-          const stationError = await validateStationsForOrg(
-            this.prisma,
-            orgId,
-            value.stationIds as string[]
-          );
+        const nextRoleCodes =
+          (value.roleCodes as string[] | undefined) ?? existing.roles.map((r) => r.roleCode);
+        const isOrgAdmin = memberRolesIncludeOrgAdmin(nextRoleCodes);
+        const nextStationIds = stationIdsForMemberRoles(
+          nextRoleCodes,
+          value.stationIds as string[] | undefined
+        );
+        const shouldSyncStations = isOrgAdmin || value.stationIds !== undefined;
+
+        if (shouldSyncStations) {
+          const stationError = await validateStationsForOrg(this.prisma, orgId, nextStationIds);
           if (stationError) {
             return responseError(res, 400, { code: 'INVALID_STATIONS', message: stationError });
           }
         }
-
-        const nextRoleCodes =
-          (value.roleCodes as string[] | undefined) ?? existing.roles.map((r) => r.roleCode);
-        const isOrgAdmin = nextRoleCodes.some(
-          (code) => normalizeMemberRoleCode(code) === 'ORG_ADMIN'
-        );
         if (value.isPrimary === true && !isOrgAdmin) {
           return responseError(res, 400, {
             code: 'PRIMARY_REQUIRES_ORG_ADMIN',
@@ -578,8 +577,8 @@ export class TenantAccessControlController {
               });
             }
           }
-          if (value.stationIds) {
-            await syncStationScopes(tx, orgId, recordId!, value.stationIds as string[]);
+          if (shouldSyncStations) {
+            await syncStationScopes(tx, orgId, recordId!, nextStationIds);
           }
 
           const nextPassword =
@@ -617,11 +616,11 @@ export class TenantAccessControlController {
         });
       }
 
-      const stationError = await validateStationsForOrg(
-        this.prisma,
-        orgId,
-        (value.stationIds as string[]) ?? []
+      const nextStationIds = stationIdsForMemberRoles(
+        value.roleCodes as string[],
+        value.stationIds as string[] | undefined
       );
+      const stationError = await validateStationsForOrg(this.prisma, orgId, nextStationIds);
       if (stationError) {
         return responseError(res, 400, { code: 'INVALID_STATIONS', message: stationError });
       }
@@ -714,7 +713,7 @@ export class TenantAccessControlController {
         });
 
         await syncMemberRoles(tx, orgId, row.id, value.roleCodes as string[], actorAdminId);
-        await syncStationScopes(tx, orgId, row.id, (value.stationIds as string[]) ?? []);
+        await syncStationScopes(tx, orgId, row.id, nextStationIds);
 
         return row.id;
       });

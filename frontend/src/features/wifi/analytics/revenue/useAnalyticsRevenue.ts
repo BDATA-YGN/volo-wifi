@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
+import { singleMembershipOrgId } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   RevenueAnalyticsData,
@@ -20,6 +21,7 @@ export function useAnalyticsRevenue() {
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [month, setMonth] = useState(currentMonthKey());
   const [formOptions, setFormOptions] = useState<RevenueFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const params: RevenueAnalyticsParams = {
     orgId,
@@ -27,24 +29,52 @@ export function useAnalyticsRevenue() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
+    ready: Boolean(orgId),
     refreshDeps: [orgId, month],
   });
 
   const analytics = (data?.data ?? null) as RevenueAnalyticsData | null;
   const meta = (data?.meta ?? {}) as RevenueAnalyticsMeta;
 
+  const applyOrgFormOptions = useCallback((opts: RevenueFormOptions) => {
+    setFormOptions({
+      memberships: opts.memberships ?? [],
+      currency: opts.currency ?? "MMK",
+      canSwitchOrg: opts.canSwitchOrg,
+      requiresOrgSelection: opts.requiresOrgSelection,
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as RevenueFormOptions;
-    setFormOptions({
-      ...emptyFormOptions,
-      ...opts,
-    });
-    if (!targetOrgId && opts.memberships.length === 1 && !opts.canSwitchOrg) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as RevenueFormOptions;
+      const scopedOpts = scoped.data as RevenueFormOptions;
+      applyOrgFormOptions(scopedOpts);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+        canSwitchOrg: opts.canSwitchOrg,
+        requiresOrgSelection: opts.requiresOrgSelection,
+        currency: opts.currency ?? prev.currency,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

@@ -31,3 +31,18 @@ export function sessionStationAllowList(orgId?: string | null): string[] | null 
     orgId
   );
 }
+
+/** Single-tenant users: hydrate org-scoped form options instead of keeping the empty first response. */
+export function singleMembershipOrgId(
+  opts: {
+    canSwitchOrg?: boolean;
+    requiresOrgSelection?: boolean;
+    memberships?: { id: string }[];
+  },
+  targetOrgId?: string
+): string | undefined {
+  if (targetOrgId) return undefined;
+  if (opts.canSwitchOrg || opts.requiresOrgSelection) return undefined;
+  if ((opts.memberships?.length ?? 0) !== 1) return undefined;
+  return opts.memberships![0].id;
+}

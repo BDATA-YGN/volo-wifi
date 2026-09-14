@@ -10,7 +10,10 @@ import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
-import { resolveAllowedStationIds } from '@/features/wifi/shared/resolve-station-scope';
+import {
+  isStationInAllowList,
+  resolveAllowedStationIds,
+} from '@/features/wifi/shared/resolve-station-scope';
 import type { EligibilityStatus } from './constants';
 import { AnalyticsReconciliationCoverageQuerySchema } from './schema';
 import {
@@ -118,6 +121,10 @@ export class AnalyticsReconciliationCoverageController {
         });
       }
 
+      const allowedStationIds = allowedStationScope(
+        await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+      );
+
       const coverageId =
         typeof req.query.coverageId === 'string' ? req.query.coverageId.trim() : undefined;
 
@@ -127,6 +134,12 @@ export class AnalyticsReconciliationCoverageController {
           return responseError(res, 404, {
             code: 'NOT_FOUND',
             message: 'Coverage record not found.',
+          });
+        }
+        if (!isStationInAllowList(detail.stationId, allowedStationIds)) {
+          return responseError(res, 403, {
+            code: 'FORBIDDEN_SITE',
+            message: 'You do not have access to this site.',
           });
         }
 
@@ -150,10 +163,6 @@ export class AnalyticsReconciliationCoverageController {
         typeof req.query.eligibility === 'string'
           ? (req.query.eligibility.trim() as EligibilityStatus)
           : undefined;
-
-      const allowedStationIds = allowedStationScope(
-        await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
-      );
 
       if (stationId) {
         if (allowedStationIds && !allowedStationIds.includes(stationId)) {

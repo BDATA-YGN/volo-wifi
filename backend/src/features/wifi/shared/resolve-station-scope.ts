@@ -39,6 +39,14 @@ export function stationFkScope(allowedIds: string[] | null): { stationId?: { in:
   return { stationId: { in: allowedIds } };
 }
 
+export function isStationInAllowList(
+  stationId: string | null | undefined,
+  allowedIds: string[] | null
+): boolean {
+  if (!allowedIds) return true;
+  return Boolean(stationId && allowedIds.includes(stationId));
+}
+
 /** Narrow a requested station id to the allow-list. `null` means reject the request. */
 export function narrowStationId(
   requested: string | undefined,

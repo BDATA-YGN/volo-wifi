@@ -6,9 +6,11 @@ import { asyncController } from '@/utils/async-controller';
 import { responseError, responseSuccess } from '@/utils/api-response';
 import {
   canAccessOrg,
+  hasGlobalOrgAccess,
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
+import { loadAdminSiteAllowList } from '@/features/wifi/shared/resolve-station-scope';
 import { DEFAULT_PRESET, PERIOD_PRESETS, type PeriodPreset } from './constants';
 import { AnalyticsTenantsQuerySchema } from './schema';
 import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
@@ -97,7 +99,21 @@ export class AnalyticsTenantsController {
       }
 
       const { periodFrom, periodTo, preset } = resolvePeriod(req.query);
-      const analytics = await buildTenantAnalytics(this.prisma, orgIds, periodFrom, periodTo);
+      let stationScopeByOrg: Map<string, string[]> | undefined;
+      if (!hasGlobalOrgAccess(req.user!)) {
+        const allowList = await loadAdminSiteAllowList(this.prisma, adminId);
+        const scoped = allowList.filter((row) => orgIds.includes(row.orgId));
+        if (scoped.length > 0) {
+          stationScopeByOrg = new Map(scoped.map((row) => [row.orgId, row.stationIds]));
+        }
+      }
+      const analytics = await buildTenantAnalytics(
+        this.prisma,
+        orgIds,
+        periodFrom,
+        periodTo,
+        stationScopeByOrg
+      );
 
       const payload: TenantAnalyticsPayload & {
         periodFrom: string;

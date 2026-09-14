@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
 import { useNetworkOrgListState } from "@/features/wifi/network/shared/useNetworkOrgListState";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PlanPoliciesFormOptions,
@@ -44,7 +45,14 @@ export function useNetworkRadiusPlanPolicies(initialParams: Partial<PlanPolicies
   const loadFormOptions = useCallback(
     async (targetOrgId?: string) => {
       const res = await Query.loadFormOptions(targetOrgId ?? orgId);
-      return res.data as PlanPoliciesFormOptions;
+      const opts = res.data as PlanPoliciesFormOptions;
+      return {
+        ...opts,
+        stations: filterBySiteAllowList(
+          opts.stations ?? [],
+          sessionStationAllowList(targetOrgId ?? orgId)
+        ),
+      };
     },
     [orgId]
   );

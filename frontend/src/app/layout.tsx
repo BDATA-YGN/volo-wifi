@@ -58,8 +58,8 @@ async function DynamicContent({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={voucherCodeFont.variable}>
-      <body>
+    <html lang="en" className={voucherCodeFont.variable} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <Suspense fallback={
           <div style={{
             display: 'flex',

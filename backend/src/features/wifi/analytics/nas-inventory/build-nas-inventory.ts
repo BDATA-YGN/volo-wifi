@@ -68,6 +68,7 @@ export type NasInventoryPayload = {
 
 type NasFilters = {
   stationId?: string;
+  stationIds?: string[];
   type?: string;
   isRadiusClient?: boolean;
   unassigned?: boolean;
@@ -111,10 +112,17 @@ function readinessScore(row: {
 }
 
 function buildDeviceWhere(orgId: string, filters?: NasFilters): Prisma.StationDeviceWhereInput {
+  if (filters?.unassigned && filters?.stationIds) {
+    return { orgId, deletedAt: null, id: { in: [] } };
+  }
   return {
     orgId,
     deletedAt: null,
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
+    ...(filters?.stationId
+      ? { stationId: filters.stationId }
+      : filters?.stationIds
+        ? { stationId: { in: filters.stationIds } }
+        : {}),
     ...(filters?.type ? { type: filters.type as 'ROUTER' | 'AP' | 'CONTROLLER' | 'SWITCH' } : {}),
     ...(filters?.isRadiusClient !== undefined ? { isRadiusClient: filters.isRadiusClient } : {}),
     ...(filters?.unassigned ? { stationId: null } : {}),

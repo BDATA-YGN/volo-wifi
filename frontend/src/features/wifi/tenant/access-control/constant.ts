@@ -89,3 +89,9 @@ export function formatMemberRoleLabel(roleCode: string): string {
   const normalized = normalizeMemberRoleCode(roleCode) ?? roleCode;
   return ROLE_OPTIONS.find((option) => option.value === normalized)?.label ?? roleCode;
 }
+
+/** Admin is always org-wide. Every other provisioned role can be limited to selected sites. */
+export function roleUsesSiteAllowList(roleCode: string | undefined | null): boolean {
+  if (!roleCode) return true;
+  return normalizeMemberRoleCode(roleCode) !== "ORG_ADMIN";
+}

@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useWifiListState } from "@/features/wifi/shared/hooks";
 import { useNetworkOrgListState } from "@/features/wifi/network/shared/useNetworkOrgListState";
+import { filterBySiteAllowList, sessionStationAllowList } from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   DeviceType,
@@ -51,7 +52,14 @@ export function useNetworkNasDevices(initialParams: Partial<ExtendedParams> = {}
 
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
     const res = await Query.loadFormOptions(targetOrgId ?? orgId);
-    return res.data as NasDevicesFormOptions;
+    const opts = res.data as NasDevicesFormOptions;
+    return {
+      ...opts,
+      stations: filterBySiteAllowList(
+        opts.stations ?? [],
+        sessionStationAllowList(targetOrgId ?? orgId)
+      ),
+    };
   }, [orgId]);
 
   const createDevice = useCallback(

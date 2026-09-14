@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
+import {
+  filterBySiteAllowList,
+  sessionStationAllowList,
+  singleMembershipOrgId,
+} from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PeriodPreset,
@@ -32,6 +37,7 @@ export function useAnalyticsServicePlans() {
     periodTo?: string;
   }>({});
   const [formOptions, setFormOptions] = useState<PlansFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const params: PlanAnalyticsParams = {
     orgId,
@@ -43,21 +49,66 @@ export function useAnalyticsServicePlans() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
-    refreshDeps: [orgId, stationId, resellerId, profile, planId, preset, customPeriod.periodFrom, customPeriod.periodTo],
+    ready: Boolean(orgId),
+    refreshDeps: [
+      orgId,
+      stationId,
+      resellerId,
+      profile,
+      planId,
+      preset,
+      customPeriod.periodFrom,
+      customPeriod.periodTo,
+    ],
   });
 
   const analytics = (data?.data ?? null) as PlanAnalyticsData | null;
   const meta = (data?.meta ?? {}) as PlanAnalyticsMeta;
 
+  const applyOrgFormOptions = useCallback((opts: PlansFormOptions, scopedOrgId: string) => {
+    setFormOptions({
+      memberships: opts.memberships ?? [],
+      plans: opts.plans ?? [],
+      stations: filterBySiteAllowList(opts.stations ?? [], sessionStationAllowList(scopedOrgId)),
+      resellers: opts.resellers ?? [],
+      profiles: opts.profiles ?? [],
+      currency: opts.currency ?? "MMK",
+      canSwitchOrg: opts.canSwitchOrg,
+      requiresOrgSelection: opts.requiresOrgSelection,
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as PlansFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1 && !opts.canSwitchOrg) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as PlansFormOptions;
+      const scopedOpts = scoped.data as PlansFormOptions;
+      applyOrgFormOptions(scopedOpts, onlyOrgId);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+        canSwitchOrg: opts.canSwitchOrg,
+        requiresOrgSelection: opts.requiresOrgSelection,
+        currency: opts.currency ?? prev.currency,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts, targetOrgId);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

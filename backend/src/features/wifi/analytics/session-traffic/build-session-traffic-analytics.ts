@@ -90,6 +90,7 @@ type PlanMeta = {
 
 type TrafficFilters = {
   stationId?: string;
+  stationIds?: string[];
   planId?: string;
 };
 
@@ -199,13 +200,14 @@ export function previousPeriod(periodFrom: Date, periodTo: Date): { from: Date; 
 async function loadStationMeta(
   prisma: PrismaClient,
   orgId: string,
-  stationId?: string
+  stationId?: string,
+  stationIds?: string[]
 ): Promise<StationMeta[]> {
   const stations = await prisma.wifiStation.findMany({
     where: {
       orgId,
       deletedAt: null,
-      ...(stationId ? { id: stationId } : {}),
+      ...(stationId ? { id: stationId } : stationIds ? { id: { in: stationIds } } : {}),
     },
     select: {
       id: true,
@@ -647,7 +649,7 @@ export async function buildSessionTrafficAnalytics(
   filters?: TrafficFilters
 ): Promise<SessionTrafficPayload> {
   const [stations, plans] = await Promise.all([
-    loadStationMeta(prisma, orgId, filters?.stationId),
+    loadStationMeta(prisma, orgId, filters?.stationId, filters?.stationIds),
     loadPlanMeta(prisma, orgId, filters?.planId),
   ]);
   const stationIds = stations.map((s) => s.id);

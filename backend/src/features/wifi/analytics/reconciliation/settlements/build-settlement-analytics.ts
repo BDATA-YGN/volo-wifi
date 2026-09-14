@@ -104,6 +104,7 @@ type SettlementFilters = {
   stationId?: string;
   resellerId?: string;
   status?: string;
+  allowedStationIds?: string[] | null;
 };
 
 function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
@@ -147,7 +148,11 @@ function buildWhere(
     orgId,
     deletedAt: null,
     periodStart: { gte: periodFrom, lte: periodTo },
-    ...(filters?.stationId ? { stationId: filters.stationId } : {}),
+    ...(filters?.stationId
+      ? { stationId: filters.stationId }
+      : filters?.allowedStationIds
+        ? { stationId: { in: filters.allowedStationIds } }
+        : {}),
     ...(filters?.resellerId ? { resellerId: filters.resellerId } : {}),
     ...(filters?.status
       ? { status: filters.status as Prisma.EnumRptFinSettlementStatusFilter['equals'] }

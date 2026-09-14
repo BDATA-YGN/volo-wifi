@@ -10,6 +10,10 @@ import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
+import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 import { DEFAULT_PRESET, PERIOD_PRESETS, type PeriodPreset } from './constants';
 import { AnalyticsVoucherRunsQuerySchema } from './schema';
 import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
@@ -76,6 +80,9 @@ export class AnalyticsVoucherRunsController {
 
       if (req.query.formOptions === 'true') {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+        const allowedStationIds = orgIdParam
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+          : null;
         const [memberships, plans, stations] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgIdParam
@@ -87,7 +94,7 @@ export class AnalyticsVoucherRunsController {
             : Promise.resolve([]),
           orgIdParam
             ? this.prisma.wifiStation.findMany({
-                where: { orgId: orgIdParam, deletedAt: null },
+                where: { orgId: orgIdParam, deletedAt: null, ...stationPkScope(allowedStationIds) },
                 select: { id: true, code: true, name: true, status: true },
                 orderBy: { name: 'asc' },
               })
@@ -149,12 +156,19 @@ export class AnalyticsVoucherRunsController {
         }
       }
 
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgIdParam,
+        req.user!
+      );
+
       if (stationId) {
         const station = await this.prisma.wifiStation.findFirst({
           where: { id: stationId, orgId: orgIdParam, deletedAt: null },
           select: { id: true },
         });
-        if (!station) {
+        if (!station || (allowedStationIds && !allowedStationIds.includes(station.id))) {
           return responseError(res, 400, {
             code: 'INVALID_STATION',
             message: 'Site not found in this organization.',
@@ -181,7 +195,7 @@ export class AnalyticsVoucherRunsController {
         orgIdParam,
         periodFrom,
         periodTo,
-        { planId, stationId, batchId }
+        { planId, stationId, batchId, stationIds: allowedStationIds ?? undefined }
       );
 
       const org = await this.prisma.org.findUnique({

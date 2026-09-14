@@ -70,6 +70,7 @@ export type SiteInventoryPayload = {
 
 type InventoryFilters = {
   stationId?: string;
+  stationIds?: string[];
   stationSizeId?: string;
   status?: string;
 };
@@ -119,7 +120,11 @@ export async function buildSiteInventory(
     where: {
       orgId,
       deletedAt: null,
-      ...(filters?.stationId ? { id: filters.stationId } : {}),
+      ...(filters?.stationId
+        ? { id: filters.stationId }
+        : filters?.stationIds
+          ? { id: { in: filters.stationIds } }
+          : {}),
       ...(filters?.stationSizeId ? { stationSizeId: filters.stationSizeId } : {}),
       ...(filters?.status ? { status: filters.status as 'ACTIVE' | 'MAINTENANCE' | 'DISABLED' } : {}),
     },
@@ -147,12 +152,25 @@ export async function buildSiteInventory(
     orderBy: [{ status: 'asc' }, { name: 'asc' }],
   });
 
+  const scopedStationIds = filters?.stationId
+    ? [filters.stationId]
+    : filters?.stationIds ?? null;
+
   const [unassignedDevices, orgDevices] = await Promise.all([
     prisma.stationDevice.count({
-      where: { orgId, deletedAt: null, stationId: null },
+      where: {
+        orgId,
+        deletedAt: null,
+        stationId: null,
+        ...(scopedStationIds ? { id: { in: [] } } : {}),
+      },
     }),
     prisma.stationDevice.findMany({
-      where: { orgId, deletedAt: null },
+      where: {
+        orgId,
+        deletedAt: null,
+        ...(scopedStationIds ? { stationId: { in: scopedStationIds } } : {}),
+      },
       select: { type: true, isRadiusClient: true, stationId: true },
     }),
   ]);

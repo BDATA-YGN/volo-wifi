@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
+import {
+  filterBySiteAllowList,
+  sessionStationAllowList,
+  singleMembershipOrgId,
+} from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PeriodPreset,
@@ -33,6 +38,7 @@ export function useAnalyticsReconciliationSettlements() {
   const [formOptions, setFormOptions] = useState<SettlementsFormOptions>(emptyFormOptions);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedDetail, setSelectedDetail] = useState<SettlementDetail | null>(null);
+  const formOptionsSeq = useRef(0);
 
   const params: SettlementAnalyticsParams = {
     orgId,
@@ -43,6 +49,7 @@ export function useAnalyticsReconciliationSettlements() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
+    ready: Boolean(orgId),
     refreshDeps: [
       orgId,
       stationId,
@@ -57,15 +64,41 @@ export function useAnalyticsReconciliationSettlements() {
   const analytics = (data?.data ?? null) as SettlementAnalyticsData | null;
   const meta = (data?.meta ?? {}) as SettlementAnalyticsMeta;
 
+  const applyOrgFormOptions = useCallback((opts: SettlementsFormOptions, scopedOrgId: string) => {
+    setFormOptions({
+      memberships: opts.memberships ?? [],
+      stations: filterBySiteAllowList(opts.stations ?? [], sessionStationAllowList(scopedOrgId)),
+      resellers: opts.resellers ?? [],
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as SettlementsFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as SettlementsFormOptions;
+      const scopedOpts = scoped.data as SettlementsFormOptions;
+      applyOrgFormOptions(scopedOpts, onlyOrgId);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts, targetOrgId);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

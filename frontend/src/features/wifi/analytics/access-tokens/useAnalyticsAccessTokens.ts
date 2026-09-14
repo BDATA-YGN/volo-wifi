@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
 import dayjs from "dayjs";
+import { singleMembershipOrgId } from "@/features/wifi/shared/site-allow-list";
 import type { CredentialType } from "./types";
 import * as Query from "./query";
 import type {
@@ -32,6 +33,7 @@ export function useAnalyticsAccessTokens() {
     periodTo: dayjs().endOf("day").toISOString(),
   }));
   const [formOptions, setFormOptions] = useState<AccessTokensFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const params: CredentialAnalyticsParams = {
     orgId,
@@ -41,21 +43,47 @@ export function useAnalyticsAccessTokens() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
+    ready: Boolean(orgId),
     refreshDeps: [orgId, planId, credentialType, preset, customPeriod.periodFrom, customPeriod.periodTo],
   });
 
   const analytics = (data?.data ?? null) as CredentialAnalyticsData | null;
   const meta = (data?.meta ?? {}) as CredentialAnalyticsMeta;
 
+  const applyOrgFormOptions = useCallback((opts: AccessTokensFormOptions) => {
+    setFormOptions({
+      memberships: opts.memberships ?? [],
+      plans: opts.plans ?? [],
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as AccessTokensFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as AccessTokensFormOptions;
+      const scopedOpts = scoped.data as AccessTokensFormOptions;
+      applyOrgFormOptions(scopedOpts);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

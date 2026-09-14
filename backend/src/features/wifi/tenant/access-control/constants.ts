@@ -68,3 +68,16 @@ export function pickConsoleRoleName(roleCodes: string[]): string {
   }
   return 'ORG_VIEWER';
 }
+
+export function memberRolesIncludeOrgAdmin(roleCodes: string[]): boolean {
+  return roleCodes.some((code) => normalizeMemberRoleCode(code) === 'ORG_ADMIN');
+}
+
+/** Org admin is always org-wide. Other roles persist the submitted site allow-list. */
+export function stationIdsForMemberRoles(
+  roleCodes: string[],
+  stationIds: string[] | undefined
+): string[] {
+  if (memberRolesIncludeOrgAdmin(roleCodes)) return [];
+  return stationIds ?? [];
+}

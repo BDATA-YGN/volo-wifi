@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
+import {
+  filterBySiteAllowList,
+  sessionStationAllowList,
+  singleMembershipOrgId,
+} from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   SiteInventoryData,
@@ -23,6 +28,7 @@ export function useAnalyticsSiteInventory() {
   const [stationSizeId, setStationSizeId] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<StationStatus | undefined>(undefined);
   const [formOptions, setFormOptions] = useState<SiteInventoryFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const params: SiteInventoryParams = {
     orgId,
@@ -32,21 +38,48 @@ export function useAnalyticsSiteInventory() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadInventory(params), {
+    ready: Boolean(orgId),
     refreshDeps: [orgId, stationId, stationSizeId, status],
   });
 
   const inventory = (data?.data ?? null) as SiteInventoryData | null;
   const meta = (data?.meta ?? {}) as SiteInventoryMeta;
 
+  const applyOrgFormOptions = useCallback((opts: SiteInventoryFormOptions, scopedOrgId: string) => {
+    setFormOptions({
+      ...opts,
+      memberships: opts.memberships ?? [],
+      stations: filterBySiteAllowList(opts.stations ?? [], sessionStationAllowList(scopedOrgId)),
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as SiteInventoryFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as SiteInventoryFormOptions;
+      const scopedOpts = scoped.data as SiteInventoryFormOptions;
+      applyOrgFormOptions(scopedOpts, onlyOrgId);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts, targetOrgId);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

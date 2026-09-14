@@ -13,6 +13,10 @@ import {
   scopedNetworkFormOrgs,
   toNetworkOrgMeta,
 } from '@/features/wifi/network/shared/resolve-network-org';
+import {
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 import { NetworkRadiusPlanPoliciesBundleSchema } from './schema';
 
 const orgSelect = {
@@ -348,6 +352,12 @@ export class NetworkRadiusPlanPoliciesController {
       const orgScopeWhere = { deletedAt: null as null, orgId };
 
       if (req.query.formOptions === 'true') {
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          orgId,
+          req.user!
+        );
         const [plans, stations, vendorProfiles, catalogAttributes] = await Promise.all([
           this.prisma.plan.findMany({
             where: { orgId, deletedAt: null },
@@ -355,7 +365,7 @@ export class NetworkRadiusPlanPoliciesController {
             orderBy: { name: 'asc' },
           }),
           this.prisma.wifiStation.findMany({
-            where: { orgId, deletedAt: null },
+            where: { orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
             select: stationSelect,
             orderBy: { name: 'asc' },
           }),

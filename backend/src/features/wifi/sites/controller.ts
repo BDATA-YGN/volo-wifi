@@ -12,6 +12,11 @@ import {
   loadOrgMembershipOptions,
   resolveOrgIdForAdmin,
 } from '@/features/wifi/shared/resolve-org';
+import {
+  isStationInAllowList,
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 import { STATION_STATUSES, type StationStatus } from './constants';
 import { SitesCreateSchema, SitesUpdateSchema } from './schema';
 
@@ -311,9 +316,15 @@ export class SitesController {
       if (!isUndefinedOrUndefinedString(req.params?.id)) {
         const idParam = req.params.id as string | string[];
         const id = Array.isArray(idParam) ? idParam[0] : idParam;
+        const allowedStationIds = await resolveAllowedStationIds(
+          this.prisma,
+          adminId,
+          orgId,
+          req.user!
+        );
 
         const row = await this.prisma.wifiStation.findFirst({
-          where: { id, orgId, deletedAt: null },
+          where: { id, orgId, deletedAt: null, ...stationPkScope(allowedStationIds) },
           select: stationSelect,
         });
 
@@ -327,7 +338,21 @@ export class SitesController {
         return responseSuccess(res, { message: 'Success', data: serializeStation(row) });
       }
 
-      const where = buildListWhere(orgId, req.query);
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
+      const where: Prisma.WifiStationWhereInput = {
+        ...buildListWhere(orgId, req.query),
+        ...stationPkScope(allowedStationIds),
+      };
+      const scopedBase: Prisma.WifiStationWhereInput = {
+        orgId,
+        deletedAt: null,
+        ...stationPkScope(allowedStationIds),
+      };
       const { page, limit, skip, take } = parsePagination(req.query);
 
       const [rows, total, activeCount, maintenanceCount, disabledCount, licenseMeta, memberships] =
@@ -341,13 +366,13 @@ export class SitesController {
           }),
           this.prisma.wifiStation.count({ where }),
           this.prisma.wifiStation.count({
-            where: { orgId, deletedAt: null, status: 'ACTIVE' },
+            where: { ...scopedBase, status: 'ACTIVE' },
           }),
           this.prisma.wifiStation.count({
-            where: { orgId, deletedAt: null, status: 'MAINTENANCE' },
+            where: { ...scopedBase, status: 'MAINTENANCE' },
           }),
           this.prisma.wifiStation.count({
-            where: { orgId, deletedAt: null, status: 'DISABLED' },
+            where: { ...scopedBase, status: 'DISABLED' },
           }),
           loadLicenseMeta(this.prisma, orgId),
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
@@ -385,6 +410,7 @@ export class SitesController {
         return responseError(res, 400, { code: 'ORG_REQUIRED', message });
       }
 
+      const adminId = req.userId!;
       const { error, value } = (isUpdate ? SitesUpdateSchema : SitesCreateSchema).validate(
         req.body,
         { abortEarly: false, allowUnknown: false }
@@ -397,13 +423,20 @@ export class SitesController {
         });
       }
 
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgId,
+        req.user!
+      );
+
       if (isUpdate) {
         const existing = await this.prisma.wifiStation.findFirst({
           where: { id: recordId!, orgId, deletedAt: null },
           select: { id: true, code: true, status: true, stationSizeId: true },
         });
 
-        if (!existing) {
+        if (!existing || !isStationInAllowList(existing.id, allowedStationIds)) {
           return responseError(res, 404, { code: 'NOT_FOUND', message: 'Site not found.' });
         }
 
@@ -491,6 +524,13 @@ export class SitesController {
         });
       }
 
+      if (allowedStationIds) {
+        return responseError(res, 403, {
+          code: 'SITE_SCOPE_RESTRICTED',
+          message: 'Your account is limited to assigned sites. Ask an admin to create new sites.',
+        });
+      }
+
       const tierError = await validateStationSize(this.prisma, value.stationSizeId);
       if (tierError) {
         return responseError(res, 400, { code: 'VALIDATION_ERROR', message: tierError });
@@ -567,6 +607,12 @@ export class SitesController {
 
       const idParam = req.params.id as string | string[];
       const id = Array.isArray(idParam) ? idParam[0] : idParam;
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        req.userId!,
+        orgId,
+        req.user!
+      );
 
       const existing = await this.prisma.wifiStation.findFirst({
         where: { id, orgId, deletedAt: null },
@@ -576,7 +622,7 @@ export class SitesController {
         },
       });
 
-      if (!existing) {
+      if (!existing || !isStationInAllowList(existing.id, allowedStationIds)) {
         return responseError(res, 404, { code: 'NOT_FOUND', message: 'Site not found.' });
       }
 

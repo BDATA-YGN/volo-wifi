@@ -1,8 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRequest } from "ahooks";
 import dayjs from "dayjs";
+import {
+  filterBySiteAllowList,
+  sessionStationAllowList,
+  singleMembershipOrgId,
+} from "@/features/wifi/shared/site-allow-list";
 import * as Query from "./query";
 import type {
   PeriodPreset,
@@ -32,6 +37,7 @@ export function useAnalyticsSessionTraffic() {
     periodTo: dayjs().endOf("day").toISOString(),
   }));
   const [formOptions, setFormOptions] = useState<SessionTrafficFormOptions>(emptyFormOptions);
+  const formOptionsSeq = useRef(0);
 
   const params: SessionTrafficParams = {
     orgId,
@@ -41,6 +47,7 @@ export function useAnalyticsSessionTraffic() {
   };
 
   const { data, loading, error, refresh } = useRequest(() => Query.loadAnalytics(params), {
+    ready: Boolean(orgId),
     refreshDeps: [
       orgId,
       stationId,
@@ -54,15 +61,42 @@ export function useAnalyticsSessionTraffic() {
   const analytics = (data?.data ?? null) as SessionTrafficData | null;
   const meta = (data?.meta ?? {}) as SessionTrafficMeta;
 
+  const applyOrgFormOptions = useCallback((opts: SessionTrafficFormOptions, scopedOrgId: string) => {
+    setFormOptions({
+      ...opts,
+      memberships: opts.memberships ?? [],
+      stations: filterBySiteAllowList(opts.stations ?? [], sessionStationAllowList(scopedOrgId)),
+      plans: opts.plans ?? [],
+    });
+  }, []);
+
   const loadFormOptions = useCallback(async (targetOrgId?: string) => {
+    const seq = ++formOptionsSeq.current;
     const res = await Query.loadFormOptions(targetOrgId);
     const opts = res.data as SessionTrafficFormOptions;
-    setFormOptions(opts);
-    if (!targetOrgId && opts.memberships.length === 1) {
-      setOrgId(opts.memberships[0].id);
+    if (seq !== formOptionsSeq.current) return opts;
+
+    const onlyOrgId = singleMembershipOrgId(opts, targetOrgId);
+    if (onlyOrgId) {
+      setOrgId(onlyOrgId);
+      const scoped = await Query.loadFormOptions(onlyOrgId);
+      if (seq !== formOptionsSeq.current) return scoped.data as SessionTrafficFormOptions;
+      const scopedOpts = scoped.data as SessionTrafficFormOptions;
+      applyOrgFormOptions(scopedOpts, onlyOrgId);
+      return scopedOpts;
     }
+
+    if (!targetOrgId) {
+      setFormOptions((prev) => ({
+        ...prev,
+        memberships: opts.memberships ?? prev.memberships,
+      }));
+      return opts;
+    }
+
+    applyOrgFormOptions(opts, targetOrgId);
     return opts;
-  }, []);
+  }, [applyOrgFormOptions]);
 
   const selectOrg = useCallback(
     (id: string) => {

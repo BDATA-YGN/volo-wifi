@@ -10,6 +10,11 @@ import {
   isDeveloperAdmin,
   loadOrgMembershipOptions,
 } from '@/features/wifi/shared/resolve-org';
+import {
+  isStationInAllowList,
+  resolveAllowedStationIds,
+  stationPkScope,
+} from '@/features/wifi/shared/resolve-station-scope';
 import { DEFAULT_PRESET, PERIOD_PRESETS, type PeriodPreset } from './constants';
 import { AnalyticsReconciliationApprovalsQuerySchema } from './schema';
 import { startOfAppDay as startOfUtcDay, endOfAppDay as endOfUtcDay } from '@/utils/app-time';
@@ -79,11 +84,18 @@ export class AnalyticsReconciliationApprovalsController {
 
       if (req.query.formOptions === 'true') {
         const orgIdParam = typeof req.query.orgId === 'string' ? req.query.orgId.trim() : '';
+        const allowedStationIds = orgIdParam
+          ? await resolveAllowedStationIds(this.prisma, adminId, orgIdParam, req.user!)
+          : null;
         const [memberships, stations, resellers] = await Promise.all([
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
           orgIdParam
             ? this.prisma.wifiStation.findMany({
-                where: { orgId: orgIdParam, deletedAt: null },
+                where: {
+                  orgId: orgIdParam,
+                  deletedAt: null,
+                  ...stationPkScope(allowedStationIds),
+                },
                 select: { id: true, code: true, name: true, status: true },
                 orderBy: { name: 'asc' },
               })
@@ -134,6 +146,13 @@ export class AnalyticsReconciliationApprovalsController {
         });
       }
 
+      const allowedStationIds = await resolveAllowedStationIds(
+        this.prisma,
+        adminId,
+        orgIdParam,
+        req.user!
+      );
+
       const settlementId =
         typeof req.query.settlementId === 'string' ? req.query.settlementId.trim() : undefined;
 
@@ -143,6 +162,12 @@ export class AnalyticsReconciliationApprovalsController {
           return responseError(res, 404, {
             code: 'NOT_FOUND',
             message: 'Settlement not found.',
+          });
+        }
+        if (!isStationInAllowList(detail.stationId, allowedStationIds)) {
+          return responseError(res, 403, {
+            code: 'FORBIDDEN_SITE',
+            message: 'You do not have access to this site.',
           });
         }
 
@@ -165,6 +190,12 @@ export class AnalyticsReconciliationApprovalsController {
       const status = typeof req.query.status === 'string' ? req.query.status.trim() : undefined;
 
       if (stationId) {
+        if (allowedStationIds && !allowedStationIds.includes(stationId)) {
+          return responseError(res, 403, {
+            code: 'FORBIDDEN_SITE',
+            message: 'You do not have access to this site.',
+          });
+        }
         const station = await this.prisma.wifiStation.findFirst({
           where: { id: stationId, orgId: orgIdParam, deletedAt: null },
           select: { id: true },
@@ -196,7 +227,7 @@ export class AnalyticsReconciliationApprovalsController {
         orgIdParam,
         periodFrom,
         periodTo,
-        { stationId, resellerId, status }
+        { stationId, resellerId, status, allowedStationIds }
       );
 
       const org = await this.prisma.org.findUnique({
