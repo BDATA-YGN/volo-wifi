@@ -1,7 +1,5 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { getServerApiBaseUrl } from "@/lib/api-origins";
-
-export const dynamic = "force-dynamic";
 
 const TIMEOUT_MS = 4_000;
 
@@ -28,6 +26,7 @@ function notReady(detail: string) {
 
 /** Login readiness probe — proxies to the backend without going through Cloudflare. */
 export async function GET() {
+  await connection();
   const base = getServerApiBaseUrl();
   if (!base) {
     return notReady("API_URL / INTERNAL_API_URL is not set on the frontend container.");
