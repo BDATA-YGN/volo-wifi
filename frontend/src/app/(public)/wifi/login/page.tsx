@@ -35,7 +35,7 @@ interface FormValues {
 
 const SignInPage: React.FC = () => {
   const t = useTranslations("login_page");
-  const { login, fetchMe, loading } = useLoginUser();
+  const { login, loading } = useLoginUser();
   const [feedback, setFeedback] = useState<LoginFeedback | null>(null);
   const [lockTick, setLockTick] = useState(0);
   const { setMenus } = useMenuStore();
@@ -90,9 +90,7 @@ const SignInPage: React.FC = () => {
   const onFinish = async (values: FormValues) => {
     try {
       setFeedback(null);
-      await login(values.email.trim(), values.password);
-
-      const userData = await fetchMe();
+      const userData = await login(values.email.trim(), values.password);
       setMenus(userData.menus);
 
       window.location.href = CONSOLE_HOME_PATH;

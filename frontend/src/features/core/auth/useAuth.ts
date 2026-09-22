@@ -1,6 +1,6 @@
 "use client";
 
-import { LoggedUser, LoginInput, LoginResponse } from "@/features/core/auth/types";
+import { LoggedUser, LoginInput } from "@/features/core/auth/types";
 import * as AuthUseCase from "@/features/core/auth/query";
 import { useAuthStore } from "@/features/core/auth/store";
 import { useRequest } from "ahooks";
@@ -41,7 +41,7 @@ export const useLoginUser = () => {
     loading: loginLoading,
     error: loginError,
   } = useRequest(
-    async (email: string, password: string): Promise<LoginResponse> => {
+    async (email: string, password: string): Promise<{ loggedUser: LoggedUser; menus: Record<string, { visibility: boolean; access: boolean }> }> => {
       clearSessionCaches();
 
       const payload: LoginInput = {
@@ -54,7 +54,14 @@ export const useLoginUser = () => {
         throw result.error;
       }
       setAge(result.data.data.maxAge);
-      return result.data;
+      const data = result.user;
+      setAuthData(data);
+      const roleMenuMapping = await extraRolesAndMenus(data);
+      applySessionMenus(roleMenuMapping);
+      return {
+        loggedUser: data,
+        menus: roleMenuMapping,
+      };
     },
     {
       manual: true,

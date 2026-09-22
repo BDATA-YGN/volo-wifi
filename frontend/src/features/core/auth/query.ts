@@ -12,7 +12,7 @@ import { cookies } from "next/headers";
 const login = async (data: LoginInput): Promise<LoginActionResult> => {
   try {
     const clientIp = data.clientIp ?? (await resolveServerActionClientIp());
-    const res = await sessionBootstrapApiClient.post<LoginResponse>(
+    const res: any = await sessionBootstrapApiClient.post<LoginResponse>(
       AUTH_API_ROUTES.login(data.username, data.password),
       {
         username: data.username,
@@ -21,7 +21,23 @@ const login = async (data: LoginInput): Promise<LoginActionResult> => {
       },
     );
 
-    return { success: true, data: res.data };
+    // Same server action: cookies().get cannot see cookies we just set.
+    // Partner login uses this handoff; admin login must too or /auth/me 401s.
+    const cookieHeader =
+      typeof res?.__syncedCookieHeader === "string" ? res.__syncedCookieHeader : "";
+    if (!cookieHeader) {
+      return {
+        success: false,
+        error: {
+          code: 500,
+          errorCode: "SESSION_COOKIE_MISSING",
+          message: "Login succeeded but session cookies were not set.",
+        },
+      };
+    }
+
+    const user = await fetchLoggedUser(cookieHeader);
+    return { success: true, data: res.data, user };
   } catch (error) {
     return { success: false, error: parseApiError(error) };
   }
@@ -66,9 +82,11 @@ const refreshToken = async (): Promise<any> => {
   }
 };
 
-const fetchLoggedUser = async (): Promise<LoggedUser> => {
+const fetchLoggedUser = async (cookieHeader?: string): Promise<LoggedUser> => {
   try {
-    const res: AxiosResponse<any> = await apiClient.get<any>(AUTH_API_ROUTES.userDetails);
+    const res: AxiosResponse<any> = await apiClient.get<any>(AUTH_API_ROUTES.userDetails, {
+      headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
+    });
     return res.data.data;
   } catch (error) {
     throw handleApiError(error);

@@ -36,7 +36,8 @@ function setBoth(canonicalKey, publicKey, value) {
 export function applyPublicEnvDefaults() {
   const apiUrl = first("API_URL", "NEXT_PUBLIC_API_URL");
   if (apiUrl) {
-    setBoth("API_URL", "NEXT_PUBLIC_API_URL", apiUrl);
+    process.env.API_URL = apiUrl;
+    process.env.NEXT_PUBLIC_API_URL = apiUrl;
     setIfEmpty("NEXT_PUBLIC_UPLOAD_URL", apiUrl);
   }
 

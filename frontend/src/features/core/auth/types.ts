@@ -20,7 +20,7 @@ export interface LoginResponse {
 
   /** Server action return — avoids throwing across the RSC boundary (metadata would be lost). */
   export type LoginActionResult =
-    | { success: true; data: LoginResponse }
+    | { success: true; data: LoginResponse; user: LoggedUser }
     | { success: false; error: APIErrorResponse };
   
   export interface LoggedUser {

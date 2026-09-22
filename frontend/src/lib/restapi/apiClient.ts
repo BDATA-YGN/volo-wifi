@@ -59,9 +59,11 @@ const createApiClient = (baseURL?: string, customConfig: ApiClientConfig = {}) =
   const configuredAuthApp = customConfig.authApp ?? 'admin';
 
   const instance = axios.create({
-    baseURL: baseURL || process.env.NEXT_PUBLIC_API_URL || process.env.API_URL,
+    baseURL: baseURL || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL,
     withCredentials: isBrowser,
     timeout: customConfig.timeout || 30000,
+    // Node http adapter keeps Set-Cookie; the fetch adapter hides it.
+    ...(!isBrowser ? { adapter: "http" as const } : {}),
     headers: {
       'Content-Type': 'application/json',
       ...customConfig.headers,
