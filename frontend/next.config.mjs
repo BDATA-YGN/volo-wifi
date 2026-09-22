@@ -10,6 +10,7 @@ loadEnvConfig(process.cwd());
 
 const {
   apiUrl,
+  serverApiUrl,
   fileServerUrl: fileServerBaseURL,
   hostName,
 } = applyPublicEnvDefaults();
@@ -81,7 +82,7 @@ const nextConfig = {
 
   async rewrites() {
     const filesBase = (fileServerBaseURL || "").replace(/\/$/, "");
-    const apiBase = (apiUrl || "").replace(/\/$/, "");
+    const apiBase = (serverApiUrl || apiUrl || "").replace(/\/$/, "");
 
     return {
       beforeFiles: [
@@ -102,12 +103,8 @@ const nextConfig = {
         },
       ],
       afterFiles: [
-        // Login probes same-origin `/health` → backend `${API_URL}/health`
-        // (e.g. https://console.volowifi.com/console/health). Do not strip
-        // `/console` or this hits the frontend host and 502s.
-        ...(apiBase
-          ? [{ source: "/health", destination: `${apiBase}/health` }]
-          : []),
+        // `/health` is a Route Handler (src/app/health/route.ts) so it can use
+        // INTERNAL_API_URL at runtime instead of a Cloudflare-baked rewrite.
         ...(filesBase
           ? [
               { source: "/images/:path*", destination: `${filesBase}/images/:path*` },
@@ -234,6 +231,12 @@ const nextConfig = {
         headers: [
           { key: "Content-Type", value: "application/manifest+json; charset=utf-8" },
           { key: "Cache-Control", value: "no-cache" },
+        ],
+      },
+      {
+        source: "/wifi/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, must-revalidate" },
         ],
       },
       {

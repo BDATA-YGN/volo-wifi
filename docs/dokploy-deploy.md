@@ -103,9 +103,16 @@ same `CAPTIVE_API_URL` (API app `…/api`, **not** console `…/console`).
 ### Build-time env (set once — `NEXT_PUBLIC_*` are auto-mirrored)
 
 ```env
-API_URL=https://console.volowifi.com/console
-CAPTIVE_API_URL=https://api.volowifi.com/api
-SOCKET_URL=https://socket.volowifi.com
+# Browser / Cloudflare public host
+NEXT_PUBLIC_API_URL=https://cpanal-api.volowifi.com/console
+API_URL=https://cpanal-api.volowifi.com/console
+
+# Next.js server must NOT call Cloudflare. Use the backend Docker service + PORT.
+# Example: app name volowifi-backend-zouugw, PORT=6558 (or 4458 if that is what you set).
+INTERNAL_API_URL=http://volowifi-backend-zouugw:6558/console
+CAPTIVE_API_URL=http://volowifi-backend-zouugw:6557/api
+
+SOCKET_URL=https://cpanal-socket.volowifi.com
 SOCKET_PATH=/general/socket.io
 CACHE_PREFIX=volo-wifi
 BY_PASS=false
@@ -115,7 +122,11 @@ COLLECTOR_HOST=collector.volowifi.com
 CUSTOMER_HOST=customer.volowifi.com
 ```
 
-If `CAPTIVE_API_URL` is omitted, it is derived by rewriting `API_URL`’s `/console` → `/api` on the **same host**. That only works when the console process also mounts captive routes at `/api` (current backend does). Prefer an explicit API host in production.
+`INTERNAL_API_URL` is required on Dokploy. If it is missing, the frontend container tries `https://…volowifi.com` (Cloudflare `104.21.*` / `172.67.*`) and logs `UND_ERR_CONNECT_TIMEOUT`.
+
+Join frontend and backend to the **same Docker network**. The hostname is the backend app/service name; the port is the backend `PORT` env (not 443).
+
+If `CAPTIVE_API_URL` is omitted, it is derived by rewriting `API_URL`’s `/console` → `/api` on the **same host**. That only works when the console process also mounts captive routes at `/api` (current backend does). Prefer an explicit API host in production. Use the **internal** host/port (`API_PORT`) for `CAPTIVE_API_URL` on Dokploy.
 
 Login from the portal posts to `/portal-api/login` (Next proxy) → `{CAPTIVE_API_URL}/login` (e.g. `https://api.volowifi.com/api/login`). Seeing **Route not found** on Connect almost always means this upstream URL is wrong or the API/captive routes are not deployed.
 
@@ -134,6 +145,8 @@ Backend `ALLOWED_ORIGINS` must include every HTTPS origin the browser uses (cons
 5. **Committing Firebase JSON** — GitHub blocks push; use mounted secrets in Dokploy.
 6. **Backend `PORT` ≠ Dokploy domain port** — health and login fail with 502. Use `6558/6557/6559` (docs) or change the domain target to match `4458/4457/4459`.
 7. **Dokploy backend health path** — must be `GET /console/health` (not `/health` on the public console host, which is the frontend).
+8. **Frontend `INTERNAL_API_URL` missing** — Next.js server-side `/health` and login call Cloudflare and time out (`UND_ERR_CONNECT_TIMEOUT`). Set `INTERNAL_API_URL=http://<backend-app>:<PORT>/console`.
+9. **Failed to find Server Action** — stale HTML after a deploy (Cloudflare/browser cache). Hard-refresh the login page.
 
 ---
 

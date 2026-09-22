@@ -31,19 +31,29 @@ function setBoth(canonicalKey, publicKey, value) {
 }
 
 /**
- * @returns {{ apiUrl: string, captiveApiUrl: string, socketUrl: string, fileServerUrl: string, hostName: string }}
+ * @returns {{ apiUrl: string, serverApiUrl: string, captiveApiUrl: string, socketUrl: string, fileServerUrl: string, hostName: string }}
  */
 export function applyPublicEnvDefaults() {
-  const apiUrl = first("API_URL", "NEXT_PUBLIC_API_URL");
-  if (apiUrl) {
-    process.env.API_URL = apiUrl;
-    process.env.NEXT_PUBLIC_API_URL = apiUrl;
-    setIfEmpty("NEXT_PUBLIC_UPLOAD_URL", apiUrl);
+  // Browser (Cloudflare public host) vs Next.js server (Docker-internal host).
+  // They must differ in Dokploy: the frontend container cannot call its own
+  // Cloudflare hostname (ConnectTimeoutError to 104.21.x / 172.67.x).
+  const publicApiUrl = first("NEXT_PUBLIC_API_URL", "API_URL");
+  const serverApiUrl = first("INTERNAL_API_URL", "API_URL", "NEXT_PUBLIC_API_URL");
+
+  if (serverApiUrl) {
+    process.env.API_URL = serverApiUrl;
+  }
+  if (first("INTERNAL_API_URL")) {
+    process.env.INTERNAL_API_URL = first("INTERNAL_API_URL");
+  }
+  if (publicApiUrl) {
+    process.env.NEXT_PUBLIC_API_URL = publicApiUrl;
+    setIfEmpty("NEXT_PUBLIC_UPLOAD_URL", publicApiUrl);
   }
 
   const captiveApiUrl =
     first("CAPTIVE_API_URL") ||
-    (apiUrl ? apiUrl.replace(/\/console\/?$/, "/api") : "") ||
+    (serverApiUrl ? serverApiUrl.replace(/\/console\/?$/, "/api") : "") ||
     "http://localhost:4457/api";
   process.env.CAPTIVE_API_URL = captiveApiUrl;
   // Browser always goes through Next proxy route `/portal-api` — never paste the raw API host twice.
@@ -77,7 +87,8 @@ export function applyPublicEnvDefaults() {
   setIfEmpty("HOST_NAME", "localhost");
 
   return {
-    apiUrl: process.env.API_URL || "",
+    apiUrl: process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "",
+    serverApiUrl: process.env.API_URL || "",
     captiveApiUrl: process.env.CAPTIVE_API_URL || "",
     socketUrl: process.env.SOCKET_URL || process.env.NEXT_PUBLIC_SOCKET_URL || "",
     fileServerUrl: process.env.FILE_SERVER_URL || "",

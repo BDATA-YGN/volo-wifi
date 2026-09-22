@@ -3,11 +3,12 @@ import { getUserLocale } from "./locale";
 import { cacheLife } from "next/cache";
 import { mergeBootstrapMessages } from "./defaultMessages";
 import { cacheTag } from "@/lib/cacheKeys";
+import { getServerApiBaseUrl } from "@/lib/api-origins";
 
 export const getMessages = async (locale: string) => {
   'use cache'
   try {
-    const apiUrl = process.env.API_URL;
+    const apiUrl = getServerApiBaseUrl();
     cacheLife("translation");
     const response = await fetch(`${apiUrl}/translations/${locale}`, {
       headers: {
@@ -38,7 +39,7 @@ export const getMessages = async (locale: string) => {
 export const getAppSettings = async () => {
   'use cache'
   try {
-    const apiUrl = process.env.API_URL;
+    const apiUrl = getServerApiBaseUrl();
     cacheLife("apps");
     const response = await fetch(`${apiUrl}/app-settings/public/app-shell`, {
       headers: {

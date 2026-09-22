@@ -73,6 +73,12 @@ const createApiClient = (baseURL?: string, customConfig: ApiClientConfig = {}) =
 
   instance.interceptors.request.use(
     async (config) => {
+      if (!isBrowser) {
+        const { getServerApiBaseUrl } = await import("@/lib/api-origins");
+        const serverBase = getServerApiBaseUrl();
+        if (serverBase) config.baseURL = serverBase;
+      }
+
       const authApp = isBrowser
         ? configuredAuthApp === 'admin' && !customConfig.lockAuthApp
           ? authAppFromPathname(window.location.pathname)
