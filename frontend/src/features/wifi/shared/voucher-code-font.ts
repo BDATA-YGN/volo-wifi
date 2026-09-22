@@ -1,8 +1,10 @@
 import { JetBrains_Mono } from "next/font/google";
 
 /**
- * Shared access-token / voucher code typeface.
- * Apply `voucherCodeFont.variable` on <html> so --font-voucher-code loads app-wide.
+ * Load JetBrains Mono once in the root layout (server).
+ * Do not import this module from client components — Turbopack fails with
+ * "next/font/google queries have exactly one entry".
+ * Clients should use CSS `var(--font-voucher-code)` / VoucherCodeText.
  */
 export const voucherCodeFont = JetBrains_Mono({
   subsets: ["latin"],

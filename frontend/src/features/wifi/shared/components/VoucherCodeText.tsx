@@ -2,12 +2,10 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { Typography } from "antd";
-import { voucherCodeFont } from "../voucher-code-font";
 import styles from "./VoucherCodeText.module.css";
 
-export { voucherCodeFont } from "../voucher-code-font";
-
-export const voucherCodeFontClassName = `${voucherCodeFont.className} ${styles.voucherCode}`;
+/** CSS class that uses `--font-voucher-code` from the root layout. */
+export const voucherCodeFontClassName = styles.voucherCode;
 
 export const VOUCHER_CODE_FONT_STACK =
   'var(--font-voucher-code), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
@@ -61,7 +59,6 @@ export function VoucherCodeText({
   copyText,
 }: Props) {
   const classNames = [
-    voucherCodeFont.className,
     styles.voucherCode,
     block ? styles.voucherCodeBlock : styles.voucherCodeInline,
     className,
