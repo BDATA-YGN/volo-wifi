@@ -80,7 +80,6 @@ const nextConfig = {
   },
 
   async rewrites() {
-    const consoleBase = (apiUrl || "").replace(/\/console\/?$/, "");
     const filesBase = (fileServerBaseURL || "").replace(/\/$/, "");
     const apiBase = (apiUrl || "").replace(/\/$/, "");
 
@@ -103,8 +102,11 @@ const nextConfig = {
         },
       ],
       afterFiles: [
-        ...(consoleBase
-          ? [{ source: "/health", destination: `${consoleBase}/health` }]
+        // Login probes same-origin `/health` → backend `${API_URL}/health`
+        // (e.g. https://console.volowifi.com/console/health). Do not strip
+        // `/console` or this hits the frontend host and 502s.
+        ...(apiBase
+          ? [{ source: "/health", destination: `${apiBase}/health` }]
           : []),
         ...(filesBase
           ? [

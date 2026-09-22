@@ -8,6 +8,7 @@ export const PARTNER_HOST =
 
 const PARTNER_SUBDOMAIN_SHARED_PREFIXES = [
   "/health",
+  "/healthz",
   "/api/",
   "/_next/",
   "/uploads/",

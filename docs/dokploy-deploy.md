@@ -11,7 +11,7 @@ Monorepo with **two Dokploy applications** (same Git repo, different root direct
 | Install | `npm ci` |
 | Build | `npm run build` |
 | Start | `npm start` |
-| Health check | `GET /console/health` |
+| Health check | `GET /console/health` (always 200 when the process is up; `ready` in JSON is for login) |
 
 ### Ports (one container, three listeners)
 
@@ -21,13 +21,14 @@ Monorepo with **two Dokploy applications** (same Git repo, different root direct
 | `API_PORT` | 6557 | Captive portal API (`/api/*`) |
 | `SOCKET_PORT` | 6559 | Socket.IO (`/general/socket.io`) |
 
-In Dokploy, create **three domains** (or path-based proxy) pointing to the same service on ports **6558**, **6557**, and **6559**.
+In Dokploy, map **container ports to the same numbers as `PORT` / `API_PORT` / `SOCKET_PORT`**. If the process listens on `4458` but the domain targets `6558`, every request (including `/console/health`) returns Cloudflare **502**.
 
-Example:
+For the console host, use **path-based** routing so the frontend keeps `/` and the API is under `/console`:
 
-- `console.volowifi.com` → container port `6558`
-- `api.volowifi.com` → container port `6557`
-- `socket.volowifi.com` → container port `6559`
+- Frontend `console.volowifi.com` → container `4488`
+- Backend `console.volowifi.com` + path `/console` → container `PORT` (`6558` or whatever you set)
+- `api.volowifi.com` → container `API_PORT`
+- `socket.volowifi.com` → container `SOCKET_PORT`
 
 ### Required env
 
@@ -81,7 +82,7 @@ Startup prints phase lines and a final `========== System Ready ==========` bann
 | Install | `npm ci` |
 | Build | `npm run build` |
 | Start | `npm start` |
-| Health check | `GET /health` |
+| Health check | `GET /healthz` (Next liveness; login still uses `/health` → backend) |
 | Container port | `4488` (or `PORT` env) |
 
 ### Domains (one frontend app, host-based routing in `next.config.mjs`)
@@ -131,6 +132,8 @@ Backend `ALLOWED_ORIGINS` must include every HTTPS origin the browser uses (cons
 3. **Missing `TRUST_PROXY=1`** on backend behind Dokploy/Traefik — wrong client IP and cookies.
 4. **Rebuilding frontend without `API_URL` / `SOCKET_URL`** — client bundle gets empty endpoints (NEXT_PUBLIC_* are mirrored from these at build).
 5. **Committing Firebase JSON** — GitHub blocks push; use mounted secrets in Dokploy.
+6. **Backend `PORT` ≠ Dokploy domain port** — health and login fail with 502. Use `6558/6557/6559` (docs) or change the domain target to match `4458/4457/4459`.
+7. **Dokploy backend health path** — must be `GET /console/health` (not `/health` on the public console host, which is the frontend).
 
 ---
 

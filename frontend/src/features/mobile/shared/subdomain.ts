@@ -14,6 +14,7 @@ export const COLLECTOR_HOST =
 /** Paths allowed on mobile subdomains without the /collector or /customer prefix. */
 const MOBILE_SUBDOMAIN_SHARED_PREFIXES = [
   "/health",
+  "/healthz",
   "/api/",
   "/_next/",
   "/uploads/",

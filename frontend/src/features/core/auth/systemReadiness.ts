@@ -22,8 +22,8 @@ const HEALTH_PATH = '/health';
 const FETCH_TIMEOUT_MS = 12_000;
 
 /**
- * Same-origin health probe — Next.js rewrites `/health` → backend `/health`
- * (see next.config.mjs). Avoids cross-origin CORS failures from the sign-in page.
+ * Same-origin health probe — Next.js rewrites `/health` → `${API_URL}/health`
+ * (backend `/console/health`). Avoids cross-origin CORS failures on sign-in.
  */
 function resolveHealthUrl(): string {
   return HEALTH_PATH;

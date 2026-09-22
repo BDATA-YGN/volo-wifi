@@ -28,6 +28,7 @@ const publicUrls = [
   "/signin",
   "/unauthorized",
   "/health",
+  "/healthz",
   "/uploads",
   "/assets",
   "/basic",

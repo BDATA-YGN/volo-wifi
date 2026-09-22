@@ -191,11 +191,14 @@ export class App {
   }
 
   private initializeRoutes(prefix: string, routes: Route[]) {
-    this.app.get('/health', async (_req, res) => {
+    // Serve both `/health` (container root) and `${prefix}/health` (Dokploy /
+    // Traefik path prefix, e.g. `/console/health`). Always 200 when the process
+    // can answer — `ready: false` is for the login UI, not Docker HEALTHCHECK.
+    const healthHandler = async (_req: Request, res: Response): Promise<void> => {
       if (prefix === '/console') {
         try {
           const report = await getReadinessReport(version);
-          res.status(report.ready ? 200 : 503).json(report);
+          res.status(200).json(report);
         } catch (err) {
           logger.error('Health check failed', err);
           res.status(503).json({
@@ -216,7 +219,12 @@ export class App {
       }
 
       res.status(200).json({ status: 'ok', ready: true, version });
-    });
+    };
+
+    this.app.get('/health', healthHandler);
+    if (prefix && prefix !== '/') {
+      this.app.get(`${prefix}/health`, healthHandler);
+    }
 
     routes.forEach((route) => {
       this.app.use(prefix, route.router);
