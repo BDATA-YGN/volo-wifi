@@ -181,6 +181,27 @@ function withoutLibpqOptions(connectionString: string): string {
   }
 }
 
+/**
+ * Drop libpq SSL params from the URI.
+ *
+ * `pg` parses `connectionString` after Pool config and lets that `ssl` object
+ * replace `config.ssl`. `sslmode=require` becomes `{}`, so Node verifies against
+ * the public CA list and DigitalOcean's private CA fails with
+ * "self-signed certificate in certificate chain". SSL is applied only via
+ * `resolvePgSsl()` (`DATABASE_SSL_MODE` + `DATABASE_SSL_ROOT_CERT`).
+ */
+function stripSslQueryParams(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    for (const key of ['sslmode', 'sslrootcert', 'sslcert', 'sslkey', 'ssl']) {
+      url.searchParams.delete(key);
+    }
+    return url.toString();
+  } catch {
+    return connectionString;
+  }
+}
+
 export function buildPgPoolConfig(
   connectionString: string,
   opts?: { sessionTimezone?: string },
@@ -189,12 +210,13 @@ export function buildPgPoolConfig(
   const sessionTz = SAFE_TZ_RE.test(opts?.sessionTimezone ?? '')
     ? (opts?.sessionTimezone as string)
     : 'UTC';
-  const pooled = isPgBouncerUrl(connectionString);
+  const connectionStringWithoutSsl = stripSslQueryParams(connectionString);
+  const pooled = isPgBouncerUrl(connectionStringWithoutSsl);
   // PgBouncer rejects `options=-c timezone=...`. Session-mode pools keep SET TIME ZONE
   // for the life of the server connection (required: DB default is Asia/Yangon).
   const applied = pooled
-    ? { connectionString: withoutLibpqOptions(connectionString), options: '' }
-    : applyPgSessionTimezone(connectionString, sessionTz);
+    ? { connectionString: withoutLibpqOptions(connectionStringWithoutSsl), options: '' }
+    : applyPgSessionTimezone(connectionStringWithoutSsl, sessionTz);
   const config: PoolConfig = {
     connectionString: applied.connectionString,
     ...(applied.options ? { options: applied.options } : {}),
