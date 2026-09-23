@@ -46,8 +46,6 @@ const partnerCoreSelect = {
 const partnerDetailCountSelect = {
   resellerStations: { where: { deletedAt: null } },
   planEntitlements: { where: { isEnabled: true } },
-  credentials: true,
-  sales: true,
 } satisfies Prisma.ResellerCountOutputTypeSelect;
 
 const stationBriefSelect = {
@@ -122,13 +120,6 @@ async function resolveOrgFromRequest(
   }
   return resolved.orgId;
 }
-
-type PartnerDetailCounts = {
-  resellerStations: number;
-  planEntitlements: number;
-  credentials: number;
-  sales: number;
-};
 
 function serializePortalAccount(
   admin:
@@ -433,16 +424,20 @@ async function loadPartnerDetail(prisma: PrismaClient, orgId: string, id: string
 
   if (!row) return null;
 
+  const [credentialCount, salesCount] = await Promise.all([
+    prisma.credential.count({ where: { orgId, resellerId: row.id } }),
+    prisma.saleOrder.count({ where: { orgId, resellerId: row.id } }),
+  ]);
+
   const { resellerStations, planEntitlements, admin, _count, ...base } = row;
   const sellablePlans = planEntitlements.filter((pe) => pe.isEnabled).map((pe) => pe.plan);
-  const counts: PartnerDetailCounts = _count;
 
   return {
     ...serializePartnerBase(base, admin, {
-      stationCount: counts.resellerStations,
-      enabledPlanCount: counts.planEntitlements,
-      credentialCount: counts.credentials,
-      salesCount: counts.sales,
+      stationCount: _count.resellerStations,
+      enabledPlanCount: _count.planEntitlements,
+      credentialCount,
+      salesCount,
     }),
     stations: resellerStations.map((rs) => ({
       mappingId: rs.id,
@@ -845,17 +840,18 @@ export class CommercePartnersController {
 
       const existing = await this.prisma.reseller.findFirst({
         where: { id, orgId, deletedAt: null },
-        select: {
-          id: true,
-          _count: { select: { credentials: true, sales: true } },
-        },
+        select: { id: true },
       });
 
       if (!existing) {
         return responseError(res, 404, { code: 'NOT_FOUND', message: 'Partner not found.' });
       }
 
-      if (existing._count.credentials > 0 || existing._count.sales > 0) {
+      const [credentialCount, salesCount] = await Promise.all([
+        this.prisma.credential.count({ where: { orgId, resellerId: id } }),
+        this.prisma.saleOrder.count({ where: { orgId, resellerId: id } }),
+      ]);
+      if (credentialCount > 0 || salesCount > 0) {
         return responseError(res, 409, {
           code: 'PARTNER_IN_USE',
           message:

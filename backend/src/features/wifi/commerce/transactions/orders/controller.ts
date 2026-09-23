@@ -45,9 +45,6 @@ const orderListSelect = {
   station: {
     select: { id: true, code: true, name: true, status: true },
   },
-  _count: {
-    select: { items: true, payments: true },
-  },
 } satisfies Prisma.SaleOrderSelect;
 
 const orderDetailSelect = {
@@ -172,7 +169,10 @@ async function resolveOrdersScope(
   return { mode: 'org', orgId };
 }
 
-function serializeOrderList(row: OrderListRow) {
+function serializeOrderList(
+  row: OrderListRow,
+  counts: { items: number; payments: number },
+) {
   return {
     id: row.id,
     orgId: row.orgId,
@@ -190,14 +190,17 @@ function serializeOrderList(row: OrderListRow) {
     stationId: row.stationId,
     reseller: row.reseller,
     station: row.station,
-    itemCount: row._count.items,
-    paymentCount: row._count.payments,
+    itemCount: counts.items,
+    paymentCount: counts.payments,
   };
 }
 
 function serializeOrderDetail(row: OrderDetailRow) {
   return {
-    ...serializeOrderList(row),
+    ...serializeOrderList(row, {
+      items: row.items.length,
+      payments: row.payments.length,
+    }),
     items: row.items.map((item) => ({
       id: item.id,
       planId: item.planId,
@@ -451,9 +454,34 @@ export class CommerceTransactionsOrdersController {
           )?.currency ??
           'MMK';
 
+        const orderIds = rows.map((row) => row.id);
+        const [itemGroups, paymentGroups] = orderIds.length
+          ? await Promise.all([
+              this.prisma.saleItem.groupBy({
+                by: ['orderId'],
+                where: { orgId: scope.orgId, orderId: { in: orderIds } },
+                _count: { _all: true },
+              }),
+              this.prisma.payment.groupBy({
+                by: ['orderId'],
+                where: { orgId: scope.orgId, orderId: { in: orderIds } },
+                _count: { _all: true },
+              }),
+            ])
+          : [[], []];
+        const itemCountByOrderId = new Map(itemGroups.map((row) => [row.orderId, row._count._all]));
+        const paymentCountByOrderId = new Map(
+          paymentGroups.flatMap((row) => (row.orderId ? [[row.orderId, row._count._all] as const] : [])),
+        );
+
         responseSuccess(res, {
           message: 'Success',
-          data: rows.map(serializeOrderList),
+          data: rows.map((row) =>
+            serializeOrderList(row, {
+              items: itemCountByOrderId.get(row.id) ?? 0,
+              payments: paymentCountByOrderId.get(row.id) ?? 0,
+            }),
+          ),
           meta: {
             page,
             limit,

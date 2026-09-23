@@ -32,6 +32,9 @@ export type OpsArchiveSettings = {
 
   /** Pre-aggregated stat tables — hard purge only (not operational). */
   reportingStatsRetentionDays: number;
+
+  /** FreeRADIUS post-auth log. Hot purge only (no archive table). */
+  radpostauthRetentionDays: number;
 };
 
 export const OPS_ARCHIVE_DEFAULTS: OpsArchiveSettings = {
@@ -40,18 +43,19 @@ export const OPS_ARCHIVE_DEFAULTS: OpsArchiveSettings = {
   batchSize: 500,
 
   credentialGraceDays: 7,
-  credentialArchiveRetentionDays: 2555,
+  credentialArchiveRetentionDays: 40,
 
   captivePortalRetentionDays: 14,
 
-  radiusSessionHotRetentionDays: 30,
-  radiusSessionArchiveRetentionDays: 730,
+  radiusSessionHotRetentionDays: 7,
+  radiusSessionArchiveRetentionDays: 40,
 
-  saleOrderHotRetentionDays: 180,
+  saleOrderHotRetentionDays: 40,
   saleOrderDraftRetentionDays: 30,
   saleOrderArchiveRetentionDays: 2555,
 
   reportingStatsRetentionDays: 1095,
+  radpostauthRetentionDays: 40,
 };
 
 const SETTING_KEYS = [
@@ -67,6 +71,7 @@ const SETTING_KEYS = [
   'sale_order_draft_retention_days',
   'sale_order_archive_retention_days',
   'reporting_stats_retention_days',
+  'radpostauth_retention_days',
 ] as const;
 
 export async function loadOpsArchiveSettings(prisma: PrismaClient): Promise<OpsArchiveSettings> {
@@ -115,6 +120,10 @@ export async function loadOpsArchiveSettings(prisma: PrismaClient): Promise<OpsA
     reportingStatsRetentionDays: toInt(
       m.get('reporting_stats_retention_days'),
       OPS_ARCHIVE_DEFAULTS.reportingStatsRetentionDays
+    ),
+    radpostauthRetentionDays: Math.max(
+      7,
+      toInt(m.get('radpostauth_retention_days'), OPS_ARCHIVE_DEFAULTS.radpostauthRetentionDays, 7)
     ),
   };
 }

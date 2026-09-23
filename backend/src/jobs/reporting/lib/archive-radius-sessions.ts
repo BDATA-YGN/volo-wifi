@@ -12,58 +12,59 @@ export async function archiveRadiusSessions(
   let archived = 0;
 
   while (true) {
-    const rows = await prisma.radiusSession.findMany({
-      where: {
-        status: 'STOP',
-        stoppedAt: { not: null, lt: hotCutoff },
-      },
-      take: batchSize,
-      orderBy: { stoppedAt: 'asc' },
-    });
-
-    if (rows.length === 0) break;
-
-    for (const row of rows) {
-      const exists = await prisma.radiusSessionArchive.findUnique({
-        where: { sourceId: row.id },
-        select: { id: true },
-      });
-      if (exists) {
-        await prisma.radiusSession.delete({ where: { id: row.id } });
-        archived += 1;
-        continue;
-      }
-
-      await prisma.$transaction([
-        prisma.radiusSessionArchive.create({
-          data: {
-            sourceId: row.id,
-            orgId: row.orgId,
-            stationId: row.stationId,
-            credentialId: row.credentialId,
-            acctSessionId: row.acctSessionId,
-            userName: row.userName,
-            callingStationId: row.callingStationId,
-            framedIpAddress: row.framedIpAddress,
-            nasIpAddress: row.nasIpAddress,
-            nasIdentifier: row.nasIdentifier,
-            status: row.status,
-            startedAt: row.startedAt,
-            lastInterimAt: row.lastInterimAt,
-            stoppedAt: row.stoppedAt,
-            inputBytes: row.inputBytes,
-            outputBytes: row.outputBytes,
-            totalBytes: row.totalBytes,
-            sessionTimeSec: row.sessionTimeSec,
-            terminateCause: row.terminateCause,
-          },
-        }),
-        prisma.radiusSession.delete({ where: { id: row.id } }),
-      ]);
-      archived += 1;
-    }
-
-    if (rows.length < batchSize) break;
+    const deleted = await prisma.$executeRaw`
+      WITH picked AS (
+        SELECT s.id
+        FROM wf_radius_session s
+        WHERE s.status = 'STOP'
+          AND s.stopped_at IS NOT NULL
+          AND s.stopped_at < ${hotCutoff}
+        ORDER BY s.stopped_at
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
+      ),
+      inserted AS (
+        INSERT INTO wf_radius_session_archive (
+          id, source_id, org_id, station_id, credential_id,
+          acct_session_id, user_name, calling_station_id, framed_ip_address,
+          nas_ip_address, nas_identifier, status, started_at, last_interim_at,
+          stopped_at, input_bytes, output_bytes, total_bytes, session_time_sec,
+          terminate_cause
+        )
+        SELECT
+          -- Hot-table columns callingStationId, inputBytes, outputBytes,
+          -- totalBytes, and sessionTimeSec were created without @map.
+          gen_random_uuid(),
+          s.id,
+          s.org_id,
+          s.station_id,
+          s.credential_id,
+          s.acct_session_id,
+          s.user_name,
+          s."callingStationId",
+          s.framed_ip_address,
+          s.nas_ip_address,
+          s.nas_identifier,
+          s.status,
+          s.started_at,
+          s.last_interim_at,
+          s.stopped_at,
+          s."inputBytes",
+          s."outputBytes",
+          s."totalBytes",
+          s."sessionTimeSec",
+          s.terminate_cause
+        FROM wf_radius_session s
+        JOIN picked ON picked.id = s.id
+        ON CONFLICT (source_id) DO NOTHING
+        RETURNING source_id
+      )
+      DELETE FROM wf_radius_session s
+      USING picked
+      WHERE s.id = picked.id
+    `;
+    archived += deleted;
+    if (deleted === 0) break;
   }
 
   logger.info(`[ops-archive] radius sessions archived: ${archived}`);
@@ -79,7 +80,12 @@ export async function purgeExpiredRadiusArchives(
 
   while (true) {
     const rows = await prisma.radiusSessionArchive.findMany({
-      where: { archivedAt: { lt: archiveCutoff } },
+      where: {
+        OR: [
+          { stoppedAt: { lt: archiveCutoff } },
+          { stoppedAt: null, startedAt: { lt: archiveCutoff } },
+        ],
+      },
       select: { id: true },
       take: batchSize,
     });

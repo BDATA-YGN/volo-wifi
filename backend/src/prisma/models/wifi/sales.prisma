@@ -32,6 +32,7 @@ model SaleOrder {
   @@unique([orgId, orderNo], map: "uq_wf_sale_order__org_id__order_no")
   @@index([orgId, status, soldAt], map: "idx_wf_sale_order__org_id__status__sold_at")
   @@index([orgId, resellerId, soldAt], map: "idx_wf_sale_order__org_id__reseller_id__sold_at")
+  @@index([orgId, stationId], map: "idx_wf_sale_order__org_id__station_id")
   @@map("wf_sale_order")
 }
 

@@ -1,8 +1,6 @@
 import type { PrismaClient } from '@/generated/prisma/client';
 import { logger } from '@/logging/logger';
 
-const CLOSED_STATUSES = ['PAID', 'VOID', 'REFUNDED'] as const;
-
 /**
  * Archives closed sale orders (snapshot includes items + payments), then removes hot rows.
  */
@@ -15,86 +13,87 @@ export async function archiveSaleOrders(
   let archived = 0;
 
   while (true) {
-    const orders = await prisma.saleOrder.findMany({
-      where: {
-        status: { in: [...CLOSED_STATUSES] },
-        OR: [{ soldAt: { lt: cutoff } }, { soldAt: null, createdAt: { lt: cutoff } }],
-      },
-      include: {
-        items: {
-          select: {
-            id: true,
-            planId: true,
-            credentialId: true,
-            qty: true,
-            unitPrice: true,
-            lineTotal: true,
-            createdAt: true,
-          },
-        },
-        payments: {
-          select: {
-            id: true,
-            method: true,
-            amount: true,
-            refNo: true,
-            paidAt: true,
-            note: true,
-            createdAt: true,
-          },
-        },
-      },
-      take: batchSize,
-      orderBy: { soldAt: 'asc' },
-    });
-
-    if (orders.length === 0) break;
-
-    for (const order of orders) {
-      const exists = await prisma.saleOrderArchive.findUnique({
-        where: { sourceId: order.id },
-        select: { id: true },
-      });
-      if (exists) {
-        await prisma.$transaction([
-          prisma.payment.deleteMany({ where: { orderId: order.id } }),
-          prisma.saleItem.deleteMany({ where: { orderId: order.id } }),
-          prisma.saleOrder.delete({ where: { id: order.id } }),
-        ]);
-        archived += 1;
-        continue;
-      }
-
-      await prisma.$transaction([
-        prisma.saleOrderArchive.create({
-          data: {
-            sourceId: order.id,
-            orgId: order.orgId,
-            orderNo: order.orderNo,
-            status: order.status,
-            resellerId: order.resellerId,
-            stationId: order.stationId,
-            total: order.total,
-            currency: order.currency,
-            soldAt: order.soldAt,
-            sourceCreatedAt: order.createdAt,
-            payload: {
-              subtotal: order.subtotal,
-              discount: order.discount,
-              note: order.note,
-              items: order.items,
-              payments: order.payments,
-            },
-          },
-        }),
-        prisma.payment.deleteMany({ where: { orderId: order.id } }),
-        prisma.saleItem.deleteMany({ where: { orderId: order.id } }),
-        prisma.saleOrder.delete({ where: { id: order.id } }),
-      ]);
-      archived += 1;
-    }
-
-    if (orders.length < batchSize) break;
+    const deleted = await prisma.$executeRaw`
+      WITH picked AS (
+        SELECT o.id
+        FROM wf_sale_order o
+        WHERE o.status IN ('PAID', 'VOID', 'REFUNDED')
+          AND COALESCE(o.sold_at, o.created_at) < ${cutoff}
+        ORDER BY COALESCE(o.sold_at, o.created_at)
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
+      ),
+      inserted AS (
+        INSERT INTO wf_sale_order_archive (
+          id, source_id, org_id, order_no, status, reseller_id, station_id,
+          total, currency, sold_at, source_created_at, payload
+        )
+        SELECT
+          gen_random_uuid(),
+          o.id,
+          o.org_id,
+          o.order_no,
+          o.status,
+          o.reseller_id,
+          o.station_id,
+          o.total,
+          o.currency,
+          o.sold_at,
+          o.created_at,
+          jsonb_build_object(
+            'subtotal', o.subtotal,
+            'discount', o.discount,
+            'note', o.note,
+            'items', COALESCE((
+              SELECT jsonb_agg(jsonb_build_object(
+                'id', i.id,
+                'planId', i.plan_id,
+                'credentialId', i.credential_id,
+                'qty', i.qty,
+                'unitPrice', i.unit_price,
+                'lineTotal', i.line_total,
+                'createdAt', i.created_at
+              ) ORDER BY i.created_at)
+              FROM wf_sale_item i
+              WHERE i.order_id = o.id AND i.org_id = o.org_id
+            ), '[]'::jsonb),
+            'payments', COALESCE((
+              SELECT jsonb_agg(jsonb_build_object(
+                'id', p.id,
+                'method', p.method,
+                'amount', p.amount,
+                'refNo', p.ref_no,
+                'paidAt', p.paid_at,
+                'note', p.note,
+                'createdAt', p.created_at
+              ) ORDER BY p.paid_at)
+              FROM wf_payment p
+              WHERE p.order_id = o.id AND p.org_id = o.org_id
+            ), '[]'::jsonb)
+          )
+        FROM wf_sale_order o
+        JOIN picked ON picked.id = o.id
+        ON CONFLICT (source_id) DO NOTHING
+        RETURNING source_id
+      ),
+      del_pay AS (
+        DELETE FROM wf_payment p
+        USING picked
+        WHERE p.order_id = picked.id
+        RETURNING p.id
+      ),
+      del_item AS (
+        DELETE FROM wf_sale_item i
+        USING picked
+        WHERE i.order_id = picked.id
+        RETURNING i.id
+      )
+      DELETE FROM wf_sale_order o
+      USING picked
+      WHERE o.id = picked.id
+    `;
+    archived += deleted;
+    if (deleted === 0) break;
   }
 
   logger.info(`[ops-archive] sale orders archived: ${archived}`);
@@ -111,23 +110,34 @@ export async function purgeDraftSaleOrders(
   let removed = 0;
 
   while (true) {
-    const drafts = await prisma.saleOrder.findMany({
-      where: { status: 'DRAFT', createdAt: { lt: cutoff } },
-      select: { id: true },
-      take: batchSize,
-    });
-    if (drafts.length === 0) break;
-
-    for (const row of drafts) {
-      await prisma.$transaction([
-        prisma.payment.deleteMany({ where: { orderId: row.id } }),
-        prisma.saleItem.deleteMany({ where: { orderId: row.id } }),
-        prisma.saleOrder.delete({ where: { id: row.id } }),
-      ]);
-      removed += 1;
-    }
-
-    if (drafts.length < batchSize) break;
+    const deleted = await prisma.$executeRaw`
+      WITH picked AS (
+        SELECT o.id
+        FROM wf_sale_order o
+        WHERE o.status = 'DRAFT'
+          AND o.created_at < ${cutoff}
+        ORDER BY o.created_at
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
+      ),
+      del_pay AS (
+        DELETE FROM wf_payment p
+        USING picked
+        WHERE p.order_id = picked.id
+        RETURNING p.id
+      ),
+      del_item AS (
+        DELETE FROM wf_sale_item i
+        USING picked
+        WHERE i.order_id = picked.id
+        RETURNING i.id
+      )
+      DELETE FROM wf_sale_order o
+      USING picked
+      WHERE o.id = picked.id
+    `;
+    removed += deleted;
+    if (deleted === 0) break;
   }
 
   logger.info(`[ops-archive] draft sale orders purged: ${removed}`);

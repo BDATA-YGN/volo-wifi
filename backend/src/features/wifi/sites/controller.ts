@@ -48,9 +48,6 @@ const stationSelect = {
   _count: {
     select: {
       devices: { where: { deletedAt: null } },
-      credentials: true,
-      sales: true,
-      sessions: true,
     },
   },
 } satisfies Prisma.WifiStationSelect;
@@ -85,7 +82,68 @@ async function resolveOrgFromRequest(
   return resolved.orgId;
 }
 
-function serializeStation(row: StationRow) {
+type StationUsage = { credentials: number; sales: number; sessions: number };
+
+async function loadStationUsage(
+  prisma: PrismaClient,
+  orgId: string,
+  stationIds: string[],
+): Promise<Map<string, StationUsage>> {
+  const usage = new Map<string, StationUsage>();
+  if (stationIds.length === 0) return usage;
+  for (const id of stationIds) {
+    usage.set(id, { credentials: 0, sales: 0, sessions: 0 });
+  }
+
+  const [credentials, sales, sessions] = await Promise.all([
+    prisma.credential.groupBy({
+      by: ['stationId'],
+      where: { orgId, stationId: { in: stationIds } },
+      _count: { _all: true },
+    }),
+    prisma.saleOrder.groupBy({
+      by: ['stationId'],
+      where: { orgId, stationId: { in: stationIds } },
+      _count: { _all: true },
+    }),
+    prisma.radiusSession.groupBy({
+      by: ['stationId'],
+      where: { orgId, stationId: { in: stationIds } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  for (const row of credentials) {
+    if (!row.stationId) continue;
+    const current = usage.get(row.stationId);
+    if (current) current.credentials = row._count._all;
+  }
+  for (const row of sales) {
+    if (!row.stationId) continue;
+    const current = usage.get(row.stationId);
+    if (current) current.sales = row._count._all;
+  }
+  for (const row of sessions) {
+    if (!row.stationId) continue;
+    const current = usage.get(row.stationId);
+    if (current) current.sessions = row._count._all;
+  }
+  return usage;
+}
+
+function withStationUsage(row: StationRow, usage?: StationUsage) {
+  return {
+    ...row,
+    _count: {
+      devices: row._count.devices,
+      credentials: usage?.credentials ?? 0,
+      sales: usage?.sales ?? 0,
+      sessions: usage?.sessions ?? 0,
+    },
+  };
+}
+
+function serializeStation(row: ReturnType<typeof withStationUsage>) {
   const { radiusSecret, ...rest } = row;
   return {
     ...rest,
@@ -335,7 +393,11 @@ export class SitesController {
           });
         }
 
-        return responseSuccess(res, { message: 'Success', data: serializeStation(row) });
+        const usage = await loadStationUsage(this.prisma, orgId, [row.id]);
+        return responseSuccess(res, {
+          message: 'Success',
+          data: serializeStation(withStationUsage(row, usage.get(row.id))),
+        });
       }
 
       const allowedStationIds = await resolveAllowedStationIds(
@@ -378,9 +440,14 @@ export class SitesController {
           loadOrgMembershipOptions(this.prisma, adminId, isDeveloper),
         ]);
 
+      const usage = await loadStationUsage(
+        this.prisma,
+        orgId,
+        rows.map((row) => row.id),
+      );
       responseSuccess(res, {
         message: 'Success',
-        data: rows.map(serializeStation),
+        data: rows.map((row) => serializeStation(withStationUsage(row, usage.get(row.id)))),
         meta: {
           page,
           limit,
@@ -518,9 +585,10 @@ export class SitesController {
           select: stationSelect,
         });
 
+        const usage = await loadStationUsage(this.prisma, orgId, [updated.id]);
         return responseSuccess(res, {
           message: 'Site updated',
-          data: serializeStation(updated),
+          data: serializeStation(withStationUsage(updated, usage.get(updated.id))),
         });
       }
 
@@ -589,7 +657,7 @@ export class SitesController {
       return responseSuccess(res, {
         status: 201,
         message: 'Site created',
-        data: serializeStation(created),
+        data: serializeStation(withStationUsage(created)),
       });
     }),
   ];
@@ -616,17 +684,18 @@ export class SitesController {
 
       const existing = await this.prisma.wifiStation.findFirst({
         where: { id, orgId, deletedAt: null },
-        select: {
-          id: true,
-          _count: { select: { credentials: true, sales: true } },
-        },
+        select: { id: true },
       });
 
       if (!existing || !isStationInAllowList(existing.id, allowedStationIds)) {
         return responseError(res, 404, { code: 'NOT_FOUND', message: 'Site not found.' });
       }
 
-      if (existing._count.credentials > 0 || existing._count.sales > 0) {
+      const [credentialCount, salesCount] = await Promise.all([
+        this.prisma.credential.count({ where: { orgId, stationId: id } }),
+        this.prisma.saleOrder.count({ where: { orgId, stationId: id } }),
+      ]);
+      if (credentialCount > 0 || salesCount > 0) {
         return responseError(res, 409, {
           code: 'SITE_IN_USE',
           message:

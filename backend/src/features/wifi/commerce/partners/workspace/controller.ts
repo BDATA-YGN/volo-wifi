@@ -157,7 +157,6 @@ async function buildDashboard(
         soldAt: true,
         createdAt: true,
         station: { select: { id: true, code: true, name: true } },
-        _count: { select: { items: true } },
       },
       orderBy: [{ soldAt: 'desc' }, { createdAt: 'desc' }],
       take: 8,
@@ -180,6 +179,18 @@ async function buildDashboard(
   const hasPricing = pricing.hasPricing;
   const canSellTokens = hasSites && hasPlans && hasPricing && reseller.status === 'ACTIVE';
   const pricedPlanIdSet = new Set(pricing.pricedPlanIds);
+  // Count only these orders. Prisma `_count.items` groups the whole wf_sale_item table.
+  const itemCountByOrderId = new Map<string, number>();
+  if (recentOrders.length > 0) {
+    const itemCounts = await prisma.saleItem.groupBy({
+      by: ['orderId'],
+      where: { orgId, orderId: { in: recentOrders.map((order) => order.id) } },
+      _count: { _all: true },
+    });
+    for (const row of itemCounts) {
+      itemCountByOrderId.set(row.orderId, row._count._all);
+    }
+  }
 
   return {
     mode,
@@ -236,7 +247,7 @@ async function buildDashboard(
       currency: o.currency,
       soldAt: o.soldAt?.toISOString() ?? null,
       createdAt: o.createdAt.toISOString(),
-      itemCount: o._count.items,
+      itemCount: itemCountByOrderId.get(o.id) ?? 0,
       station: o.station,
     })),
   };

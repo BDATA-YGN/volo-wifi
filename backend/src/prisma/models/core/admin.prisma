@@ -60,6 +60,8 @@ model AdminToken {
 
   admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
+  @@index([token], map: "idx_tbl_admin_token__token")
+  @@index([refreshToken], map: "idx_tbl_admin_token__refresh_token")
   @@map("tbl_admin_token")
 }
 

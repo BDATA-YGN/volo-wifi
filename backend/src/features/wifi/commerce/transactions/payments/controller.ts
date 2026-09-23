@@ -48,7 +48,6 @@ const paymentListSelect = {
       station: {
         select: { id: true, code: true, name: true, status: true },
       },
-      _count: { select: { items: true } },
     },
   },
 } satisfies Prisma.PaymentSelect;
@@ -130,7 +129,7 @@ function orderScopeFilter(scope: CommerceScope): Prisma.SaleOrderWhereInput {
   return {};
 }
 
-function serializePaymentList(row: PaymentListRow) {
+function serializePaymentList(row: PaymentListRow, itemCounts: Map<string, number> = new Map()) {
   const order = row.order;
   return {
     id: row.id,
@@ -154,14 +153,16 @@ function serializePaymentList(row: PaymentListRow) {
           stationId: order.stationId,
           reseller: order.reseller,
           station: order.station,
-          itemCount: order._count.items,
+          itemCount: itemCounts.get(order.id) ?? 0,
         }
       : null,
   };
 }
 
 function serializePaymentDetail(row: PaymentDetailRow) {
-  const base = serializePaymentList(row as PaymentListRow);
+  const itemCounts = new Map<string, number>();
+  if (row.order) itemCounts.set(row.order.id, row.order.items.length);
+  const base = serializePaymentList(row as PaymentListRow, itemCounts);
   const order = row.order;
   if (!order) return base;
 
@@ -481,9 +482,22 @@ export class CommerceTransactionsPaymentsController {
           )?.currency ??
           'MMK';
 
+        const orderIds = [...new Set(rows.flatMap((row) => (row.order ? [row.order.id] : [])))];
+        const itemCountByOrderId = new Map<string, number>();
+        if (orderIds.length > 0) {
+          const itemCounts = await this.prisma.saleItem.groupBy({
+            by: ['orderId'],
+            where: { orgId: scope.orgId, orderId: { in: orderIds } },
+            _count: { _all: true },
+          });
+          for (const row of itemCounts) {
+            itemCountByOrderId.set(row.orderId, row._count._all);
+          }
+        }
+
         responseSuccess(res, {
           message: 'Success',
-          data: rows.map(serializePaymentList),
+          data: rows.map((row) => serializePaymentList(row, itemCountByOrderId)),
           meta: {
             page,
             limit,

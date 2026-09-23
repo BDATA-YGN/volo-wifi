@@ -53,12 +53,7 @@ const batchSelect = {
 } satisfies Prisma.VoucherBatchSelect;
 
 type BatchRow = Prisma.VoucherBatchGetPayload<{ select: typeof batchSelect }>;
-type BatchRowWithCount = BatchRow & { _count?: { credentials: number } };
-
-const batchListSelect = {
-  ...batchSelect,
-  _count: { select: { credentials: true } },
-} satisfies Prisma.VoucherBatchSelect;
+const batchListSelect = batchSelect;
 
 function parsePagination(query: AuthenticatedRequest['query']) {
   const page = Math.max(1, Number(query.page) || 1);
@@ -178,11 +173,31 @@ async function resolveMutateOrgId(
   });
 }
 
-function serializeBatch(row: BatchRowWithCount) {
-  const { _count, ...base } = row;
+async function credentialCountsByBatch(
+  prisma: PrismaClient,
+  batchIds: string[],
+  orgId?: string,
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (batchIds.length === 0) return counts;
+  const groups = await prisma.credential.groupBy({
+    by: ['voucherBatchId'],
+    where: {
+      voucherBatchId: { in: batchIds },
+      ...(orgId ? { orgId } : {}),
+    },
+    _count: { _all: true },
+  });
+  for (const row of groups) {
+    if (row.voucherBatchId) counts.set(row.voucherBatchId, row._count._all);
+  }
+  return counts;
+}
+
+function serializeBatch(row: BatchRow, issuedTokenCount = 0) {
+  const base = row;
   const issued = base.quantity;
   const remaining = base.remainingQuantity;
-  const issuedTokenCount = _count?.credentials ?? 0;
   return {
     ...base,
     issued,
@@ -527,10 +542,11 @@ export class AccessVoucherRunsController {
           statusGroups.map((g) => [g.status, g._count._all])
         );
 
+        const issuedCounts = await credentialCountsByBatch(this.prisma, [batch.id], batch.orgId);
         return responseSuccess(res, {
           message: 'Success',
           data: {
-            ...serializeBatch(batch),
+            ...serializeBatch(batch, issuedCounts.get(batch.id) ?? 0),
             credentialStats,
           },
           meta: {
@@ -564,9 +580,14 @@ export class AccessVoucherRunsController {
         }),
       ]);
 
+      const issuedCounts = await credentialCountsByBatch(
+        this.prisma,
+        rows.map((row) => row.id),
+        orgId,
+      );
       responseSuccess(res, {
         message: 'Success',
-        data: rows.map(serializeBatch),
+        data: rows.map((row) => serializeBatch(row, issuedCounts.get(row.id) ?? 0)),
         meta: {
           page,
           limit,

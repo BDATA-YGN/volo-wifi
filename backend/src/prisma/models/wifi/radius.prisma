@@ -86,7 +86,9 @@ model RadiusSessionArchive {
   archivedAt DateTime @db.Timestamptz(3) @map("archived_at") @default(now())
 
   @@index([orgId, stoppedAt], map: "idx_wf_radius_session_arc__org_id__stopped_at")
+  @@index([stoppedAt], map: "idx_wf_radius_session_arc__stopped_at")
   @@index([archivedAt], map: "idx_wf_radius_session_arc__archived_at")
+  @@index([userName], map: "idx_wf_radius_session_arc__user_name")
   @@map("wf_radius_session_archive")
 }
 
@@ -292,5 +294,6 @@ model Radpostauth {
 
   @@index([username], map: "radpostauth_username_idx")
   @@index([class], map: "radpostauth_class_idx")
+  @@index([authdate], map: "radpostauth_authdate_idx")
   @@map("radpostauth")
 }

@@ -49,10 +49,8 @@ const planSelect = {
   _count: {
     select: {
       prices: { where: { deletedAt: null, isActive: true } },
-      credentials: true,
       voucherBatches: true,
       planAttributes: { where: { deletedAt: null } },
-      salesItems: true,
     },
   },
 } satisfies Prisma.PlanSelect;
@@ -114,7 +112,43 @@ function buildListWhere(
   return where;
 }
 
-function serializePlan(row: PlanRow) {
+async function loadPlanUsage(prisma: PrismaClient, orgId: string, planIds: string[]) {
+  const credentials = new Map<string, number>();
+  const salesItems = new Map<string, number>();
+  if (planIds.length === 0) return { credentials, salesItems };
+
+  const [credentialGroups, itemGroups] = await Promise.all([
+    prisma.credential.groupBy({
+      by: ['planId'],
+      where: { orgId, planId: { in: planIds } },
+      _count: { _all: true },
+    }),
+    prisma.saleItem.groupBy({
+      by: ['planId'],
+      where: { orgId, planId: { in: planIds } },
+      _count: { _all: true },
+    }),
+  ]);
+  for (const row of credentialGroups) credentials.set(row.planId, row._count._all);
+  for (const row of itemGroups) salesItems.set(row.planId, row._count._all);
+  return { credentials, salesItems };
+}
+
+function withPlanUsage(
+  row: PlanRow,
+  usage?: { credentials: Map<string, number>; salesItems: Map<string, number> },
+) {
+  return {
+    ...row,
+    _count: {
+      ...row._count,
+      credentials: usage?.credentials.get(row.id) ?? 0,
+      salesItems: usage?.salesItems.get(row.id) ?? 0,
+    },
+  };
+}
+
+function serializePlan(row: ReturnType<typeof withPlanUsage>) {
   return {
     ...row,
     createdAt: row.createdAt.toISOString(),
@@ -217,7 +251,8 @@ export class CatalogServicePlansController {
           });
         }
 
-        return responseSuccess(res, { message: 'Success', data: serializePlan(row) });
+        const usage = await loadPlanUsage(this.prisma, orgId, [row.id]);
+        return responseSuccess(res, { message: 'Success', data: serializePlan(withPlanUsage(row, usage)) });
       }
 
       const where = buildListWhere(orgId, req.query);
@@ -245,9 +280,14 @@ export class CatalogServicePlansController {
           }),
         ]);
 
+      const usage = await loadPlanUsage(
+        this.prisma,
+        orgId,
+        rows.map((row) => row.id),
+      );
       responseSuccess(res, {
         message: 'Success',
-        data: rows.map(serializePlan),
+        data: rows.map((row) => serializePlan(withPlanUsage(row, usage))),
         meta: {
           page,
           limit,
@@ -299,7 +339,6 @@ export class CatalogServicePlansController {
             timeAmount: true,
             timeUnit: true,
             dataMb: true,
-            _count: { select: { credentials: true } },
           },
         });
 
@@ -310,7 +349,10 @@ export class CatalogServicePlansController {
           });
         }
 
-        if (value.code && value.code !== existing.code && existing._count.credentials > 0) {
+        const credentialCount = await this.prisma.credential.count({
+          where: { orgId, planId: existing.id },
+        });
+        if (value.code && value.code !== existing.code && credentialCount > 0) {
           return responseError(res, 409, {
             code: 'PLAN_IN_USE',
             message: 'Cannot change plan code while credentials reference it.',
@@ -361,9 +403,10 @@ export class CatalogServicePlansController {
           select: planSelect,
         });
 
+        const usage = await loadPlanUsage(this.prisma, orgId, [updated.id]);
         return responseSuccess(res, {
           message: 'Service plan updated',
-          data: serializePlan(updated),
+          data: serializePlan(withPlanUsage(updated, usage)),
         });
       }
 
@@ -402,7 +445,7 @@ export class CatalogServicePlansController {
       return responseSuccess(res, {
         status: 201,
         message: 'Service plan created',
-        data: serializePlan(created),
+        data: serializePlan(withPlanUsage(created)),
       });
     }),
   ];
@@ -425,7 +468,6 @@ export class CatalogServicePlansController {
         select: {
           id: true,
           code: true,
-          _count: { select: { credentials: true, salesItems: true } },
         },
       });
 
@@ -436,7 +478,11 @@ export class CatalogServicePlansController {
         });
       }
 
-      if (existing._count.credentials > 0 || existing._count.salesItems > 0) {
+      const [credentialCount, salesItemCount] = await Promise.all([
+        this.prisma.credential.count({ where: { orgId, planId: id } }),
+        this.prisma.saleItem.count({ where: { orgId, planId: id } }),
+      ]);
+      if (credentialCount > 0 || salesItemCount > 0) {
         return responseError(res, 409, {
           code: 'PLAN_IN_USE',
           message:

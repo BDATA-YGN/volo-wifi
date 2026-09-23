@@ -17,6 +17,7 @@ import {
 } from './reporting/lib/archive-sales';
 import { purgeCaptivePortalSessions } from './reporting/lib/purge-captive-portal';
 import { purgeOldReportingStats } from './reporting/lib/purge-reporting-stats';
+import { purgeRadpostauth } from './reporting/lib/purge-radpostauth';
 import {
   loadOpsArchiveSettings,
   OPS_ARCHIVE_DEFAULTS,
@@ -35,7 +36,8 @@ let running = false;
  * 3. Credentials (terminal) → archive
  * 4. Sale orders (closed) → archive; drafts → purge
  * 5. Reporting daily stats → purge (not archived)
- * 6. Expired archive rows → purge
+ * 6. RADIUS post-auth log → purge
+ * 7. Expired archive rows → purge
  */
 export async function runOpsArchiveTick(): Promise<void> {
   if (running) {
@@ -86,6 +88,11 @@ export async function runOpsArchiveTick(): Promise<void> {
       cfg.reportingStatsRetentionDays,
       cfg.batchSize
     );
+    const postauthPurged = await purgeRadpostauth(
+      prisma,
+      cfg.radpostauthRetentionDays,
+      cfg.batchSize
+    );
 
     const [radiusPurged, credentialsPurged, salesPurged] = await Promise.all([
       purgeExpiredRadiusArchives(prisma, radiusArchiveCutoff, cfg.batchSize),
@@ -97,6 +104,7 @@ export async function runOpsArchiveTick(): Promise<void> {
       `[ops-archive] Tick done in ${Date.now() - startedAt}ms ` +
         `(radius=${radiusArchived}, captive=${captivePurged}, credentials=${credentialsArchived}, ` +
         `sales=${salesArchived}, drafts=${draftsPurged}, stats=${statsPurged.dailySales}+${statsPurged.dailyRadius}, ` +
+        `postauth=${postauthPurged}, ` +
         `purgedRadius=${radiusPurged}, purgedCredentials=${credentialsPurged}, purgedSales=${salesPurged})`
     );
   } catch (err) {

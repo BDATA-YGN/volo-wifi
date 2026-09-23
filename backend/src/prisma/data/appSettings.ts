@@ -400,11 +400,11 @@ const appSettingsData: AppSettingSeed[] = [
     description: "Days after EXPIRED / CONSUMED / REVOKED before wf_credential moves to archive. Active tokens are never archived.",
   },
   {
-    key: "credential_archive_retention_days", value: "2555", defaultValue: "2555",
+    key: "credential_archive_retention_days", value: "40", defaultValue: "40",
     valueType: "NUMBER", controlType: "NUMBER",
     category: "ops", sortOrder: 34, isPublic: false,
     labelEn: "Credential archive retention (days)", labelMy: "Credential archive retention",
-    description: "Purges wf_credential_archive rows older than this (~7 years). Set 0 to keep forever.",
+    description: "Purges wf_credential_archive rows older than this. Active tokens stay on wf_credential. Set 0 to keep forever.",
   },
   {
     key: "captive_portal_retention_days", value: "14", defaultValue: "14",
@@ -414,25 +414,25 @@ const appSettingsData: AppSettingSeed[] = [
     description: "Purges wf_captive_portal_session rows older than this (no archive table).",
   },
   {
-    key: "radius_session_hot_retention_days", value: "30", defaultValue: "30",
+    key: "radius_session_hot_retention_days", value: "7", defaultValue: "7",
     valueType: "NUMBER", controlType: "NUMBER",
     category: "ops", sortOrder: 36, isPublic: false,
     labelEn: "RADIUS session hot retention (days)", labelMy: "RADIUS hot retention",
-    description: "Stopped wf_radius_session rows older than this move to wf_radius_session_archive.",
+    description: "Stopped wf_radius_session rows older than this move to wf_radius_session_archive. Open sessions stay.",
   },
   {
-    key: "radius_session_archive_retention_days", value: "730", defaultValue: "730",
+    key: "radius_session_archive_retention_days", value: "40", defaultValue: "40",
     valueType: "NUMBER", controlType: "NUMBER",
     category: "ops", sortOrder: 37, isPublic: false,
     labelEn: "RADIUS session archive retention (days)", labelMy: "RADIUS archive retention",
-    description: "Purges archived session rows older than this (2 years). Set 0 to keep forever.",
+    description: "Purges archived sessions whose stop time is older than this. Set 0 to keep forever.",
   },
   {
-    key: "sale_order_hot_retention_days", value: "180", defaultValue: "180",
+    key: "sale_order_hot_retention_days", value: "40", defaultValue: "40",
     valueType: "NUMBER", controlType: "NUMBER",
     category: "ops", sortOrder: 38, isPublic: false,
     labelEn: "Sale order hot retention (days)", labelMy: "Sale order hot retention",
-    description: "PAID / VOID / REFUNDED orders older than this are snapshotted to wf_sale_order_archive.",
+    description: "PAID / VOID / REFUNDED orders older than this are snapshotted to wf_sale_order_archive and removed from the hot table. The archive is kept for years.",
   },
   {
     key: "sale_order_draft_retention_days", value: "30", defaultValue: "30",
@@ -447,6 +447,13 @@ const appSettingsData: AppSettingSeed[] = [
     category: "ops", sortOrder: 40, isPublic: false,
     labelEn: "Sale order archive retention (days)", labelMy: "Sale archive retention",
     description: "Purges wf_sale_order_archive rows older than this (~7 years). Set 0 to keep forever.",
+  },
+  {
+    key: "radpostauth_retention_days", value: "40", defaultValue: "40",
+    valueType: "NUMBER", controlType: "NUMBER",
+    category: "ops", sortOrder: 41, isPublic: false,
+    labelEn: "RADIUS post-auth log retention (days)", labelMy: "Post-auth log retention",
+    description: "Deletes radpostauth rows older than this. Set 0 to keep forever.",
   },
 
   // ── category: developer — auth & security (admin console / mobile API) ───
