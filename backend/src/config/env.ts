@@ -26,6 +26,9 @@ export const env = cleanEnv(process.env, {
     default:
       'postgresql://postgres:password@localhost:5432/db?options=-c%20timezone%3DUTC',
   }),
+  // Runtime URL through a DigitalOcean connection pool (port 25061). Empty = use DATABASE_URL.
+  // App pool must be session mode. Migrations stay on DATABASE_URL (direct port 25060).
+  DATABASE_POOL_URL: str({ default: '' }),
   DATABASE_SSL_MODE: str({ default: '' }),
   DATABASE_SSL_ROOT_CERT: str({ default: '' }),
   DB_HOST: str({ default: '' }),

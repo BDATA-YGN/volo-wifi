@@ -70,6 +70,7 @@ Config defaults:
 
 - `sql_user_name = %{User-Name}`
 - PG session `timezone=Asia/Yangon` (`radius_db` `options=-ctimezone=Asia/Yangon` + compose `PGTZ`)
+- Direct connections use port `25060`. A DigitalOcean **transaction** pool named `volo-wifi-radius` (port `25061`, size 15) can sit in front; drop `options=` on that URL because PgBouncer rejects it. The database default timezone is already Asia/Yangon.
 - DateTime columns are **`timestamptz`** (absolute instants; Prisma `@db.Timestamptz`)
 - `event_timestamp = TO_TIMESTAMP(${event_timestamp_epoch})` — stores timestamptz directly
 - `CURRENT_TIMESTAMP` for `updated_at` / `activated_at` / `expires_at` checks

@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { Pool } from 'pg';
 import { PrismaClient } from '@/generated/prisma/client';
 import { logger } from '@/logging/logger';
-import { DB_LOG, DATABASE_URL } from '@/config';
+import { DB_LOG, RUNTIME_DATABASE_URL } from '@/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { buildPgPoolConfig, probePgSessionTimezone } from '@/lib/pg-ssl';
 
@@ -55,12 +55,12 @@ function attachPoolErrorHandlers(pool: Pool): void {
 }
 
 function createPrismaClient(): PrismaClient {
-  if (!DATABASE_URL) {
+  if (!RUNTIME_DATABASE_URL) {
     throw new Error('DATABASE_URL is not set');
   }
 
   const createdPool = !globalThis.__pgPool__;
-  const pool = globalThis.__pgPool__ ?? new Pool(buildPgPoolConfig(DATABASE_URL));
+  const pool = globalThis.__pgPool__ ?? new Pool(buildPgPoolConfig(RUNTIME_DATABASE_URL));
   attachPoolErrorHandlers(pool);
   globalThis.__pgPool__ = pool;
   if (createdPool) {

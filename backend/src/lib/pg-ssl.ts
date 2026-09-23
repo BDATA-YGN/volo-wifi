@@ -155,18 +155,50 @@ export function resolvePgSsl(): ConnectionOptions | undefined {
  * (relabels offset without converting — +06:30 for Asia/Yangon). See prisma#26786.
  * Business timezone for display/calendar remains Asia/Yangon via `app-time` + frontend.
  * FreeRADIUS uses its own connection with Asia/Yangon (fine for timestamptz writes).
+ *
+ * DigitalOcean connection pools are PgBouncer on port 25061. They reject libpq
+ * `options=` startup parameters, so pooled URLs set the timezone in `onConnect`.
+ * That sticks only in **session** mode (transaction mode runs DISCARD ALL and
+ * falls back to the database default, Asia/Yangon).
  */
+export function isPgBouncerUrl(connectionString: string): boolean {
+  try {
+    const url = new URL(connectionString);
+    if (url.port === '25061') return true;
+    return url.searchParams.get('pgbouncer') === 'true';
+  } catch {
+    return /\bport=25061\b/.test(connectionString) || /(?:\?|&)pgbouncer=true(?:&|$)/.test(connectionString);
+  }
+}
+
+function withoutLibpqOptions(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete('options');
+    return url.toString();
+  } catch {
+    return connectionString;
+  }
+}
+
 export function buildPgPoolConfig(
   connectionString: string,
   opts?: { sessionTimezone?: string },
 ): PoolConfig {
   // Prisma adapter requires UTC until adapter-pg timestamptz fix is deployed.
-  const sessionTz = opts?.sessionTimezone ?? 'UTC';
-  const { connectionString: cs, options } = applyPgSessionTimezone(connectionString, sessionTz);
+  const sessionTz = SAFE_TZ_RE.test(opts?.sessionTimezone ?? '')
+    ? (opts?.sessionTimezone as string)
+    : 'UTC';
+  const pooled = isPgBouncerUrl(connectionString);
+  // PgBouncer rejects `options=-c timezone=...`. Session-mode pools keep SET TIME ZONE
+  // for the life of the server connection (required: DB default is Asia/Yangon).
+  const applied = pooled
+    ? { connectionString: withoutLibpqOptions(connectionString), options: '' }
+    : applyPgSessionTimezone(connectionString, sessionTz);
   const config: PoolConfig = {
-    connectionString: cs,
-    // Prefer PoolConfig.options so session TZ applies even if a driver strips URL options.
-    options,
+    connectionString: applied.connectionString,
+    ...(applied.options ? { options: applied.options } : {}),
+    onConnect: (client) => client.query(`SET TIME ZONE '${sessionTz}'`),
     // Keep headroom for FreeRADIUS + tools on DigitalOcean managed Postgres.
     max: Number(process.env.DATABASE_POOL_MAX || 8),
     // Recycle idle clients before cloud/LB silent drops (common cause of

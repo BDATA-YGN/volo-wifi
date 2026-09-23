@@ -10,6 +10,8 @@ export const SOCKET_PORT = env.SOCKET_PORT;
 
 export const TZ = env.TZ;
 export const DATABASE_URL = env.DATABASE_URL;
+/** App runtime connections. Direct DATABASE_URL when no DigitalOcean pool is configured. */
+export const RUNTIME_DATABASE_URL = env.DATABASE_POOL_URL.trim() || env.DATABASE_URL;
 export const DATABASE_SSL_MODE = env.DATABASE_SSL_MODE;
 export const DATABASE_SSL_ROOT_CERT = env.DATABASE_SSL_ROOT_CERT;
 

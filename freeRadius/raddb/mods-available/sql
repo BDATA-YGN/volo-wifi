@@ -93,7 +93,19 @@ sql {
 	# Session TimeZone=Asia/Yangon (display/NOW). Columns are timestamptz (absolute instants).
 	# Keyword/value conninfo (not a URI): do NOT percent-encode options. Use -ctimezone=… (no space).
 	# URI-style options=-c%20timezone%3DAsia%2FYangon breaks libpq → FATAL: … requires a value.
-	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25060 dbname=volo_wifi_db user=doadmin password=AVNS_PNTd5Vkn-X6ywZcAdbR sslmode=require sslrootcert=/etc/raddb/certs/do-ca-certificate.crt "
+	#
+	# DigitalOcean connection pool (PgBouncer), create before switching this line:
+	#   Name: volo-wifi-radius
+	#   Database: volo_wifi_db
+	#   User: doadmin
+	#   Mode: transaction
+	#   Size: 15
+	# Then set port=25061 and dbname=volo-wifi-radius, and DELETE options=-ctimezone=...
+	# PgBouncer rejects the options startup parameter. Transaction mode resets the
+	# session to the database default, which is already Asia/Yangon.
+	# The pool { } block below is FreeRADIUS's own client pool (up to max_servers).
+	# Those connections hit PgBouncer; size 15 is how many reach Postgres.
+	radius_db = "host=private-volo-infra-db-do-user-989265-0.k.db.ondigitalocean.com port=25061 dbname=volo-wifi-radius user=doadmin password=AVNS_PNTd5Vkn-X6ywZcAdbR sslmode=require sslrootcert=/etc/raddb/certs/do-ca-certificate.crt "
 
 	# If you want both stop and start records logged to the
 	# same SQL table, leave this as is.  If you want them in

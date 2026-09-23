@@ -45,6 +45,8 @@ SOCKET_PORT=6559
 
 For managed Postgres: `DATABASE_SSL_MODE=require` and mount `ssl/ca-certificate-volo-private.crt`.
 
+`DATABASE_URL` stays on the direct port (`25060`). After the `volo-wifi-app` session pool exists, set `DATABASE_POOL_URL` to the pool URI (port `25061`, database name `volo-wifi-app`). Prisma migrate keeps using `DATABASE_URL`.
+
 ### After first deploy
 
 ```bash

@@ -1,9 +1,9 @@
 import { Pool, QueryConfig } from 'pg';
 import { logger } from '@/logging/logger';
-import { DATABASE_URL, NODE_ENV } from '@/config';
+import { RUNTIME_DATABASE_URL, NODE_ENV } from '@/config';
 import { buildPgPoolConfig, probePgSessionTimezone } from '@/lib/pg-ssl';
 
-const poolConfig = buildPgPoolConfig(DATABASE_URL);
+const poolConfig = buildPgPoolConfig(RUNTIME_DATABASE_URL);
 // Legacy raw-SQL pool — keep timeouts aligned with Prisma (remote DO).
 poolConfig.application_name = process.env.DATABASE_APPLICATION_NAME || 'volo-wifi-raw-sql';
 
