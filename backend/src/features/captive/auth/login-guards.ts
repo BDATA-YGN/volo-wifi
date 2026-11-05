@@ -7,8 +7,8 @@ import {
   StationTokenUsageScope,
 } from '@/generated/prisma/client';
 import {
-  aggregateRadiusUsedBytes,
-  aggregateRadiusUsedSeconds,
+  aggregateRadiusUsage,
+  type RadiusUsageTotals,
   isPlanActivationWindowExceeded,
   planDataQuotaBytes,
   planHasDataQuota,
@@ -99,6 +99,7 @@ export async function assertRadiusTimeQuotaAllowsLogin(
     soldAt: Date | null;
   },
   plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode' | 'maxDevices'>,
+  precomputedUsedSec?: number,
 ): Promise<{ usedSec: number; quotaSec: number } | null> {
   if (!planHasTimeQuota(plan)) {
     return null;
@@ -109,10 +110,15 @@ export async function assertRadiusTimeQuotaAllowsLogin(
     return null;
   }
 
-  let usedSec = await aggregateRadiusUsedSeconds(credential, {
-    since: radiusUsageSinceForPlan(credential, plan),
-    includeActive: true,
-  });
+  let usedSec = precomputedUsedSec ?? 0;
+  if (precomputedUsedSec == null) {
+    usedSec = (
+      await aggregateRadiusUsage(credential, {
+        since: radiusUsageSinceForPlan(credential, plan),
+        includeActive: true,
+      })
+    ).usedSec;
+  }
   if (credential.activatedAt) {
     const elapsedSec = Math.max(
       0,
@@ -134,6 +140,7 @@ export async function assertRadiusDataQuotaAllowsLogin(
     soldAt: Date | null;
   },
   plan: Pick<Plan, 'quotaType' | 'dataMb' | 'timeUsageMode'>,
+  precomputedUsedBytes?: bigint,
 ): Promise<{ usedBytes: bigint; quotaBytes: bigint } | null> {
   if (!planHasDataQuota(plan)) {
     return null;
@@ -144,10 +151,14 @@ export async function assertRadiusDataQuotaAllowsLogin(
     return null;
   }
 
-  const usedBytes = await aggregateRadiusUsedBytes(credential, {
-    since: radiusUsageSinceForPlan(credential, plan),
-    includeActive: true,
-  });
+  const usedBytes =
+    precomputedUsedBytes ??
+    (
+      await aggregateRadiusUsage(credential, {
+        since: radiusUsageSinceForPlan(credential, plan),
+        includeActive: true,
+      })
+    ).usedBytes;
 
   return { usedBytes, quotaBytes };
 }
@@ -175,7 +186,7 @@ async function endOpenRadiusSessionsForSameDevice(params: {
     where: {
       status: { in: [RadiusAcctStatus.START, RadiusAcctStatus.INTERIM] },
       stoppedAt: null,
-      callingStationId: { in: callingStationIdCandidates(clientMacNorm), mode: 'insensitive' },
+      callingStationId: { in: callingStationIdCandidates(clientMacNorm) },
     },
     select: {
       id: true,
@@ -289,7 +300,7 @@ export type CaptiveLoginGuardOptions = {
 export async function runCaptiveLoginGuards(
   credential: NonNullable<CaptiveLoginCredential>,
   options: CaptiveLoginGuardOptions = {},
-): Promise<void> {
+): Promise<RadiusUsageTotals | null> {
   const plan = credential.plan;
   if (!plan) {
     throw Object.assign(new Error('INVALID_CREDENTIAL'), { code: 'INVALID_CREDENTIAL' });
@@ -327,7 +338,19 @@ export async function runCaptiveLoginGuards(
     throw Object.assign(new Error('RADIUS_SESSION_ACTIVE'), { code: 'RADIUS_SESSION_ACTIVE' });
   }
 
-  const timeQuota = await assertRadiusTimeQuotaAllowsLogin(credential, plan);
+  const needsUsage = planHasTimeQuota(plan) || planHasDataQuota(plan);
+  const usage = needsUsage
+    ? await aggregateRadiusUsage(credential, {
+        since: radiusUsageSinceForPlan(credential, plan),
+        includeActive: true,
+      })
+    : null;
+
+  const timeQuota = await assertRadiusTimeQuotaAllowsLogin(
+    credential,
+    plan,
+    usage?.usedSec,
+  );
   if (timeQuota && timeQuota.usedSec >= timeQuota.quotaSec) {
     await prisma.credential.update({
       where: { id: credential.id },
@@ -336,7 +359,11 @@ export async function runCaptiveLoginGuards(
     throw Object.assign(new Error('CREDENTIAL_CONSUMED'), { code: 'CREDENTIAL_CONSUMED' });
   }
 
-  const dataQuota = await assertRadiusDataQuotaAllowsLogin(credential, plan);
+  const dataQuota = await assertRadiusDataQuotaAllowsLogin(
+    credential,
+    plan,
+    usage?.usedBytes,
+  );
   if (dataQuota && dataQuota.usedBytes >= dataQuota.quotaBytes) {
     await prisma.credential.update({
       where: { id: credential.id },
@@ -354,6 +381,8 @@ export async function runCaptiveLoginGuards(
       throw Object.assign(new Error('CREDENTIAL_CONSUMED'), { code: 'CREDENTIAL_CONSUMED' });
     }
   }
+
+  return usage;
 }
 
 /**

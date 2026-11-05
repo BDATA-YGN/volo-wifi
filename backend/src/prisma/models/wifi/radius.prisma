@@ -48,6 +48,8 @@ model RadiusSession {
   @@index([credentialId], map: "idx_wf_radius_session__credential_id")
   @@index([credentialId, startedAt], map: "idx_wf_radius_session__credential_id__started_at")
   @@index([credentialId, status, stoppedAt], map: "idx_wf_radius_session__credential_id__status__stopped_at")
+  /// Open captive sessions are looked up by client MAC on every portal login.
+  @@index([callingStationId], map: "idx_wf_radius_session__calling_station_id")
   /// Stale-session cron + status-filtered scans
   @@index([status, startedAt], map: "idx_wf_radius_session__status__started_at")
   @@index([startedAt], map: "idx_wf_radius_session__started_at")

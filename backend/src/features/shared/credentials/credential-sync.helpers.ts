@@ -328,10 +328,26 @@ export async function endOpenRadiusSessionsForUser(
  * (not other tokens that shared the same device / Calling-Station-Id).
  * @param since If set, only sessions that started on or after this time (single-session cycle).
  */
-export async function aggregateRadiusUsedSeconds(
-  credential: { id: string; username: string | null; token: string | null; createdAt?: Date | null },
+type RadiusUsageCredential = {
+  id: string;
+  username: string | null;
+  token: string | null;
+  createdAt?: Date | null;
+};
+
+export type RadiusUsageTotals = {
+  usedSec: number;
+  usedBytes: bigint;
+};
+
+/**
+ * One read of this voucher's RADIUS rows, then both billed totals.
+ * Login used to scan the same rows once for time and again for data.
+ */
+export async function aggregateRadiusUsage(
+  credential: RadiusUsageCredential,
   options: { since?: Date | null; includeActive?: boolean } = {},
-): Promise<number> {
+): Promise<RadiusUsageTotals> {
   const { since = null, includeActive = true } = options;
   const sessions = await prisma.radiusSession.findMany({
     where: {
@@ -344,47 +360,42 @@ export async function aggregateRadiusUsedSeconds(
       stoppedAt: true,
       createdAt: true,
       lastInterimAt: true,
+      totalBytes: true,
+      inputBytes: true,
+      outputBytes: true,
     },
   });
 
   const now = Date.now();
-  let total = 0;
-  for (const s of sessions) {
-    if (!s.stoppedAt && !includeActive) continue;
-    const end = s.stoppedAt ?? new Date(now);
-    total += billedSessionSeconds(s.sessionTimeSec, s.startedAt, end, {
-      createdAt: s.createdAt,
-      stoppedAt: s.stoppedAt,
-      lastInterimAt: s.lastInterimAt,
+  let usedSec = 0;
+  let usedBytes = 0n;
+  for (const session of sessions) {
+    if (!session.stoppedAt && !includeActive) continue;
+    const end = session.stoppedAt ?? new Date(now);
+    usedSec += billedSessionSeconds(session.sessionTimeSec, session.startedAt, end, {
+      createdAt: session.createdAt,
+      stoppedAt: session.stoppedAt,
+      lastInterimAt: session.lastInterimAt,
     });
+    usedBytes += billedSessionBytes(session);
   }
-  return total;
+  return { usedSec, usedBytes };
+}
+
+export async function aggregateRadiusUsedSeconds(
+  credential: RadiusUsageCredential,
+  options: { since?: Date | null; includeActive?: boolean } = {},
+): Promise<number> {
+  const usage = await aggregateRadiusUsage(credential, options);
+  return usage.usedSec;
 }
 
 export async function aggregateRadiusUsedBytes(
-  credential: { id: string; username: string | null; token: string | null; createdAt?: Date | null },
+  credential: RadiusUsageCredential,
   options: { since?: Date | null; includeActive?: boolean } = {},
 ): Promise<bigint> {
-  const { since = null, includeActive = true } = options;
-  const sessions = await prisma.radiusSession.findMany({
-    where: {
-      ...radiusSessionUsageWhere(credential),
-      ...(since ? { startedAt: { gte: since } } : {}),
-    },
-    select: {
-      totalBytes: true,
-      inputBytes: true,
-      outputBytes: true,
-      stoppedAt: true,
-    },
-  });
-
-  let total = 0n;
-  for (const session of sessions) {
-    if (!session.stoppedAt && !includeActive) continue;
-    total += billedSessionBytes(session);
-  }
-  return total;
+  const usage = await aggregateRadiusUsage(credential, options);
+  return usage.usedBytes;
 }
 
 export function radiusUsageSinceForPlan(
@@ -409,6 +420,7 @@ export function radiusUsageSinceForPlan(
 export async function computeCredentialTimeRemainingSec(
   credential: CredentialTimeUsageIdentity,
   plan: Pick<Plan, 'quotaType' | 'timeAmount' | 'timeUnit' | 'timeUsageMode' | 'maxDevices'>,
+  precomputedUsedSec?: number,
 ): Promise<number | null> {
   if (!planHasTimeQuota(plan)) {
     return null;
@@ -417,10 +429,14 @@ export async function computeCredentialTimeRemainingSec(
   if (quotaSec == null || quotaSec <= 0) {
     return null;
   }
-  let usedSec = await aggregateRadiusUsedSeconds(credential, {
-    since: radiusUsageSinceForPlan(credential, plan),
-    includeActive: true,
-  });
+  let usedSec =
+    precomputedUsedSec ??
+    (
+      await aggregateRadiusUsage(credential, {
+        since: radiusUsageSinceForPlan(credential, plan),
+        includeActive: true,
+      })
+    ).usedSec;
   const floor = credential.activatedAt ?? credential.soldAt ?? null;
   if (floor) {
     const elapsedSec = Math.max(0, Math.floor((Date.now() - floor.getTime()) / 1000));
@@ -434,6 +450,7 @@ export async function computeCredentialTimeRemainingSec(
 export async function computeCredentialDataRemainingMb(
   credential: CredentialTimeUsageIdentity,
   plan: Pick<Plan, 'quotaType' | 'dataMb' | 'timeUsageMode'>,
+  precomputedUsedBytes?: bigint,
 ): Promise<number | null> {
   if (!planHasDataQuota(plan)) {
     return null;
@@ -442,10 +459,14 @@ export async function computeCredentialDataRemainingMb(
   if (quotaBytes == null || quotaBytes <= 0n) {
     return null;
   }
-  const usedBytes = await aggregateRadiusUsedBytes(credential, {
-    since: radiusUsageSinceForPlan(credential, plan),
-    includeActive: true,
-  });
+  const usedBytes =
+    precomputedUsedBytes ??
+    (
+      await aggregateRadiusUsage(credential, {
+        since: radiusUsageSinceForPlan(credential, plan),
+        includeActive: true,
+      })
+    ).usedBytes;
   const remainingBytes = quotaBytes > usedBytes ? quotaBytes - usedBytes : 0n;
   return Number(remainingBytes / (1024n * 1024n));
 }

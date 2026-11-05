@@ -20,7 +20,7 @@ import {
   resolveResellerContext,
   resolveRoleScopedReseller,
 } from '@/features/wifi/commerce/shared/resolve-reseller';
-import { resolveRetailPrice } from '@/features/wifi/commerce/shared/resolve-retail-price';
+import { resolveRetailPrice, loadRetailPriceIndex } from '@/features/wifi/commerce/shared/resolve-retail-price';
 import {
   CAPTIVE_SESSION_PREVIEW_LIMIT,
   RADIUS_SESSION_PREVIEW_LIMIT,
@@ -221,27 +221,42 @@ async function loadFirstLoginAtMap(
     }
   }
   const userNames = [...userNameToCredentialId.keys()];
+  const floors = [...floorByCredential.values()];
+  const historyFrom =
+    floors.length === credentials.length && floors.length > 0
+      ? new Date(Math.min(...floors.map((floor) => floor.getTime())))
+      : null;
 
   const [captiveMins, radiusByUserHot, radiusByUserArchive] =
     await Promise.all([
       userNames.length > 0
         ? prisma.captivePortalSession.groupBy({
             by: ['username'],
-            where: { orgId, username: { in: userNames } },
+            where: {
+              orgId,
+              username: { in: userNames },
+              ...(historyFrom ? { createdAt: { gte: historyFrom } } : {}),
+            },
             _min: { createdAt: true },
           })
         : Promise.resolve([]),
       userNames.length > 0
         ? prisma.radiusSession.groupBy({
             by: ['userName'],
-            where: { userName: { in: userNames } },
+            where: {
+              userName: { in: userNames },
+              ...(historyFrom ? { startedAt: { gte: historyFrom } } : {}),
+            },
             _min: { startedAt: true },
           })
         : Promise.resolve([]),
       userNames.length > 0
         ? prisma.radiusSessionArchive.groupBy({
             by: ['userName'],
-            where: { userName: { in: userNames } },
+            where: {
+              userName: { in: userNames },
+              ...(historyFrom ? { startedAt: { gte: historyFrom } } : {}),
+            },
             _min: { startedAt: true },
           })
         : Promise.resolve([]),
@@ -551,31 +566,31 @@ async function loadSellableCatalog(
         s.status !== 'DISABLED' && (!allowedStationIds || allowedStationIds.includes(s.id))
     );
 
-  const plans = await Promise.all(
-    entitlements.map(async (ent) => {
-      const pricesByStation: Record<string, number> = {};
-      for (const station of stationRows) {
-        const resolved = await resolveRetailPrice(
-          prisma,
-          orgId,
-          resellerId,
-          station.id,
-          ent.planId
-        );
-        if (resolved) {
-          pricesByStation[station.id] = decimalToNumber(resolved.price);
-        }
-      }
-      const pricedValues = Object.values(pricesByStation);
-      const unitPrice = pricedValues.length > 0 ? pricedValues[0]! : null;
-      return {
-        ...ent.plan,
-        unitPrice,
-        hasPricing: pricedValues.length > 0,
-        pricesByStation,
-      };
-    })
+  const priceIndex = await loadRetailPriceIndex(
+    prisma,
+    orgId,
+    resellerId,
+    stationRows.map((station) => station.id),
+    entitlements.map((ent) => ent.planId),
   );
+
+  const plans = entitlements.map((ent) => {
+    const pricesByStation: Record<string, number> = {};
+    for (const station of stationRows) {
+      const resolved = priceIndex.priceFor(station.id, ent.planId);
+      if (resolved) {
+        pricesByStation[station.id] = decimalToNumber(resolved.price);
+      }
+    }
+    const pricedValues = Object.values(pricesByStation);
+    const unitPrice = pricedValues.length > 0 ? pricedValues[0]! : null;
+    return {
+      ...ent.plan,
+      unitPrice,
+      hasPricing: pricedValues.length > 0,
+      pricesByStation,
+    };
+  });
 
   return {
     currency: org?.currency ?? 'MMK',

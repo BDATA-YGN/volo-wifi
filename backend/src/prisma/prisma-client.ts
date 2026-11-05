@@ -4,7 +4,8 @@ import { PrismaClient } from '@/generated/prisma/client';
 import { logger } from '@/logging/logger';
 import { DB_LOG, RUNTIME_DATABASE_URL } from '@/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { buildPgPoolConfig, probePgSessionTimezone } from '@/lib/pg-ssl';
+import { buildPgPoolConfig, probePgSessionTimezone, armUtcSessionTimezone } from '@/lib/pg-ssl';
+import { isPoolSaturatedError, isRetryableReadDisconnect, isRetryableConnectError } from '@/lib/pg-errors';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -13,38 +14,36 @@ declare global {
   var __pgPool__: Pool | undefined;
 }
 
-function isTransientPgError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    /timeout exceeded when trying to connect/i.test(message) ||
-    /Connection terminated unexpectedly/i.test(message) ||
-    /Connection terminated due to connection timeout/i.test(message) ||
-    /server closed the connection/i.test(message) ||
-    /ECONNRESET/i.test(message) ||
-    /ECONNREFUSED/i.test(message) ||
-    /ETIMEDOUT/i.test(message) ||
-    /cannot connect/i.test(message)
-  );
-}
+const READ_OPS = new Set([
+  'findMany',
+  'findFirst',
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirstOrThrow',
+  'count',
+  'aggregate',
+  'groupBy',
+]);
 
-async function withTransientRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      if (!isTransientPgError(error) || attempt === attempts) {
-        throw error;
-      }
-      const delayMs = 150 * attempt;
-      logger.warn(
-        `Transient DB error (attempt ${attempt}/${attempts}), retrying in ${delayMs}ms: ${(error as Error).message}`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
+async function withTransientRetry<T>(
+  operation: () => Promise<T>,
+  opName: string,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const isRead = READ_OPS.has(opName);
+    // A second try only when the statement never reached Postgres, or a read
+    // lost its connection. Retrying a write after "connection terminated" can
+    // insert the row twice. Retrying a full pool just piles more waiters on it.
+    const retry =
+      !isPoolSaturatedError(error) &&
+      (isRetryableConnectError(error) || (isRead && isRetryableReadDisconnect(error)));
+    if (!retry) throw error;
+    logger.warn(`Transient DB error, retrying once: ${(error as Error).message}`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return operation();
   }
-  throw lastError;
 }
 
 function attachPoolErrorHandlers(pool: Pool): void {
@@ -64,6 +63,7 @@ function createPrismaClient(): PrismaClient {
   attachPoolErrorHandlers(pool);
   globalThis.__pgPool__ = pool;
   if (createdPool) {
+    armUtcSessionTimezone(pool, 'UTC');
     probePgSessionTimezone(pool, (message) => logger.info(message));
   }
 
@@ -88,8 +88,8 @@ function createPrismaClient(): PrismaClient {
   // Retry once/twice on dropped idle connections (common with remote managed PG).
   const prisma = base.$extends({
     query: {
-      $allOperations({ args, query }) {
-        return withTransientRetry(() => query(args));
+      $allOperations({ args, query, operation }) {
+        return withTransientRetry(() => query(args), operation);
       },
     },
   }) as unknown as PrismaClient;

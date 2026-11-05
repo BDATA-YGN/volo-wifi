@@ -134,6 +134,116 @@ export async function resolveRetailPrice(
   return { ...picked, scope: winning.scope };
 }
 
+export type RetailPriceHit = {
+  price: Prisma.Decimal;
+  priceBookId: string;
+  scope: RetailPriceScope;
+};
+
+/**
+ * Resolve many plan/site prices with three queries instead of three per pair.
+ * Same winner-takes-all rules as `resolveRetailPrice`.
+ */
+export async function loadRetailPriceIndex(
+  prisma: PrismaClient,
+  orgId: string,
+  resellerId: string,
+  stationIds: string[],
+  planIds: string[],
+): Promise<{
+  priceFor: (stationId: string, planId: string) => RetailPriceHit | null;
+  hasDefaultBook: boolean;
+}> {
+  const uniqueStations = [...new Set(stationIds)];
+  const uniquePlans = [...new Set(planIds)];
+  const empty = {
+    priceFor: () => null as RetailPriceHit | null,
+    hasDefaultBook: false,
+  };
+  if (uniqueStations.length === 0 || uniquePlans.length === 0) {
+    const defaultBook = await prisma.planPriceBook.findFirst({
+      where: { orgId, deletedAt: null, isDefault: true },
+      select: { id: true },
+    });
+    return { ...empty, hasDefaultBook: Boolean(defaultBook) };
+  }
+
+  const stations = await prisma.wifiStation.findMany({
+    where: { id: { in: uniqueStations }, orgId, deletedAt: null },
+    select: { id: true, stationSizeId: true },
+  });
+  const stationById = new Map(stations.map((station) => [station.id, station]));
+  const sizeIds = [
+    ...new Set(stations.map((station) => station.stationSizeId).filter((id): id is string => Boolean(id))),
+  ];
+
+  const books = await prisma.planPriceBook.findMany({
+    where: {
+      orgId,
+      deletedAt: null,
+      OR: [
+        { stations: { some: { stationId: { in: uniqueStations } } } },
+        { resellers: { some: { resellerId } } },
+        ...(sizeIds.length > 0 ? [{ stationSizeId: { in: sizeIds } }] : []),
+        { isDefault: true },
+      ],
+    },
+    select: {
+      id: true,
+      isDefault: true,
+      stationSizeId: true,
+      stations: { select: { stationId: true } },
+      resellers: { select: { resellerId: true } },
+    },
+  });
+
+  const winners = new Map<string, { scope: RetailPriceScope; bookIds: Set<string> }>();
+  const bookIds = new Set<string>();
+  for (const station of stations) {
+    const winning = resolveWinningPriceBookIds(
+      books,
+      resellerId,
+      station.id,
+      station.stationSizeId,
+    );
+    if (!winning) continue;
+    winners.set(station.id, winning);
+    for (const id of winning.bookIds) bookIds.add(id);
+  }
+
+  const prices =
+    bookIds.size === 0
+      ? []
+      : await prisma.planPrice.findMany({
+          where: {
+            orgId,
+            deletedAt: null,
+            isActive: true,
+            planId: { in: uniquePlans },
+            priceBookId: { in: [...bookIds] },
+          },
+          select: { retailPrice: true, priceBookId: true, planId: true },
+        });
+  const pricesByPlan = new Map<string, { retailPrice: Prisma.Decimal; priceBookId: string }[]>();
+  for (const row of prices) {
+    const list = pricesByPlan.get(row.planId) ?? [];
+    list.push(row);
+    pricesByPlan.set(row.planId, list);
+  }
+
+  return {
+    hasDefaultBook: books.some((book) => book.isDefault),
+    priceFor: (stationId: string, planId: string) => {
+      if (!stationById.has(stationId)) return null;
+      const winning = winners.get(stationId);
+      if (!winning) return null;
+      const picked = pickPriceFromBooks(pricesByPlan.get(planId) ?? [], winning.bookIds);
+      if (!picked) return null;
+      return { ...picked, scope: winning.scope };
+    },
+  };
+}
+
 /**
  * Partner selling readiness using the same winner-takes-all resolver as sales.
  */
@@ -150,16 +260,12 @@ export async function loadPricingReadiness(
   pricedPlanIds: string[];
   priceScope: RetailPriceScope | null;
 }> {
-  const defaultBook = await prisma.planPriceBook.findFirst({
-    where: { orgId, deletedAt: null, isDefault: true },
-    select: { id: true },
-  });
-
   if (entitledPlanIds.length === 0 || stationIds.length === 0) {
+    const prices = await loadRetailPriceIndex(prisma, orgId, resellerId, [], []);
     return {
       pricedPlanCount: 0,
       hasPricing: false,
-      hasDefaultBook: Boolean(defaultBook),
+      hasDefaultBook: prices.hasDefaultBook,
       pricedPlanIds: [],
       priceScope: null,
     };
@@ -167,10 +273,17 @@ export async function loadPricingReadiness(
 
   const covered = new Set<string>();
   let priceScope: RetailPriceScope | null = null;
+  const prices = await loadRetailPriceIndex(
+    prisma,
+    orgId,
+    resellerId,
+    stationIds,
+    entitledPlanIds,
+  );
 
   for (const planId of entitledPlanIds) {
     for (const stationId of stationIds) {
-      const price = await resolveRetailPrice(prisma, orgId, resellerId, stationId, planId);
+      const price = prices.priceFor(stationId, planId);
       if (price) {
         covered.add(planId);
         priceScope = priceScope ?? price.scope;
@@ -182,7 +295,7 @@ export async function loadPricingReadiness(
   return {
     pricedPlanCount: covered.size,
     hasPricing: covered.size > 0,
-    hasDefaultBook: Boolean(defaultBook),
+    hasDefaultBook: prices.hasDefaultBook,
     pricedPlanIds: [...covered],
     priceScope,
   };

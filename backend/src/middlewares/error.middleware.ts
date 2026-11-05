@@ -7,6 +7,7 @@ import {
 } from '@/utils/exception';
 import { logger } from '@/logging/logger';
 import { responseError } from '@/utils/api-response';
+import { isDatabaseUnavailableError } from '@/lib/pg-errors';
 
 export const ErrorMiddleware = (
   error: Error,
@@ -21,11 +22,17 @@ export const ErrorMiddleware = (
 
   try {
     const isCustom = error instanceof CustomException;
-    const status = isCustom ? error.status : 500;
-    const code = isCustom ? error.code : 'INTERNAL_SERVER_ERROR';
+    const unavailable = !isCustom && isDatabaseUnavailableError(error);
+    const status = isCustom ? error.status : unavailable ? 503 : 500;
+    const code = isCustom ? error.code : unavailable ? 'DATABASE_UNAVAILABLE' : 'INTERNAL_SERVER_ERROR';
     const isProd = NODE_ENV === 'production' || NODE_ENV === 'staging';
-    const message =
-      isCustom || !isProd ? error.message : 'Something went wrong';
+    const message = isCustom
+      ? error.message
+      : unavailable
+        ? 'Database is busy. Please try again in a moment.'
+        : !isProd
+          ? error.message
+          : 'Something went wrong';
     const details: unknown =
       error instanceof InvalidPayloadException
         ? error.details

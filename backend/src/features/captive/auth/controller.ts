@@ -141,7 +141,7 @@ export class CaptiveAuthController {
             credential.expiresAt,
           );
           const quotaSec = planTimeQuotaSec(credential.plan);
-          await prisma.credential.update({
+          credential = await prisma.credential.update({
             where: { id: credential.id },
             data: {
               ...(shouldMarkActivated
@@ -153,16 +153,9 @@ export class CaptiveAuthController {
                 ? { timeRemainingSec: quotaSec }
                 : {}),
             },
+            include: captiveLoginCredentialInclude,
           });
         }
-      }
-
-      const refreshed = await prisma.credential.findUnique({
-        where: { id: credential.id },
-        include: captiveLoginCredentialInclude,
-      });
-      if (refreshed) {
-        credential = refreshed;
       }
 
       const nasParamsBody =
@@ -171,16 +164,25 @@ export class CaptiveAuthController {
           : null;
       const clientMac = resolveCaptiveClientMac(req, nasParamsBody) ?? null;
 
+      let usage: Awaited<ReturnType<typeof runCaptiveLoginGuards>> = null;
       try {
-        await runCaptiveLoginGuards(credential, { clientMac, nasParams: nasParamsBody });
+        usage = await runCaptiveLoginGuards(credential, { clientMac, nasParams: nasParamsBody });
       } catch (error) {
         mapLoginGuardError(error);
       }
 
       // Keep remaining-time / remaining-data cache aligned so FreeRADIUS/dashboard stay consistent.
       if (credential.plan) {
-        const remainingSec = await computeCredentialTimeRemainingSec(credential, credential.plan);
-        const remainingMb = await computeCredentialDataRemainingMb(credential, credential.plan);
+        const remainingSec = await computeCredentialTimeRemainingSec(
+          credential,
+          credential.plan,
+          usage?.usedSec,
+        );
+        const remainingMb = await computeCredentialDataRemainingMb(
+          credential,
+          credential.plan,
+          usage?.usedBytes,
+        );
         const patch: { timeRemainingSec?: number; dataRemainingMb?: number } = {};
         if (remainingSec != null && remainingSec !== credential.timeRemainingSec) {
           patch.timeRemainingSec = remainingSec;

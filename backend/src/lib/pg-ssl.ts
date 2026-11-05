@@ -220,7 +220,9 @@ export function buildPgPoolConfig(
   const config: PoolConfig = {
     connectionString: applied.connectionString,
     ...(applied.options ? { options: applied.options } : {}),
-    onConnect: (client) => client.query(`SET TIME ZONE '${sessionTz}'`),
+    // Timezone is applied in `armUtcSessionTimezone` after the socket connects,
+    // and that query finishes before Prisma uses the client. A fire-and-forget
+    // SET here overlaps the first real query and breaks the connection.
     // Keep headroom for FreeRADIUS + tools on DigitalOcean managed Postgres.
     max: Number(process.env.DATABASE_POOL_MAX || 8),
     // Recycle idle clients before cloud/LB silent drops (common cause of
@@ -238,6 +240,33 @@ export function buildPgPoolConfig(
     config.ssl = ssl;
   }
   return config;
+}
+
+/**
+ * Run `SET TIME ZONE` once per new connection, and hold later queries until it
+ * finishes. Overlapping `client.query()` calls desync the protocol; node-pg
+ * then fails every later query on that client.
+ */
+export function armUtcSessionTimezone(pool: Pool, sessionTz = 'UTC'): void {
+  const tz = SAFE_TZ_RE.test(sessionTz) ? sessionTz : 'UTC';
+  pool.on('connect', (client) => {
+    const original = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>;
+    // Keep every query on this client behind the previous one. Restoring
+    // client.query as soon as SET finishes lets the next checkout overlap a
+    // query that was already queued.
+    let tail: Promise<unknown> = original(`SET TIME ZONE '${tz}'`).then(
+      () => undefined,
+      () => undefined,
+    );
+    client.query = ((...args: unknown[]) => {
+      const run = tail.then(() => original(...args));
+      tail = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
+    }) as typeof client.query;
+  });
 }
 
 /** Append sslmode/sslrootcert query params for Prisma CLI and libpq connection strings. */
