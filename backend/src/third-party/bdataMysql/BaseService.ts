@@ -2,6 +2,13 @@ import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { paginate, PaginationParams } from './pagination';
 import { logger } from '@/logging/logger';
 
+function isMissingLookupValue(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'string' && value.trim() === '') return true;
+  if (typeof value === 'number' && !Number.isFinite(value)) return true;
+  return false;
+}
+
 export class BaseService<T, WhereInput = any> {
   public model: any;
   private prismaClient: PrismaClient;
@@ -63,19 +70,30 @@ export class BaseService<T, WhereInput = any> {
     return this.findAll(paginationParams, searchFields, includeRelations);
   }
 
-  // Fetch data based on custom column
+  // Fetch data based on custom column.
+  // A missing key must not become `{ not: null }`: that is invalid on required
+  // columns (Prisma 500) and, on nullable columns, a full-table findMany.
   async findWithCustomKey(column: string, columnValue?: any, includeRelations: any = {}, array = false) {
+    if (isMissingLookupValue(columnValue)) {
+      return array ? [] : null;
+    }
+
     const whereCondition: any = {
-      [column]: columnValue ? columnValue : { not: null },
+      [column]: columnValue,
       deletedAt: null,
     };
 
-    const records = await this.model.findMany({
+    if (!array) {
+      return this.model.findFirst({
+        where: whereCondition,
+        include: includeRelations,
+      });
+    }
+
+    return this.model.findMany({
       where: whereCondition,
       include: includeRelations,
     });
-
-    return array ? records : records[0] || null;
   }
 
   async findWithCustomKeys(columnKeys: Record<string, any>, paginationParams?: PaginationParams, includeRelations: any = {}) {

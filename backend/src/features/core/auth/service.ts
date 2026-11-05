@@ -15,6 +15,9 @@ export class AuthService {
   private jwtService = Container.get(JwtService);
 
   public validateToken = async (token: string) => {
+    if (typeof token !== 'string' || token.trim() === '') {
+      throw new CustomException(401, 'INVALID_TOKEN', 'Invalid Token');
+    }
 
     const record = await this.adminTokenService.findWithCustomKey("token", token);
 

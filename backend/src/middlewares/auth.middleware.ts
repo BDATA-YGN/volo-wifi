@@ -108,6 +108,11 @@ export const AuthMiddleware = async (req: AuthenticatedRequest, res: Response, n
     const refreshToken = req.cookies[names.refresh] as string | undefined;
 
     if (!refreshToken) throw new CustomException(401, 'INVALID_TOKEN', 'Please login first');
+    // Refresh can still be present after the access cookie expires or is dropped.
+    // Do not look the token up — a missing value used to build `token: { not: null }`.
+    if (typeof accessToken !== 'string' || accessToken.trim() === '') {
+      throw new CustomException(401, 'INVALID_TOKEN', 'Please login first');
+    }
 
     // Resolve AuthService from the Container
     const authService = Container.get(AuthService);
