@@ -29,6 +29,7 @@ export function formatInsufficientVoucherInventoryMessage(
 }
 
 type InventoryClient = Pick<Prisma.TransactionClient, 'voucherBatch'>;
+type InventoryLockClient = InventoryClient & Pick<Prisma.TransactionClient, '$queryRaw'>;
 
 /** Batches that can supply vouchers for a partner sale (HQ runs only). */
 export function voucherBatchAvailabilityWhere(
@@ -89,20 +90,67 @@ export async function reserveVoucherBatchSlot(
 }
 
 export async function reserveVoucherBatchSlots(
-  tx: InventoryClient,
+  tx: InventoryLockClient,
   orgId: string,
   planId: string,
   stationId: string,
   quantity: number
 ): Promise<string[]> {
-  const available = await countAvailableVoucherSlots(tx, orgId, planId, stationId);
-  if (available < quantity) {
+  if (quantity <= 0) return [];
+
+  // Lock the open runs in FIFO order so two sales cannot read the same
+  // remaining quantity and both succeed. Ids are text, not uuid.
+  const locked = await tx.$queryRaw<Array<{ id: string; remainingQuantity: number }>>`
+    SELECT id, remaining_quantity AS "remainingQuantity"
+    FROM wf_voucher_batch
+    WHERE org_id = ${orgId}
+      AND plan_id = ${planId}
+      AND deleted_at IS NULL
+      AND reseller_id IS NULL
+      AND remaining_quantity > 0
+      AND (station_id IS NULL OR station_id = ${stationId})
+    ORDER BY created_at ASC
+    FOR UPDATE
+  `;
+  const batches = locked.map((row) => ({
+    id: row.id,
+    remainingQuantity: Number(row.remainingQuantity),
+  }));
+
+  const plan: { id: string; take: number }[] = [];
+  let need = quantity;
+  let available = 0;
+  for (const batch of batches) {
+    available += batch.remainingQuantity;
+    if (need <= 0) continue;
+    const take = Math.min(batch.remainingQuantity, need);
+    if (take > 0) {
+      plan.push({ id: batch.id, take });
+      need -= take;
+    }
+  }
+  if (need > 0) {
     throw new InsufficientVoucherInventoryError(available, quantity);
   }
 
   const batchIds: string[] = [];
-  for (let i = 0; i < quantity; i += 1) {
-    batchIds.push(await reserveVoucherBatchSlot(tx, orgId, planId, stationId));
+  for (const slot of plan) {
+    const updated = await tx.voucherBatch.updateMany({
+      where: { id: slot.id, remainingQuantity: { gte: slot.take } },
+      data: { remainingQuantity: { decrement: slot.take } },
+    });
+    if (updated.count !== 1) {
+      // Another sale took this batch between the read and the decrement.
+      // Keep slots already reserved and fill the rest one by one, still FIFO.
+      const rest = quantity - batchIds.length;
+      for (let i = 0; i < rest; i += 1) {
+        batchIds.push(await reserveVoucherBatchSlot(tx, orgId, planId, stationId));
+      }
+      return batchIds;
+    }
+    for (let i = 0; i < slot.take; i += 1) {
+      batchIds.push(slot.id);
+    }
   }
   return batchIds;
 }

@@ -45,7 +45,7 @@ import {
 } from './credential-lifecycle';
 import { CommerceAccessTokensActionSchema, CommerceAccessTokensIssueSchema, CommerceAccessTokensDeleteSessionQuerySchema } from './schema';
 import { revokeAccessToken } from './revoke-access-token';
-import { generateUniqueAlphanumericToken } from '@/features/shared/credentials/voucher-token';
+import { generateUniqueAlphanumericTokens } from '@/features/shared/credentials/voucher-token';
 import {
   countAvailableVoucherSlots,
   formatInsufficientVoucherInventoryMessage,
@@ -520,6 +520,36 @@ function generateOrderNo(): string {
   return `SO-${date}-${rand}`;
 }
 
+function isRetryableSaleConflict(err: unknown): boolean {
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? String((err as { code?: unknown }).code ?? '')
+      : '';
+  // Deadlock or write conflict: Postgres already rolled the transaction back.
+  if (code === 'P2034' || code === '40P01' || code === '40001') return true;
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== 'P2002') {
+    return false;
+  }
+  const target = err.meta?.target ?? err.meta?.constraint;
+  const text = `${Array.isArray(target) ? target.join(',') : String(target ?? '')} ${err.message}`;
+  // A collided receipt number or voucher code is safe to retry in a new transaction.
+  return /order_no|orderNo|\btoken\b/.test(text);
+}
+
+/** Domain errors we threw ourselves. Database errors must not be copied to the client. */
+function readAppError(err: unknown): { status: number; code: string; message: string } | null {
+  if (!(err instanceof Error) || !err || typeof err !== 'object') return null;
+  const status = (err as { status?: unknown }).status;
+  const code = (err as { code?: unknown }).code;
+  if (typeof status !== 'number' || !Number.isInteger(status) || status < 400 || status > 599) {
+    return null;
+  }
+  if (typeof code !== 'string' || !/^[A-Z][A-Z0-9_]{2,64}$/.test(code) || /^P\d{4}$/.test(code)) {
+    return null;
+  }
+  return { status, code, message: err.message };
+}
+
 function queryResellerParams(query: AuthenticatedRequest['query']) {
   return {
     orgId: typeof query.orgId === 'string' ? query.orgId : undefined,
@@ -861,16 +891,14 @@ export class CommerceAccessTokensController {
             },
           });
         } catch (err: unknown) {
-          const status =
-            err && typeof err === 'object' && 'status' in err
-              ? Number((err as { status: number }).status)
-              : 400;
-          const code =
-            err && typeof err === 'object' && 'code' in err
-              ? String((err as { code: string }).code)
-              : 'ACCESS_TOKENS_ERROR';
-          const message = err instanceof Error ? err.message : 'Failed to load form options.';
-          return responseError(res, status, { code, message });
+          const appError = readAppError(err);
+          if (appError) {
+            return responseError(res, appError.status, {
+              code: appError.code,
+              message: appError.message,
+            });
+          }
+          throw err;
         }
       }
 
@@ -890,19 +918,16 @@ export class CommerceAccessTokensController {
         }
 
         const { orgId, resellerId, mode, partnerLocked } = scope;
-        const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
-          adminId,
-          orgId,
-          user: req.user!,
-          mode,
-        });
-        const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
-        const allowedStationIds = await resolveAllowedStationIds(
-          this.prisma,
-          adminId,
-          orgId,
-          req.user!
-        );
+        const [permissionCtx, revokeWindowMinutes, allowedStationIds] = await Promise.all([
+          resolveCredentialPermissionContext(this.prisma, {
+            adminId,
+            orgId,
+            user: req.user!,
+            mode,
+          }),
+          loadAccessTokenRevokeWindowMinutes(this.prisma),
+          resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!),
+        ]);
 
         if (!isUndefinedOrUndefinedString(req.params?.id)) {
           const idParam = req.params.id as string | string[];
@@ -1046,16 +1071,14 @@ export class CommerceAccessTokensController {
           },
         });
       } catch (err: unknown) {
-        const status =
-          err && typeof err === 'object' && 'status' in err
-            ? Number((err as { status: number }).status)
-            : 400;
-        const code =
-          err && typeof err === 'object' && 'code' in err
-            ? String((err as { code: string }).code)
-            : 'ACCESS_TOKENS_ERROR';
-        const message = err instanceof Error ? err.message : 'Failed to load access tokens.';
-        return responseError(res, status, { code, message });
+        const appError = readAppError(err);
+        if (appError) {
+          return responseError(res, appError.status, {
+            code: appError.code,
+            message: appError.message,
+          });
+        }
+        throw err;
       }
     }),
   ];
@@ -1080,13 +1103,15 @@ export class CommerceAccessTokensController {
 
         const { orgId, resellerId, mode } = context;
         const isDeveloper = isDeveloperAdmin(req.user!);
-        const permissionCtx = await resolveCredentialPermissionContext(this.prisma, {
-          adminId,
-          orgId,
-          user: req.user!,
-          mode,
-        });
-        const revokeWindowMinutes = await loadAccessTokenRevokeWindowMinutes(this.prisma);
+        const [permissionCtx, revokeWindowMinutes] = await Promise.all([
+          resolveCredentialPermissionContext(this.prisma, {
+            adminId,
+            orgId,
+            user: req.user!,
+            mode,
+          }),
+          loadAccessTokenRevokeWindowMinutes(this.prisma),
+        ]);
         const elevated = isDeveloper || mode === 'preview';
 
         if (isRevoke) {
@@ -1134,10 +1159,53 @@ export class CommerceAccessTokensController {
           });
         }
 
-        const reseller = await this.prisma.reseller.findFirst({
-          where: { id: resellerId, orgId, deletedAt: null, status: 'ACTIVE' },
-          select: { id: true, code: true },
-        });
+        const quantity = value.quantity as number;
+        const [
+          reseller,
+          stationMapped,
+          allowedStationIds,
+          entitled,
+          priceResult,
+          org,
+          availableSlots,
+        ] = await Promise.all([
+          this.prisma.reseller.findFirst({
+            where: { id: resellerId, orgId, deletedAt: null, status: 'ACTIVE' },
+            select: { id: true, code: true, name: true, status: true },
+          }),
+          this.prisma.resellerStation.findFirst({
+            where: {
+              orgId,
+              resellerId,
+              stationId: value.stationId,
+              deletedAt: null,
+              station: { deletedAt: null, status: { not: 'DISABLED' } },
+            },
+            select: {
+              id: true,
+              station: { select: { id: true, code: true, name: true, status: true } },
+            },
+          }),
+          resolveAllowedStationIds(this.prisma, adminId, orgId, req.user!),
+          this.prisma.resellerPlanEntitlement.findFirst({
+            where: {
+              resellerId,
+              planId: value.planId,
+              isEnabled: true,
+              plan: { orgId, deletedAt: null, isActive: true },
+            },
+            select: {
+              id: true,
+              plan: { select: { id: true, code: true, name: true, quotaType: true, isActive: true } },
+            },
+          }),
+          resolveRetailPrice(this.prisma, orgId, resellerId, value.stationId, value.planId),
+          this.prisma.org.findUnique({
+            where: { id: orgId },
+            select: { currency: true },
+          }),
+          countAvailableVoucherSlots(this.prisma, orgId, value.planId, value.stationId),
+        ]);
 
         if (!reseller) {
           return responseError(res, 403, {
@@ -1146,23 +1214,6 @@ export class CommerceAccessTokensController {
           });
         }
 
-        const stationMapped = await this.prisma.resellerStation.findFirst({
-          where: {
-            orgId,
-            resellerId,
-            stationId: value.stationId,
-            deletedAt: null,
-            station: { deletedAt: null, status: { not: 'DISABLED' } },
-          },
-          select: { id: true },
-        });
-
-        const allowedStationIds = await resolveAllowedStationIds(
-          this.prisma,
-          adminId,
-          orgId,
-          req.user!
-        );
         if (allowedStationIds && !allowedStationIds.includes(value.stationId)) {
           return responseError(res, 403, {
             code: 'SITE_NOT_ALLOWED',
@@ -1170,37 +1221,19 @@ export class CommerceAccessTokensController {
           });
         }
 
-        if (!stationMapped) {
+        if (!stationMapped?.station) {
           return responseError(res, 400, {
             code: 'STATION_NOT_MAPPED',
             message: 'Selected site is not mapped to this partner.',
           });
         }
 
-        const entitled = await this.prisma.resellerPlanEntitlement.findFirst({
-          where: {
-            resellerId,
-            planId: value.planId,
-            isEnabled: true,
-            plan: { orgId, deletedAt: null, isActive: true },
-          },
-          select: { id: true },
-        });
-
-        if (!entitled) {
+        if (!entitled?.plan) {
           return responseError(res, 400, {
             code: 'PLAN_NOT_ENTITLED',
             message: 'This plan is not enabled for this partner.',
           });
         }
-
-        const priceResult = await resolveRetailPrice(
-          this.prisma,
-          orgId,
-          resellerId,
-          value.stationId,
-          value.planId
-        );
 
         if (!priceResult) {
           return responseError(res, 400, {
@@ -1210,25 +1243,11 @@ export class CommerceAccessTokensController {
         }
 
         const unitPrice = priceResult.price;
-        const quantity = value.quantity as number;
         const lineSubtotal = unitPrice.mul(quantity);
-        const discount = new Prisma.Decimal(value.discount ?? 0);
+        const requestedDiscount = new Prisma.Decimal(value.discount ?? 0);
+        const discount = Prisma.Decimal.min(requestedDiscount, lineSubtotal);
         const total = Prisma.Decimal.max(new Prisma.Decimal(0), lineSubtotal.sub(discount));
 
-        const org = await this.prisma.org.findUnique({
-          where: { id: orgId },
-          select: { currency: true },
-        });
-
-        const orderNo = generateOrderNo();
-        const soldAt = new Date();
-
-        const availableSlots = await countAvailableVoucherSlots(
-          this.prisma,
-          orgId,
-          value.planId,
-          value.stationId
-        );
         if (availableSlots < quantity) {
           return responseError(res, 409, {
             code: 'INSUFFICIENT_VOUCHER_INVENTORY',
@@ -1236,85 +1255,134 @@ export class CommerceAccessTokensController {
           });
         }
 
-        const result = await this.prisma.$transaction(
-          async (tx) => {
-          const batchIds = await reserveVoucherBatchSlots(
-            tx,
-            orgId,
-            value.planId,
-            value.stationId,
-            quantity
+        const soldAt = new Date();
+        const issuedPlan = entitled.plan;
+        const issuedStation = stationMapped.station;
+        const issuedReseller = reseller;
+
+        const issueOnce = (orderNo: string) =>
+          this.prisma.$transaction(
+            async (tx) => {
+              const tokens = await generateUniqueAlphanumericTokens(tx, quantity);
+              const batchIds = await reserveVoucherBatchSlots(
+                tx,
+                orgId,
+                value.planId,
+                value.stationId,
+                quantity
+              );
+
+              const order = await tx.saleOrder.create({
+                data: {
+                  orgId,
+                  orderNo,
+                  status: 'PAID',
+                  resellerId,
+                  stationId: value.stationId,
+                  subtotal: lineSubtotal,
+                  discount,
+                  total,
+                  currency: org?.currency ?? 'MMK',
+                  note: value.note || null,
+                  soldAt,
+                },
+                select: { id: true, orderNo: true, total: true, currency: true },
+              });
+
+              await tx.payment.create({
+                data: {
+                  orgId,
+                  orderId: order.id,
+                  method: value.paymentMethod,
+                  amount: total,
+                  paidAt: soldAt,
+                  note: value.note || null,
+                },
+              });
+
+              const created = await tx.credential.createManyAndReturn({
+                data: tokens.map((token, index) => ({
+                  orgId,
+                  type: 'VOUCHER_TOKEN' as const,
+                  status: 'SOLD' as const,
+                  planId: value.planId,
+                  token,
+                  stationId: value.stationId,
+                  resellerId,
+                  voucherBatchId: batchIds[index]!,
+                  soldAt,
+                })),
+                select: {
+                  id: true,
+                  orgId: true,
+                  type: true,
+                  status: true,
+                  token: true,
+                  username: true,
+                  planId: true,
+                  stationId: true,
+                  resellerId: true,
+                  soldAt: true,
+                  activatedAt: true,
+                  expiresAt: true,
+                  revokedAt: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
+              });
+              const byToken = new Map(created.map((row) => [row.token, row]));
+              const credentials: CredentialRow[] = tokens.map((token) => {
+                const row = byToken.get(token);
+                if (!row) {
+                  throw Object.assign(new Error('Failed to issue access token.'), {
+                    status: 500,
+                    code: 'ISSUE_FAILED',
+                  });
+                }
+                return {
+                  ...row,
+                  plan: issuedPlan,
+                  station: issuedStation,
+                  reseller: issuedReseller,
+                  salesItems: [] as CredentialRow['salesItems'],
+                  _count: { captivePortalSessions: 0 },
+                };
+              });
+
+              await tx.saleItem.createMany({
+                data: credentials.map((credential) => ({
+                  orgId,
+                  orderId: order.id,
+                  planId: value.planId,
+                  credentialId: credential.id,
+                  qty: 1,
+                  unitPrice,
+                  lineTotal: unitPrice,
+                })),
+              });
+
+              return { order, credentials };
+            },
+            // Remote DO PG: uniqueness checks + creates; default 5s is too tight.
+            { maxWait: 15_000, timeout: 60_000 },
           );
 
-          const order = await tx.saleOrder.create({
-            data: {
-              orgId,
-              orderNo,
-              status: 'PAID',
-              resellerId,
-              stationId: value.stationId,
-              subtotal: lineSubtotal,
-              discount,
-              total,
-              currency: org?.currency ?? 'MMK',
-              note: value.note || null,
-              soldAt,
-            },
-            select: { id: true, orderNo: true, total: true, currency: true },
-          });
-
-          await tx.payment.create({
-            data: {
-              orgId,
-              orderId: order.id,
-              method: value.paymentMethod,
-              amount: total,
-              paidAt: soldAt,
-              note: value.note || null,
-            },
-          });
-
-          const credentials: CredentialRow[] = [];
-
-          for (let i = 0; i < quantity; i += 1) {
-            const token = await generateUniqueAlphanumericToken(tx);
-            const voucherBatchId = batchIds[i]!;
-
-            const credential = await tx.credential.create({
-              data: {
-                orgId,
-                type: 'VOUCHER_TOKEN',
-                status: 'SOLD',
-                planId: value.planId,
-                token,
-                stationId: value.stationId,
-                resellerId,
-                voucherBatchId,
-                soldAt,
-              },
-              select: credentialSelect,
-            });
-
-            await tx.saleItem.create({
-              data: {
-                orgId,
-                orderId: order.id,
-                planId: value.planId,
-                credentialId: credential.id,
-                qty: 1,
-                unitPrice,
-                lineTotal: unitPrice,
-              },
-            });
-
-            credentials.push(credential);
+        let result: Awaited<ReturnType<typeof issueOnce>> | undefined;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            result = await issueOnce(generateOrderNo());
+            break;
+          } catch (err) {
+            if (attempt < 2 && isRetryableSaleConflict(err)) continue;
+            throw err;
           }
-
-          return { order, credentials };
-          },
-          // Remote DO PG: each token does uniqueness check + creates; default 5s is too tight.
-          { maxWait: 15_000, timeout: 60_000 },
-        );
+        }
+        if (!result) {
+          return responseError(res, 503, {
+            code: 'ISSUE_FAILED',
+            message: 'Failed to issue access token.',
+          });
+        }
 
         return responseSuccess(res, {
           status: 201,
@@ -1337,9 +1405,6 @@ export class CommerceAccessTokensController {
           },
         });
       } catch (err: unknown) {
-        if (err instanceof InsufficientVoucherInventoryError) {
-          return responseError(res, err.status, { code: err.code, message: err.message });
-        }
         const rawMessage = err instanceof Error ? err.message : '';
         if (/expired transaction|transaction.*timeout|interactive transaction/i.test(rawMessage)) {
           return responseError(res, 503, {
@@ -1348,16 +1413,14 @@ export class CommerceAccessTokensController {
               'Issuing tokens took too long (slow database). Please try again with a smaller quantity.',
           });
         }
-        const status =
-          err && typeof err === 'object' && 'status' in err
-            ? Number((err as { status: number }).status)
-            : 400;
-        const code =
-          err && typeof err === 'object' && 'code' in err
-            ? String((err as { code: string }).code)
-            : 'ISSUE_FAILED';
-        const message = err instanceof Error ? err.message : 'Failed to issue access token.';
-        return responseError(res, status, { code, message });
+        const appError = readAppError(err);
+        if (appError) {
+          return responseError(res, appError.status, {
+            code: appError.code,
+            message: appError.message,
+          });
+        }
+        throw err;
       }
     }),
   ];
@@ -1421,16 +1484,14 @@ export class CommerceAccessTokensController {
           data: result,
         });
       } catch (err: unknown) {
-        const status =
-          err && typeof err === 'object' && 'status' in err
-            ? Number((err as { status: number }).status)
-            : 400;
-        const code =
-          err && typeof err === 'object' && 'code' in err
-            ? String((err as { code: string }).code)
-            : 'REVOKE_FAILED';
-        const message = err instanceof Error ? err.message : 'Failed to revoke access token.';
-        return responseError(res, status, { code, message });
+        const appError = readAppError(err);
+        if (appError) {
+          return responseError(res, appError.status, {
+            code: appError.code,
+            message: appError.message,
+          });
+        }
+        throw err;
       }
     }),
   ];
@@ -1561,24 +1622,14 @@ export class CommerceAccessTokensController {
             : null,
         });
       } catch (err: unknown) {
-        const assignedStatus =
-          err && typeof err === 'object' && 'status' in err
-            ? Number((err as { status: unknown }).status)
-            : NaN;
-        const status =
-          Number.isInteger(assignedStatus) && assignedStatus >= 400 && assignedStatus < 600
-            ? assignedStatus
-            : 500;
-        const prismaCode =
-          err && typeof err === 'object' && 'code' in err
-            ? String((err as { code: unknown }).code)
-            : '';
-        const code =
-          prismaCode.startsWith('P')
-            ? 'ACTION_FAILED'
-            : prismaCode || 'ACTION_FAILED';
-        const message = err instanceof Error ? err.message : 'Failed to update access token.';
-        return responseError(res, status, { code, message });
+        const appError = readAppError(err);
+        if (appError) {
+          return responseError(res, appError.status, {
+            code: appError.code,
+            message: appError.message,
+          });
+        }
+        throw err;
       }
     }),
   ];
@@ -1660,16 +1711,14 @@ export class CommerceAccessTokensController {
 
         return responseSuccess(res, { message: 'Session row deleted.' });
       } catch (err: unknown) {
-        const status =
-          err && typeof err === 'object' && 'status' in err
-            ? Number((err as { status: number }).status)
-            : 400;
-        const code =
-          err && typeof err === 'object' && 'code' in err
-            ? String((err as { code: string }).code)
-            : 'DELETE_FAILED';
-        const message = err instanceof Error ? err.message : 'Failed to delete session.';
-        return responseError(res, status, { code, message });
+        const appError = readAppError(err);
+        if (appError) {
+          return responseError(res, appError.status, {
+            code: appError.code,
+            message: appError.message,
+          });
+        }
+        throw err;
       }
     }),
   ];
